@@ -20,7 +20,7 @@
 
 <Table TItem="Node" DataSource="_nodes" Responsive Loading="Loading">
     <ChildContent>
-        <PropertyColumn Property="c => c.NodeIdString" Title="ID" Sortable Filterable>
+        <PropertyColumn Property="c => c.NodeIdString" Title="ID" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
             <a href="/node/@context.Id" target="_blank">@context.NodeIdString</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.ShortName" Title="Nom court" Sortable Filterable>
@@ -98,9 +98,7 @@
         Context = await ContextFactory.CreateDbContextAsync();
 
         _nodes = Context.Nodes
-            .Where(a => a.LastSeen.HasValue && a.NodeId != Services.MqttService.NodeBroadcast)
-            .AsEnumerable()
-            .OrderByDescending(n => n.NodeIdAsString())
+            .Where(a => a.LastSeen.HasValue && a.NodeId != MqttService.NodeBroadcast)
             .ToList();
 
         Subtitle = $"{_nodes.Count} noeuds";

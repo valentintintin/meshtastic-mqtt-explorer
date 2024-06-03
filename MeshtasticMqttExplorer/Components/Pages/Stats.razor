@@ -18,7 +18,14 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Type de paquet">
                 <ChildContent>
-                    <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configPacketType"/>
+                    @if (Loading)
+                    {
+                        <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configPacketType"/>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>
@@ -26,7 +33,14 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Profil de modulation">
                 <ChildContent>
-                    <AntDesign.Charts.Column Data="DataProfileTypes" Config="_configPacketType"/>
+                    @if (Loading)
+                    {
+                    <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Column Data="DataProfileTypes" Config="_configPacketType"/>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>
@@ -34,7 +48,14 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Type de carte">
                 <ChildContent>
-                    <AntDesign.Charts.Pie Data="DataHardwareTypes" Config="_configNodeType"/>
+                    @if (Loading)
+                    {
+                    <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Pie Data="DataHardwareTypes" Config="_configNodeType"/>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>
@@ -42,7 +63,14 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Type de noeud">
                 <ChildContent>
-                    <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configNodeType"/>
+                    @if (Loading)
+                    {
+                    <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configNodeType"/>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>

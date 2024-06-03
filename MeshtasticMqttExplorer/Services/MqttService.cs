@@ -447,8 +447,9 @@ public class MqttService : AService, IAsyncDisposable
         {
             Logger.LogWarning("Disconnect from MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
             await mqttClientAndConfiguration.Client.DisconnectAsync();
+            await mqttClientAndConfiguration.Context.DisposeAsync();
         }
-
+        
         await base.DisposeAsync();
     }
     
