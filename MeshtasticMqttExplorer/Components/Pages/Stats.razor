@@ -54,12 +54,12 @@
                     }
                     else
                     {
-                        <AntDesign.Charts.Pie Data="DataHardwareTypes" Config="_configNodeType"/>
+                        <AntDesign.Charts.Column Data="DataHardwareTypes" Config="_configPacketType"/>
                     }
                 </ChildContent>
             </Card>
         </GridCol>
-        
+
         <GridCol Xs="24" Md="12">
             <Card Title="Type de noeud">
                 <ChildContent>
@@ -69,7 +69,22 @@
                     }
                     else
                     {
-                        <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configNodeType"/>
+                    <AntDesign.Charts.Column Data="DataNodeTypes" Config="_configPacketType"/>
+                    }
+                </ChildContent>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Md="12">
+            <Card Title="Versions de firmware installées">
+                <ChildContent>
+                    @if (Loading)
+                    {
+                    <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                    <AntDesign.Charts.Column Data="DataFirmwareVersions" Config="_configPacketType"/>
                     }
                 </ChildContent>
             </Card>
@@ -85,6 +100,7 @@
     private List<ChartData<int>> DataProfileTypes { get; set; } = [];
     private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
+    private List<ChartData<int>> DataFirmwareVersions { get; set; } = [];
 
     private readonly PieConfig _configNodeType = new()
     {
@@ -100,7 +116,7 @@
         {
             Type = new
             {
-                Alias = "Type de paquets",
+                Alias = "Donnée",
             },
             Value = new
             {
@@ -152,6 +168,16 @@
             }, (profile, nodes) => new ChartData<int>
             {
                 type = $"{profile.RegionCode} {profile.ModemPreset}",
+                value = nodes.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .ToListAsync();
+        
+        DataFirmwareVersions = await Context.Nodes
+            .Where(a => !string.IsNullOrWhiteSpace(a.FirmwareVersion))
+            .GroupBy(a => a.FirmwareVersion, (version, nodes) => new ChartData<int>
+            {
+                type = version ?? "",
                 value = nodes.Count()
             })
             .OrderByDescending(v => v.value)
