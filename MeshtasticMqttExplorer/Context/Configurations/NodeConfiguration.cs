@@ -36,6 +36,9 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         builder.Property(a => a.ModemPreset).EnumToStringNotRequired(64);
         builder.HasIndex(a => a.ModemPreset);
         
+        builder.Property(a => a.Role).EnumToStringNotRequired(32);
+        builder.HasIndex(a => a.Role);
+        
         builder.HasIndex(a => a.LastSeen).IsDescending();
     }
 }
