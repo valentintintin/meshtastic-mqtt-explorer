@@ -1,0 +1,20 @@
+@using System.Globalization
+@using MeshtasticMqttExplorer.Extensions
+
+@if (Value.HasValue)
+{
+    @Value.Value.ToFrench().ToString(CultureInfo.CurrentCulture)
+}
+else
+{
+    @Fallback
+}
+
+@code
+{
+    [Parameter]
+    public DateTime? Value { get; set; }
+
+    [Parameter]
+    public string Fallback { get; set; } = "";
+}

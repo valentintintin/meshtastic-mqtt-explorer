@@ -1,0 +1,141 @@
+@page "/stats"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Context
+@using MeshtasticMqttExplorer.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Statistiques</PageTitle>
+
+<PageHeader Title="Statistiques" />
+
+<Spin Spinning="Loading">
+    <GridRow Gutter="(16, 16)" Justify="center">
+        <GridCol Xs="24" Md="12">
+            <Card Title="Type de paquet">
+                <ChildContent>
+                    <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configPacketType"/>
+                </ChildContent>
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Card Title="Profil de modulation">
+                <ChildContent>
+                    <AntDesign.Charts.Column Data="DataProfileTypes" Config="_configPacketType"/>
+                </ChildContent>
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Card Title="Type de carte">
+                <ChildContent>
+                    <AntDesign.Charts.Pie Data="DataHardwareTypes" Config="_configNodeType"/>
+                </ChildContent>
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Card Title="Type de noeud">
+                <ChildContent>
+                    <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configNodeType"/>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    </GridRow>
+</Spin>
+
+@code
+{
+    private bool Loading { get; set; } = true;
+    private DataContext Context { get; set; } = null!;
+    private List<ChartData<int>> DataPacketTypes { get; set; } = [];
+    private List<ChartData<int>> DataProfileTypes { get; set; } = [];
+    private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
+    private List<ChartData<int>> DataNodeTypes { get; set; } = [];
+
+    private readonly PieConfig _configNodeType = new()
+    {
+        AngleField = "value",
+        ColorField = "type"
+    };
+    
+    private readonly ColumnConfig _configPacketType = new()
+    {
+        XField = "type",
+        YField = "value",
+        Meta = new
+        {
+            Type = new
+            {
+                Alias = "Type de paquets",
+            },
+            Value = new
+            {
+                Alias = "Nombre",
+            },
+        },
+    };
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        DataPacketTypes = await Context.Packets
+            .Where(a => a.PortNum != PortNum.MapReportApp)
+            .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
+            {
+                type = (portNum.HasValue ? portNum.ToString() : "Chiffrés")!,
+                value = packets.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .ToListAsync();
+        
+        DataNodeTypes = await Context.Nodes
+            .Where(a => a.Role.HasValue)
+            .GroupBy(a => a.Role, (role, nodes) => new ChartData<int>
+            {
+                type = role.ToString()!,
+                value = nodes.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .ToListAsync();
+        
+        DataHardwareTypes = await Context.Nodes
+            .Where(a => a.HardwareModel.HasValue)
+            .GroupBy(a => a.HardwareModel, (hardwareModel, nodes) => new ChartData<int>
+            {
+                type = hardwareModel.ToString()!,
+                value = nodes.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .ToListAsync();
+        
+        DataProfileTypes = await Context.Nodes
+            .Where(a => a.RegionCode.HasValue && a.ModemPreset.HasValue)
+            .GroupBy(a => new
+            {
+                a.RegionCode,
+                a.ModemPreset
+            }, (profile, nodes) => new ChartData<int>
+            {
+                type = $"{profile.RegionCode} {profile.ModemPreset}",
+                value = nodes.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .ToListAsync();
+        
+        Loading = false;
+        
+        await base.OnInitializedAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

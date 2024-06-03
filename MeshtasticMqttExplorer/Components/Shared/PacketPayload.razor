@@ -1,0 +1,257 @@
+@using System.Text
+@using System.Text.Json
+@using Google.Protobuf
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Context.Entities
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+@using NeighborInfo = Meshtastic.Protobufs.NeighborInfo
+@using Position = Meshtastic.Protobufs.Position
+@using Telemetry = Meshtastic.Protobufs.Telemetry
+
+@if (Packet.PortNum != null)
+{
+    @switch (Packet.PortNum)
+    {
+        case PortNum.MapReportApp:
+            <Descriptions Column="1">
+                <DescriptionsItem Title="Nom court">
+                    @MapReport?.ShortName
+                </DescriptionsItem>
+                <DescriptionsItem Title="Nom long">
+                    @MapReport?.LongName
+                </DescriptionsItem>
+                <DescriptionsItem Title="Carte">
+                    @MapReport?.HwModel
+                </DescriptionsItem>
+                <DescriptionsItem Title="Rôle">
+                    @MapReport?.Role
+                </DescriptionsItem>
+                <DescriptionsItem Title="Bande">
+                    @MapReport?.Region
+                </DescriptionsItem>
+                <DescriptionsItem Title="Profil de modulation">
+                    @MapReport?.ModemPreset
+                </DescriptionsItem>
+                <DescriptionsItem Title="Version du firmware">
+                    @MapReport?.FirmwareVersion
+                </DescriptionsItem>
+                <DescriptionsItem Title="Nombre de noeuds locaux">
+                    @MapReport?.NumOnlineLocalNodes
+                </DescriptionsItem>
+                <DescriptionsItem Title="Canal par défaut">
+                    @(MapReport?.HasDefaultChannel == true ? "Oui" : "Non")
+                </DescriptionsItem>
+                <DescriptionsItem Title="Latitude">
+                    @(Position?.LatitudeI * 0.0000001)
+                </DescriptionsItem>
+                <DescriptionsItem Title="Longitude">
+                    @(Position?.LongitudeI * 0.0000001)
+                </DescriptionsItem>
+                <DescriptionsItem Title="Altitude">
+                    @(Position?.Altitude)m
+                </DescriptionsItem>
+            </Descriptions>
+            break;
+        case PortNum.NodeinfoApp:
+            <Descriptions Column="1">
+                <DescriptionsItem Title="Nom court">
+                    @User?.ShortName
+                </DescriptionsItem>
+                <DescriptionsItem Title="Nom long">
+                    @User?.LongName
+                </DescriptionsItem>
+                <DescriptionsItem Title="Carte">
+                    @User?.HwModel
+                </DescriptionsItem>
+                <DescriptionsItem Title="Rôle">
+                    @User?.Role
+                </DescriptionsItem>
+                <DescriptionsItem Title="Licencié">
+                    @(User?.IsLicensed == true ? "Oui" : "Non")
+                </DescriptionsItem>
+            </Descriptions>
+            break;
+        case PortNum.PositionApp:
+            <Descriptions Column="1">
+                <DescriptionsItem Title="Latitude">
+                    @(Position?.LatitudeI * 0.0000001)
+                </DescriptionsItem>
+                <DescriptionsItem Title="Longitude">
+                    @(Position?.LongitudeI * 0.0000001)
+                </DescriptionsItem>
+                <DescriptionsItem Title="Altitude">
+                    @(Position?.Altitude)m
+                </DescriptionsItem>
+            </Descriptions>
+            break;
+        case PortNum.TelemetryApp:
+            <Descriptions Column="1">
+                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
+                {
+                    <DescriptionsItem Title="Niveau de batterie">
+                        @(Telemetry?.DeviceMetrics?.BatteryLevel)%
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Tension batterie">
+                        @(Telemetry?.DeviceMetrics?.Voltage)V
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Utilisation du canal">
+                        @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Utilisation TX">
+                        @(Telemetry?.DeviceMetrics?.AirUtilTx)%
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Durée de fonctionnement">
+                        <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
+                    </DescriptionsItem>
+                }
+                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
+                {
+                    <DescriptionsItem Title="Température">
+                        @(Telemetry?.EnvironmentMetrics?.Temperature)°C
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Humidité">
+                        @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
+                    </DescriptionsItem>
+                    <DescriptionsItem Title="Pression atmosphérique">
+                        @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
+                    </DescriptionsItem>
+                }
+            </Descriptions>
+            break;
+        case PortNum.SerialApp:
+        case PortNum.TextMessageApp:
+            <p>@TextMessage</p>
+            break;
+        case PortNum.NeighborinfoApp:
+            <Descriptions Column="1">
+                <DescriptionsItem Title="Dernier envoi par">
+                    !@NeighborInfo?.LastSentById.ToString("X").ToLower()
+                </DescriptionsItem>
+                <DescriptionsItem Title="Interval">
+                    <TimeElapsed Value="@(TimeSpan.FromSeconds(NeighborInfo?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
+                </DescriptionsItem>
+                <DescriptionsItem Title="Voisins">
+                    @if (NeighborInfo?.Neighbors?.Any() == true)
+                    {
+                        @foreach (var neighbor in NeighborInfo?.Neighbors ?? [])
+                        {
+                            <Tag>
+                                !@neighbor.NodeId.ToString("X").ToLower()
+                                (SNR : @neighbor.Snr)
+                            </Tag>
+                        }
+                    }
+                    else
+                    {
+                        <text>Aucun</text>
+                    }
+                </DescriptionsItem>
+            </Descriptions>
+            break;
+    }
+
+    <Popover ContentTemplate="@ContentRaw" Title="Données brutes">
+        <Button>Voir les données brutes</Button>
+    </Popover>
+}
+
+@code
+{
+    [Parameter]
+    public required Packet Packet { get; set; }
+
+    private RenderFragment ContentRaw => @<div>@Packet.PayloadJson</div>;
+    
+    private Telemetry? Telemetry { get; set; }
+    private User? User { get; set; }
+    private Position? Position { get; set; }
+    private NeighborInfo? NeighborInfo { get; set; }
+    private MapReport? MapReport { get; set; }
+    private string? TextMessage { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Packet.PortNum == null)
+        {
+        //     try
+        //     {
+        //         Packet.Payload = EncryptionHelper.DecryptPacket(Packet.Payload, "AQ==", (ulong) Packet.PacketId, (int) Packet.From.NodeId);
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Console.WriteLine("Error: " + ex.Message);
+        //     }
+            return;
+        }
+
+        try
+        {
+            var rootPacket = new ServiceEnvelope();
+            rootPacket.MergeFrom(Packet.Payload);
+            
+            switch (Packet.PortNum)
+            {
+                case PortNum.TextMessageApp:
+                case PortNum.SerialApp:
+                    TextMessage = rootPacket.Packet.GetPayload<string>();
+                    break;
+                case PortNum.TelemetryApp:
+                    Telemetry = rootPacket.Packet.GetPayload<Telemetry>();
+                    break;
+                case PortNum.NodeinfoApp:
+                    User = rootPacket.Packet.GetPayload<User>();
+                    break;
+                case PortNum.PositionApp:
+                    Position = rootPacket.Packet.GetPayload<Position>();
+                    break;
+                case PortNum.NeighborinfoApp:
+                    NeighborInfo = rootPacket.Packet.GetPayload<NeighborInfo>();
+                    break;
+                case PortNum.MapReportApp:
+                    MapReport = rootPacket.Packet.GetPayload<MapReport>();
+                    break;
+            }
+        }
+        catch (Exception)
+        {
+            try
+            {
+                switch (Packet.PortNum)
+                {
+                    case PortNum.TextMessageApp:
+                    case PortNum.SerialApp:
+                        TextMessage = Packet.ByteString?.ToStringUtf8();
+                        break;
+                    case PortNum.TelemetryApp:
+                        Telemetry = new Telemetry();
+                        Telemetry.MergeFrom(Packet.Payload);
+                        break;
+                    case PortNum.NodeinfoApp:
+                        User = new User();
+                        User.MergeFrom(Packet.Payload);
+                        break;
+                    case PortNum.PositionApp:
+                        Position = new Position();
+                        Position.MergeFrom(Packet.Payload);
+                        break;
+                    case PortNum.NeighborinfoApp:
+                        NeighborInfo = new NeighborInfo();
+                        NeighborInfo.MergeFrom(Packet.Payload);
+                        break;
+                    case PortNum.MapReportApp:
+                        MapReport = new MapReport();
+                        MapReport.MergeFrom(Packet.Payload);
+                        break;
+                }
+            }
+            catch (Exception)
+            {
+                // Ignored
+            }
+            // Ignored
+        }
+
+        base.OnParametersSet();
+    }
+}

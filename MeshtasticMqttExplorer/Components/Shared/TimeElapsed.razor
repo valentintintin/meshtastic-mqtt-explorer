@@ -1,0 +1,43 @@
+@if (Value.HasValue)
+{
+    @if (Value.Value.Days > 0)
+    {
+        @Value.Value.Days
+        <text> jours&nbsp;</text>
+    }
+    
+    if (Value.Value.Hours > 0)
+    {
+        @Value.Value.Hours
+        <text> heures&nbsp;</text>
+    }
+    
+    if (Value.Value.Minutes > 0)
+    {
+        @Value.Value.Minutes
+        <text> minutes&nbsp;</text>
+    }
+    
+    if (Value.Value.TotalSeconds > 0)
+    {
+        @Value.Value.Seconds
+        <text> secondes</text>
+    }
+    else
+    {
+        <text>0</text>
+    }
+}
+else
+{
+    @Fallback
+}
+
+@code
+{
+    [Parameter]
+    public TimeSpan? Value { get; set; } 
+
+    [Parameter]
+    public string Fallback { get; set; } = "";
+}

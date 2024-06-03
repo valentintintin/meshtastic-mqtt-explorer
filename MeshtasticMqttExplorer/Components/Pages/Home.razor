@@ -1,0 +1,51 @@
+﻿@page "/"
+@using MeshtasticMqttExplorer.Models
+@using MQTTnet
+@rendermode InteractiveServer
+
+@inject IConfiguration Configuration
+
+<PageTitle>Meshtastic Mqtt Explorer</PageTitle>
+
+<h1>Meshtastic Mqtt Explorer</h1>
+
+<p>
+        Ce site permet d'explorer les <a href="/packets">trames transmises</a> sur le réseau Meshtastic <b>Français</b>. Il permet également de voir <a href="/map">les noeuds connectés</a> au réseau.
+</p>
+
+<h2>Serveurs MQTT utilisés</h2>
+@foreach (var mqtt in MqttConfigurations)
+{
+        <Descriptions Bordered Column="1">
+                <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Name</DescriptionsItem>
+                <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Host</DescriptionsItem>
+                <DescriptionsItem Title="Topics">
+                        @foreach (var topic in mqtt.Topics)
+                        {
+                                <Tag>@topic</Tag>
+                        }
+                </DescriptionsItem>
+        </Descriptions>
+        <Divider></Divider>
+}
+
+<h2>Inspirations</h2>
+
+<ul>
+        <li><a href="https://meshmap.net/" target="_blank">MeshMap</a></li>
+        <li><a href="https://meshtastic.liamcottle.net/" target="_blank">Liam Cottle</a></li>
+</ul>
+
+@code
+{
+        private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
+        
+        protected override void OnInitialized()
+        {
+                MqttConfigurations = (Configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
+                        .Where(c => c.Enabled)
+                        .ToList();
+                
+                base.OnInitialized();
+        }
+}

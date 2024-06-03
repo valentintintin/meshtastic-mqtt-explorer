@@ -1,0 +1,196 @@
+@page "/map"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Globalization
+@using System.Reactive.Linq
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+
+@inject MqttService MqttService
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Carte des noeuds</PageTitle>
+
+<PageHeader Title="Cartes des noeuds" Subtitle="@Subtitle" />
+
+<Spin Spinning="Loading">
+    <Osm Height="calc(100vh - 270px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+
+    <Card Title="Légende" Size="small" Bordered="true">
+        <ChildContent>
+            <GridRow Gutter="(16, 16)" Justify="center">
+                <GridCol Xs="24" Md="8">
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Red))</i>
+                        433Mhz | Hors ligne depuis plus de 3h
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Green))</i>
+                        433Mhz | En ligne - Passerelle MQTT
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Blue))</i>
+                        433Mhz | En ligne - Pas de MQTT
+                    </div>
+                </GridCol>
+
+                <GridCol Xs="24" Md="8">
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Red))</i>
+                        868Mhz | Hors ligne depuis plus de 3h
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Green))</i>
+                        868Mhz | En ligne - Passerelle MQTT
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Blue))</i>
+                        868Mhz | En ligne - Pas de MQTT
+                    </div>
+                </GridCol>
+
+                <GridCol Xs="24" Md="8">
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Triangle, SvgColor.Gray))</i>
+                        Pas de bande définie | Manque de données
+                    </div>
+                </GridCol>
+            </GridRow>
+        </ChildContent>
+    </Card>
+</Spin>
+
+@code
+{
+    private bool Loading { get; set; } = true;
+    private string Subtitle { get; set; } = "Chargement en cours";
+    private List<Node> Nodes { get; set; } = [];
+    private List<long> NodesGateway { get; set; } = [];
+    private DataContext Context { get; set; } = null!;
+    private Osm? Map { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Map != null)
+        {
+            await Map.AddMarkers(Nodes.Select(GetMarker).ToList());
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        Nodes = await Context.Nodes
+            .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
+            .Where(n => n.LastSeen.HasValue)
+            .ToListAsync();
+
+        NodesGateway = Context.Packets
+            .GroupBy(a => a.GatewayId, (id, _) => id)
+            .ToList();
+        
+        Subtitle = $"{Nodes.Count} noeuds avec position";
+
+        MqttService.NewNode
+            .Where(n => n is { Latitude: not null, Longitude: not null })
+            .Delay(TimeSpan.FromSeconds(1))
+            .SubscribeAsync(async node =>
+        {
+            if (Nodes.All(n => n.Id != node.Id))
+            {
+                Nodes.Add(node);
+
+                Subtitle = $"{Nodes.Count} noeuds avec position";
+            }
+
+            if (Map != null)
+            {
+                await Map.AddMarker(GetMarker(node));
+            }
+
+            await InvokeAsync(StateHasChanged); 
+        });
+        
+        Loading = false;
+
+        await base.OnInitializedAsync();
+    }
+
+    private Osm.Marker GetMarker(Node node)
+    {
+        var mqtt = NodesGateway.Any(n => n == node.Id);
+        var offline = (DateTime.UtcNow - node.LastSeen!).Value.TotalHours > 3;
+        var shape = node.RegionCode switch
+        {
+            Config.Types.LoRaConfig.Types.RegionCode.Eu433 => SvgShape.Square,
+            Config.Types.LoRaConfig.Types.RegionCode.Eu868 => SvgShape.Circle,
+            _ => SvgShape.Triangle
+        };
+        var color = node.RegionCode is Config.Types.LoRaConfig.Types.RegionCode.Unset or null ? SvgColor.Gray : 
+            offline ? SvgColor.Red : 
+            mqtt ? SvgColor.Green : SvgColor.Blue;
+
+        return new Osm.Marker
+        {
+            Id = node.Id,
+            Latitude = node.Latitude!.Value,
+            Longitude = node.Longitude!.Value,
+            Label = node.FullName(),
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.FullName()}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(mqtt ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Svg = GetSvg(shape, color)
+        };
+    }
+
+    private string GetSvg(SvgShape shape, SvgColor color)
+    {
+        var colorRgb = color switch
+        {
+            SvgColor.Red => "#f44336",
+            SvgColor.Green => "#4caf50",
+            SvgColor.Blue => "#1890ff",
+            SvgColor.Gray => "gray",
+            _ => throw new ArgumentOutOfRangeException(nameof(color), color, null)
+        };
+        
+        var svg = """<svg width="40" height="40" viewBox="0 0 100 100" version="1.1" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">""";
+
+        svg += shape switch
+        {
+            SvgShape.Square => """<rect x="0" y="0" width="40" height="40" stroke="black" stroke-width="1" fill=""" + colorRgb + " />",
+            SvgShape.Circle => """<circle cx="20" cy="20" r="20" stroke="black" stroke-width="1" fill=""" + colorRgb + " />",
+            SvgShape.Triangle => """<polygon points="0,0 20,40 40,0" stroke="black" stroke-width="1" fill=""" + colorRgb + " />",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape), shape, null)
+        };
+
+        return svg + "</svg>";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+    
+    private enum SvgShape
+    {
+        Circle,
+        Square,
+        Triangle
+    }
+    
+    private enum SvgColor
+    {
+        Red,
+        Green,
+        Blue,
+        Gray
+    }
+}

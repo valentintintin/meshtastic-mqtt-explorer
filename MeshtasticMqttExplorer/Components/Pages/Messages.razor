@@ -1,0 +1,101 @@
+@page "/messages"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Globalization
+@using System.Reactive.Linq
+@using System.Text.RegularExpressions
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+@using Channel = MeshtasticMqttExplorer.Context.Entities.Channel
+
+@inject MqttService MqttService
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Messages</PageTitle>
+
+<PageHeader Title="Messages" Subtitle="@Subtitle" />
+
+<Spin Spinning="Loading">
+    <Tabs Size="TabSize.Default">
+        @foreach (var channel in _channels)
+        {
+            <TabPane Tab="@channel.Name" Key="@channel.Id.ToString()">
+                <p>
+                    @channel.TextMessages.Count messages
+                </p>
+                
+                @foreach (var message in channel.TextMessages.OrderByDescending(a => a.CreatedAt))
+                {
+                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName())"
+                             Avatar="@message.From.HardwareModel?.GetImageUrl()"
+                             Content="@message.Message"
+                             Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)">
+                    </Comment>
+                }
+            </TabPane>
+        }
+    </Tabs>
+</Spin>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private bool Loading { get; set; } = true;
+    private string Subtitle { get; set; } = "Chargement en cours";
+    private List<Channel> _channels = [];
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        _channels = Context.Channels
+            .Include(c => c.TextMessages)
+            .ThenInclude(c => c.From)
+            .Include(c => c.TextMessages)
+            .ThenInclude(c => c.To)
+            .Where(a => a.TextMessages.Count > 0)
+            .ToList();
+
+        Subtitle = $"{_channels.Sum(a => a.TextMessages.Count)} messages";
+
+        MqttService.NewTextMessage.SubscribeAsync(async message =>
+        {
+            var channel = _channels.Find(c => c.Id == message.ChannelId);
+
+            if (channel == null)
+            {
+                _channels.Add(message.Channel);
+            }
+            else
+            {
+                channel.TextMessages.Add(message);
+            }
+
+            Subtitle = $"{_channels.Sum(a => a.TextMessages.Count)} messages";
+
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        MqttService.NewChannel.Where(c => _channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
+        {
+            _channels.Add(channel);
+            
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        Loading = false;
+        
+        await base.OnInitializedAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

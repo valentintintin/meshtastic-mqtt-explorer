@@ -1,0 +1,94 @@
+@page "/node/{id:long}"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Reactive.Linq
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+
+@inject MqttService MqttService
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<PageTitle>Détails du noeud @Node?.FullName()</PageTitle>
+
+<Spin Spinning="Loading">
+    @if (Node != null)
+    {
+        <PageHeader Title="@Node?.Name()" Subtitle="@Node?.NodeIdAsString()" />
+
+        <Node NodeInfo="Node" NbPackets="NbPackets"></Node>
+    }
+    else if (Loading)
+    {
+        <Skeleton></Skeleton>
+    }
+    else
+    {
+        <Result Title="Noeud introuvable" Status="404"></Result>
+    }
+</Spin>
+
+@code
+{
+    [Parameter]
+    public long Id { get; set; }
+
+    private bool Loading { get; set; } = true;
+    private Context.Entities.Node? Node { get; set; }
+    private int NbPackets { get; set; }
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await FetchData();
+
+        MqttService.NewNode.Where(n => Node != null && n.Id == Node.Id).SubscribeAsync(async _ =>
+        {
+            await FetchData();
+            
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        MqttService.NewTelemetry.Where(n => Node != null && n.NodeId == Node.Id).SubscribeAsync(async telemetry =>
+        {
+            Node!.Telemetries.Add(telemetry);
+            
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        MqttService.NewPacket.Where(n => Node != null && n.FromId == Node.Id && n.PortNum != PortNum.MapReportApp).SubscribeAsync(async _ =>
+        {
+            NbPackets++;
+            
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        Loading = false;
+        
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        var threeDays = DateTime.Today.AddDays(-3).ToUniversalTime();
+        
+        Node = await Context.Nodes
+            .Include(n => n.MyNeighbors).ThenInclude(n => n.Neighbor)
+            .Include(n => n.Positions.Where(a => a.CreatedAt >= threeDays))
+            .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
+            .FirstOrDefaultAsync(a => a.Id == Id);
+        
+        NbPackets = await Context.Packets.CountAsync(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

@@ -1,0 +1,91 @@
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<div style="position: relative">
+    <div id="map" style="@("height: " + Height)"></div>
+</div>
+
+@code
+{
+    [Parameter] 
+    public string Height { get; set; } = "500px";
+    
+    [Parameter]
+    public double Latitude { get; set; }
+    
+    [Parameter]
+    public double Longitude { get; set; }
+
+    [Parameter]
+    public int Zoom { get; set; } = 13;
+
+    [Parameter]
+    public Marker? OneMarker { get; set; }
+    
+    private TaskCompletionSource<bool> _mapInitialized = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initializeLeafletMap", new[] { Latitude, Longitude }, Zoom);
+            _mapInitialized.SetResult(true);
+
+            if (OneMarker != null)
+            {
+                await AddMarker(OneMarker);
+            }
+        }
+    }
+    
+    public async Task AddMarker(Marker marker)
+    {
+        await _mapInitialized.Task;
+        
+        await JSRuntime.InvokeVoidAsync("addMarkerToMap", marker);
+    }
+    
+    public async Task AddMarkers(List<Marker> markers)
+    {
+        if (!markers.Any())
+        {
+            return;
+        }
+        
+        await _mapInitialized.Task;
+
+        await JSRuntime.InvokeVoidAsync("addMarkersToMap", markers);
+    }
+
+    public async Task AddPolyline(List<double[]> points, string color)
+    {
+        await _mapInitialized.Task;
+
+        await JSRuntime.InvokeVoidAsync("addPolylineToMap", points, color);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("disposeLeafletMap");
+        }
+        catch (Exception)
+        {
+            // Ignore
+        }
+    }
+
+    public class Marker
+    {
+        public required long Id { get; set; }
+        public required double Latitude { get; set; }
+        public required double Longitude { get; set; }
+        public string? Label { get; set; }
+        public string? Popup { get; set; }
+        public string? Svg { get; set; }
+        public string? Color { get; set; }
+    }
+}

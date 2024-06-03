@@ -1,0 +1,172 @@
+﻿@page "/packets"
+@page "/node/{id:long}/packets"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Reactive.Linq
+@using AntDesign.TableModels
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Context
+@using MeshtasticMqttExplorer.Context.Entities
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+
+@inject IDbContextFactory<DataContext> ContextFactory;
+@inject MqttService MqttService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Trames</PageTitle>
+
+@if (Id.HasValue)
+{
+    <PageHeader Title="Trames" Subtitle="@Subtitle" OnBack="OnBack"/>   
+}
+else
+{
+    <PageHeader Title="Trames" Subtitle="@Subtitle"/>
+}
+
+<Table TItem="Packet" DataSource="_packets" Responsive
+       Total="Total"
+       RowClassName="@(x => x.Data.PortNum == null ? "red" : "" )"
+       OnChange="OnTableChange">
+    <ChildContent>
+        <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Sortable Filterable>
+            <div style="width: 150px">
+                <a href="/node/@context.FromId" target="_blank">@context.From.AllNames</a>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Sortable Filterable>
+            <div style="width: 150px">
+                <a href="/node/@context.ToId" target="_blank">@context.To.AllNames</a>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Sortable Filterable>
+            <div style="width: 150px">
+                <a href="/node/@context.GatewayId" target="_blank">@context.Gateway.AllNames</a>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
+            <div style="width: 150px">
+                <Date Value="context.CreatedAt"></Date>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="_mqttServerFilters">
+            @context.MqttServer
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Sortable Filters="_channelFilters">
+            @context.Channel.Name
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.PortNum" Title="Type" Sortable Filters="_portNumFilters">
+            @(context.PortNum?.ToString() ?? "Chiffrée")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.PayloadJson" Title="Contenu" Filterable>
+            <PacketPayload Packet="context"></PacketPayload>
+        </PropertyColumn>
+    </ChildContent>
+</Table>
+
+<style>
+    .red {
+        background-color: #ffccc7 !important;
+    }
+</style>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private string Subtitle { get; set; } = "Chargement en cours";
+    private List<Packet> _packets = [];
+    private int Total { get; set; }
+    private DataContext? Context { get; set; }
+
+    private TableFilter<long>[] _channelFilters = [];
+    private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
+        .Select(p => new TableFilter<PortNum?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
+        .OrderBy(p => p.Text)
+        .ToArray();
+    private readonly TableFilter<string?>[] _mqttServerFilters =
+    [
+        new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
+        new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Node? node = null;
+        var context = await ContextFactory.CreateDbContextAsync();
+
+        _channelFilters = await context.Channels
+            .OrderBy(c => c.Name)
+            .Select(c => new TableFilter<long>()
+            {
+                Text = c.Name,
+                Value = c.Id
+            }).ToArrayAsync();
+        
+        if (Id.HasValue)
+        {
+            node = await context.Nodes.FindAsync(Id);
+        }
+
+        Total = await context.Packets.CountAsync(a => !Id.HasValue || a.FromId == Id);
+
+        Subtitle = $"{Total} trames {(node != null ? $" pour {node.AllNames}" : "")}";
+        
+        MqttService.NewPacket
+            .Where(p => !Id.HasValue || p.FromId == Id)
+            .Where(p => p.PortNum != PortNum.MapReportApp)
+            .Delay(TimeSpan.FromSeconds(1))
+            .SubscribeAsync(async packet =>
+            {
+                Total++;
+                
+                _packets.Insert(0, packet);
+
+                Subtitle = $"{Total} trames {(node != null ? $" pour {node.AllNames}" : "")}";
+
+                await InvokeAsync(StateHasChanged); 
+            });
+
+        await context.DisposeAsync();
+        
+        await base.OnInitializedAsync();
+    }
+
+    private void OnTableChange(QueryModel<Packet> queryModel)
+    {
+        Context ??= ContextFactory.CreateDbContext();
+
+        _packets = queryModel.CurrentPagedRecords(
+                queryModel.ExecuteQuery(Context.Packets
+                    .Include(a => a.Channel)
+                    .Include(a => a.Gateway)
+                    .Include(a => a.From)
+                    .Include(a => a.To)
+                    .Where(a => !Id.HasValue || a.From.Id == Id))
+            ).ToList();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Context != null)
+        {
+            await Context.DisposeAsync();
+        }
+    }
+
+    private void OnBack()
+    {
+        NavigationManager.NavigateTo($"/node/{Id}");
+    }
+}

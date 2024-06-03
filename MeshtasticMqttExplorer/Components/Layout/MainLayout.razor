@@ -1,0 +1,33 @@
+﻿@inherits LayoutComponentBase
+
+<Layout Class="layout">
+    <Header Style="height: auto; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; color: white;">
+        <a href="/" style="color: unset; margin-right: 60px">Meshtastic MQTT Explorer</a>
+        <Menu Theme="MenuTheme.Dark" Mode="MenuMode.Horizontal">
+            <MenuItem RouterLink="/map" RouterMatch="NavLinkMatch.All">Carte</MenuItem>
+            <MenuItem RouterLink="/nodes" RouterMatch="NavLinkMatch.All">Noeuds</MenuItem>
+            <MenuItem RouterLink="/messages" RouterMatch="NavLinkMatch.All">Messages</MenuItem>
+            <MenuItem RouterLink="/packets" RouterMatch="NavLinkMatch.All">Trames</MenuItem>
+            <MenuItem RouterLink="/stats" RouterMatch="NavLinkMatch.All">Statistiques</MenuItem>
+        </Menu>
+    </Header>
+
+    <Content Style="padding: 20px;">
+        @Body
+    </Content>
+
+    <Footer Style="text-align: center; ">
+        <a href="https://f4hvv.valentin-saugnier.fr" target="_blank">Valentin Saugnier - F4HVV</a> - <a href="mailto:valentin.s.10@gmail.com">valentin.s.10@gmail.com</a>
+    </Footer>
+</Layout>
+
+<div id="blazor-error-ui">
+    <environment include="Staging,Production">
+    Une erreur est survenue
+    </environment>
+    <environment include="Development">
+        Une exception a été lancée !
+    </environment>
+    <a href="" class="reload">Recharger</a>
+    <a class="dismiss">🗙</a>
+</div>

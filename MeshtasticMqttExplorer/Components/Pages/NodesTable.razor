@@ -1,0 +1,142 @@
+@page "/nodes"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Reactive.Linq
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
+@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+
+@inject MqttService MqttService
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Noeuds</PageTitle>
+
+<PageHeader Title="Noeuds" Subtitle="@Subtitle" />
+
+<Table TItem="Node" DataSource="_nodes" Responsive Loading="Loading">
+    <ChildContent>
+        <PropertyColumn Property="c => c.NodeIdString" Title="ID" Sortable Filterable>
+            <a href="/node/@context.Id" target="_blank">@context.NodeIdString</a>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.ShortName" Title="Nom court" Sortable Filterable>
+            <a href="/node/@context.Id" target="_blank">@(!string.IsNullOrWhiteSpace(context.ShortName) ? context.ShortName : "-")</a>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.LongName" Title="Nom long" Sortable Filterable>
+            <a href="/node/@context.Id" target="_blank">@(!string.IsNullOrWhiteSpace(context.LongName) ? context.LongName : "-")</a>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable>
+           <Date Value="context.LastSeen" Fallback="-"></Date>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable Filters="_regionCodeFilters">
+            @(context.RegionCode?.ToString() ?? "-")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.ModemPreset" Title="Profile de modulation" Sortable Filters="_modemPresetFilters">
+            @(context.ModemPreset?.ToString() ?? "-")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="_roleFilters">
+            @(context.Role?.ToString() ?? "-")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.HardwareModel" Title="Carte" Sortable Filters="_hardwareModelFilters">
+            @(context.HardwareModel?.ToString() ?? "-")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.FirmwareVersion" Title="Version" Sortable Filterable>
+            @(context.FirmwareVersion ?? "-")
+        </PropertyColumn>
+    </ChildContent>
+</Table>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private bool Loading { get; set; } = true;
+    private string Subtitle { get; set; } = "Chargement en cours";
+    private List<Node> _nodes = [];
+    private DataContext Context { get; set; } = null!;
+    
+    private readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] _regionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
+        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .OrderBy(p => p.Text)
+        .ToArray();
+    private readonly TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>[] _modemPresetFilters = ((Config.Types.LoRaConfig.Types.ModemPreset[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.ModemPreset)))
+        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .OrderBy(p => p.Text)
+        .ToArray();
+    private readonly TableFilter<HardwareModel?>[] _hardwareModelFilters = ((HardwareModel[])Enum.GetValues(typeof(HardwareModel)))
+        .Select(p => new TableFilter<HardwareModel?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .OrderBy(p => p.Text)
+        .ToArray();
+    private readonly TableFilter<Config.Types.DeviceConfig.Types.Role?>[] _roleFilters = ((Config.Types.DeviceConfig.Types.Role[])Enum.GetValues(typeof(Config.Types.DeviceConfig.Types.Role)))
+        .Select(p => new TableFilter<Config.Types.DeviceConfig.Types.Role?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .OrderBy(p => p.Text)
+        .ToArray();
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        _nodes = Context.Nodes
+            .Where(a => a.LastSeen.HasValue && a.NodeId != Services.MqttService.NodeBroadcast)
+            .AsEnumerable()
+            .OrderByDescending(n => n.NodeIdAsString())
+            .ToList();
+
+        Subtitle = $"{_nodes.Count} noeuds";
+
+        MqttService.NewNode
+            .Where(a => a.NodeId != MqttService.NodeBroadcast)
+            .Delay(TimeSpan.FromSeconds(1))
+            .SubscribeAsync(async node =>
+        {
+            var index = _nodes.FindIndex(n => n.Id == node.Id);
+
+            if (index == -1)
+            {
+                _nodes.Add(node);
+
+                _nodes = _nodes
+                    .OrderByDescending(n => n.NodeIdAsString())
+                    .ToList();
+                
+                Subtitle = $"{_nodes.Count} noeuds";
+            }
+            else
+            {
+                _nodes[index] = node;
+            }
+
+            await InvokeAsync(StateHasChanged); 
+        });
+
+        Loading = false;
+        
+        await base.OnInitializedAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

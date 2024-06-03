@@ -1,0 +1,16 @@
+﻿@page "/error"
+@rendermode InteractiveServer
+
+@using System.Diagnostics
+
+<PageTitle>Une erreur est survenue !</PageTitle>
+
+<Result Status="error" Title="Une erreur est survenue" SubTitle="@("Requête : " + RequestId)"></Result>
+
+@code{
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+
+    protected override void OnInitialized() => RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

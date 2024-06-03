@@ -1,0 +1,8 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:String x:Key="/Default/Environment/AssemblyExplorer/XmlDocument/@EntryValue">&lt;AssemblyExplorer&gt;
+  &lt;Assembly Path="/home/valentin/.nuget/packages/meshtastic/1.0.0/lib/net8.0/Meshtastic.dll" /&gt;
+  &lt;Assembly Path="/home/valentin/.nuget/packages/openlayers.blazor/1.5.9/lib/net8.0/OpenLayers.Blazor.dll" /&gt;
+  &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign.charts/0.5.1/lib/net8.0/AntDesign.Charts.dll" /&gt;
+  &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign/0.19.1/lib/net8.0/AntDesign.dll" /&gt;
+&lt;/AssemblyExplorer&gt;</s:String>
+	<s:String x:Key="/Default/Monitoring/StartMode/@EntryValue">OnDebug</s:String></wpf:ResourceDictionary>
