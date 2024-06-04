@@ -16,7 +16,6 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="MQTTnet" Version="4.3.6.1152" />
-      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.11" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
@@ -36,6 +35,9 @@
         <DependentUpon>NodesMap.razor</DependentUpon>
       </Content>
       <None Include="wwwroot\osm.js" />
+      <Content Update="appsettings.Production.json">
+        <DependentUpon>appsettings.json</DependentUpon>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

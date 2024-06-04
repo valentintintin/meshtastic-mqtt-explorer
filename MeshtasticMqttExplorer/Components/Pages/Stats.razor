@@ -31,6 +31,21 @@
         </GridCol>
         
         <GridCol Xs="24" Md="12">
+            <Card Title="Paquets par serveur MQTT, noeud et type hier">
+                <ChildContent>
+                    @if (Loading)
+                    {
+                        <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Column Data="DataYesterdayNodePackets" Config="_configPacketType"/>
+                    }
+                </ChildContent>
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
             <Card Title="Profil de modulation">
                 <ChildContent>
                     @if (Loading)
@@ -101,12 +116,7 @@
     private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
     private List<ChartData<int>> DataFirmwareVersions { get; set; } = [];
-
-    private readonly PieConfig _configNodeType = new()
-    {
-        AngleField = "value",
-        ColorField = "type"
-    };
+    private List<ChartData<int>> DataYesterdayNodePackets { get; set; } = [];
     
     private readonly ColumnConfig _configPacketType = new()
     {
@@ -181,6 +191,26 @@
                 value = nodes.Count()
             })
             .OrderByDescending(v => v.value)
+            .ToListAsync();
+
+        var yesterday = DateTime.Today.AddDays(-1).ToUniversalTime().Date;
+        
+        DataYesterdayNodePackets = await Context.Packets
+            .Include(a => a.From)
+            .Where(a => a.PortNum != PortNum.MapReportApp)
+            .Where(a => a.CreatedAt.Date == yesterday)
+            .GroupBy(a => new
+            {
+                a.MqttServer,
+                a.From.AllNames,
+                a.PortNum
+            }, (grouped, packets) => new ChartData<int>
+            {
+                type = $"[{grouped.MqttServer}] {grouped.AllNames} --> {(grouped.PortNum != null ? grouped.PortNum.ToString() : "Chiffrés")}",
+                value = packets.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .Take(50)
             .ToListAsync();
         
         Loading = false;
