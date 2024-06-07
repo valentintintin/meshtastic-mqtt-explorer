@@ -22,9 +22,13 @@
                         <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
                     </DescriptionsItem>
                     
-                    <DescriptionsItem Title="Nombre de trames" ContentStyle="font-weight: bold">
-                        @(NbPackets ?? 0)
+                    <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                        @(NbPackets?.Today ?? 0)/@(NbPackets?.Yesterday ?? 0)/@(NbPackets?.Total ?? 0)
                         <a href="/node/@NodeInfo.Id/packets">Voir</a>
+                    </DescriptionsItem>
+                    
+                    <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
+                        @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
                     </DescriptionsItem>
                     
                     <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
@@ -45,6 +49,14 @@
                 <Descriptions Bordered="true" Column="1">
                     <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
                         <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
+                    </DescriptionsItem>
+
+                    <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
+                        @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
+                    </DescriptionsItem>
+
+                    <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
+                        @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
                     </DescriptionsItem>
 
                     <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
@@ -213,7 +225,7 @@
     public required Context.Entities.Node? NodeInfo { get; set; }
     
     [Parameter]
-    public int? NbPackets { get; set; }
+    public NbPacketsMetrics? NbPackets { get; set; }
 
     private Telemetry? LastTelemetryDevice { get; set; }
     private Telemetry? LastTelemetryEnvironment { get; set; }
@@ -446,5 +458,12 @@
         }).ToList();
         
         base.OnParametersSet();
+    }
+    
+    public class NbPacketsMetrics
+    {
+        public int Today { get; set; }
+        public int Yesterday { get; set; }
+        public int Total { get; set; }
     }
 }

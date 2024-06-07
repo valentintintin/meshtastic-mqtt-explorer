@@ -71,13 +71,12 @@
     private bool Loading { get; set; } = true;
     private string Subtitle { get; set; } = "Chargement en cours";
     private List<Node> Nodes { get; set; } = [];
-    private List<long> NodesGateway { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && Map != null)
+        if (!firstRender && Map != null)
         {
             await Map.AddMarkers(Nodes.Select(GetMarker).ToList());
         }
@@ -89,16 +88,14 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
+        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
+        
         Nodes = await Context.Nodes
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => n.LastSeen.HasValue)
+            .Where(n => n.LastSeen >= threeDays)
             .ToListAsync();
 
-        NodesGateway = Context.Packets
-            .GroupBy(a => a.GatewayId, (id, _) => id)
-            .ToList();
-        
-        Subtitle = $"{Nodes.Count} noeuds avec position";
+        Subtitle = $"{Nodes.Count} noeuds avec position depuis les 3 derniers jours";
 
         MqttService.NewNode
             .Where(n => n is { Latitude: not null, Longitude: not null })
@@ -109,7 +106,7 @@
             {
                 Nodes.Add(node);
 
-                Subtitle = $"{Nodes.Count} noeuds avec position";
+                Subtitle = $"{Nodes.Count} noeuds avec position depuis les 3 derniers jours";
             }
 
             if (Map != null)
@@ -127,7 +124,6 @@
 
     private Osm.Marker GetMarker(Node node)
     {
-        var mqtt = NodesGateway.Any(n => n == node.Id);
         var offline = (DateTime.UtcNow - node.LastSeen!).Value.TotalHours > 3;
         var shape = node.RegionCode switch
         {
@@ -137,7 +133,7 @@
         };
         var color = node.RegionCode is Config.Types.LoRaConfig.Types.RegionCode.Unset or null ? SvgColor.Gray : 
             offline ? SvgColor.Red : 
-            mqtt ? SvgColor.Green : SvgColor.Blue;
+            node.IsMqttGateway == true ? SvgColor.Green : SvgColor.Blue;
 
         return new Osm.Marker
         {
@@ -145,7 +141,7 @@
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
             Label = node.FullName(),
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.FullName()}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(mqtt ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.FullName()}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             Svg = GetSvg(shape, color)
         };
     }

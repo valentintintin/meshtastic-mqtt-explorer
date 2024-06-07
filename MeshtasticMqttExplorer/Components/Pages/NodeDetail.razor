@@ -39,7 +39,7 @@
 
     private bool Loading { get; set; } = true;
     private Context.Entities.Node? Node { get; set; }
-    private int NbPackets { get; set; }
+    private Node.NbPacketsMetrics NbPackets { get; set; } = new();
     private DataContext Context { get; set; } = null!;
     
     protected override async Task OnInitializedAsync()
@@ -64,7 +64,8 @@
 
         MqttService.NewPacket.Where(n => Node != null && n.FromId == Node.Id && n.PortNum != PortNum.MapReportApp).SubscribeAsync(async _ =>
         {
-            NbPackets++;
+            NbPackets.Today++;
+            NbPackets.Total++;
             
             await InvokeAsync(StateHasChanged); 
         });
@@ -76,15 +77,21 @@
 
     private async Task FetchData()
     {
-        var threeDays = DateTime.Today.AddDays(-3).ToUniversalTime();
+        var today = DateTime.UtcNow.Date;
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
+        var threeHours = DateTime.UtcNow.AddHours(-3);
         
         Node = await Context.Nodes
-            .Include(n => n.MyNeighbors).ThenInclude(n => n.Neighbor)
-            .Include(n => n.Positions.Where(a => a.CreatedAt >= threeDays))
+            .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= threeDays)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.Positions.Where(a => a.CreatedAt >= threeHours))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
             .FirstOrDefaultAsync(a => a.Id == Id);
-        
-        NbPackets = await Context.Packets.CountAsync(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
+
+        var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
+        NbPackets.Total = await countPackets.CountAsync();
+        NbPackets.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
+        NbPackets.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
     }
 
     public async ValueTask DisposeAsync()

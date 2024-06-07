@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reactive.Subjects;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -84,10 +85,17 @@ public class MqttService : AService, IAsyncDisposable
                 
                 var data = e.ApplicationMessage.PayloadSegment.ToArray().ToArray();
 
+                var topicSegments = e.ApplicationMessage.Topic.Split("/");
+                if (topicSegments.Contains("stat"))
+                {
+                    await DoReceiveStatus(topicSegments.Last(), Encoding.Default.GetString(data), mqttClientAndConfiguration);
+                    return;
+                }
+                
                 var rootPacket = new ServiceEnvelope();
                 rootPacket.MergeFrom(data);
 
-                await DoReceive(rootPacket, mqttClientAndConfiguration);
+                await DoReceive(rootPacket, mqttClientAndConfiguration, e.ApplicationMessage.Topic);
             };
 
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
@@ -100,13 +108,39 @@ public class MqttService : AService, IAsyncDisposable
         }
     }
 
-    private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt)
+    private async Task DoReceiveStatus(string nodeIdString, string status, MqttClientAndConfiguration mqtt)
+    {
+        var nodeId = uint.Parse(nodeIdString[1..], NumberStyles.HexNumber);
+        var node = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
+        {
+            NodeId = nodeId,
+            IsMqttGateway = status == "online"
+        };
+        if (node.Id == 0)
+        {
+            if (node.IsMqttGateway == true)
+            {
+                Logger.LogInformation("New node (status) created {node}", node);
+                mqtt.Context.Add(node);
+            }
+        }
+        else if (node.NodeId != NodeBroadcast)
+        {
+            node.IsMqttGateway = status == "online";
+            node.LastSeen = DateTime.UtcNow;
+            mqtt.Context.Update(node);
+        }
+        await mqtt.Context.SaveChangesAsync();
+    }
+
+    private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt, string topic)
     {
         var nodeGatewayId = uint.Parse(rootPacket.GatewayId[1..], NumberStyles.HexNumber);
         var nodeGateway = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeGatewayId) ?? new Node
         {
             NodeId = nodeGatewayId,
-            LastSeen = DateTime.UtcNow
+            LastSeen = DateTime.UtcNow,
+            IsMqttGateway = true
         };
         if (nodeGateway.Id == 0)
         {
@@ -116,6 +150,7 @@ public class MqttService : AService, IAsyncDisposable
         else if (nodeGateway.NodeId != NodeBroadcast)
         {
             nodeGateway.LastSeen = DateTime.UtcNow;
+            nodeGateway.IsMqttGateway = true;
             mqtt.Context.Update(nodeGateway);
         }
         await mqtt.Context.SaveChangesAsync();
@@ -206,7 +241,8 @@ public class MqttService : AService, IAsyncDisposable
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
             To = nodeTo,
-            MqttServer = mqtt.Configuration.Name
+            MqttServer = mqtt.Configuration.Name,
+            MqttTopic = topic
         };
 
         mqtt.Context.Add(packet);
@@ -462,7 +498,7 @@ public class MqttService : AService, IAsyncDisposable
 
     public async Task PurgePackets()
     {
-        var minDate = DateTime.Today.AddDays(-_configuration.GetValue("PurgeDays", 3)).ToUniversalTime();
+        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
         var context = await DbContextFactory.CreateDbContextAsync();
         
         var packets = context.Packets.Where(a => a.CreatedAt < minDate).ToList();
@@ -501,7 +537,7 @@ public class MqttService : AService, IAsyncDisposable
 
     private async Task KeepDatedPacketsTypeForNode(Node node, PortNum portNum, int nbDays)
     {
-        var minDate = DateTime.Today.AddDays(-nbDays).ToUniversalTime();
+        var minDate = DateTime.UtcNow.Date.AddDays(-nbDays);
         var context = await DbContextFactory.CreateDbContextAsync();
         
         var packets = context.Packets

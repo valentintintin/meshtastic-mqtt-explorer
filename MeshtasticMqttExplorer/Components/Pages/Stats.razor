@@ -4,6 +4,7 @@
 
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context
+@using MeshtasticMqttExplorer.Context.Entities
 @using MeshtasticMqttExplorer.Models
 @using Microsoft.EntityFrameworkCore
 
@@ -24,7 +25,7 @@
                     }
                     else
                     {
-                        <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configPacketType"/>
+                        <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configBarType"/>
                     }
                 </ChildContent>
             </Card>
@@ -33,14 +34,23 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Paquets par serveur MQTT, noeud et type hier">
                 <ChildContent>
-                    @if (Loading)
-                    {
-                        <Skeleton></Skeleton>
-                    }
-                    else
-                    {
-                        <AntDesign.Charts.Column Data="DataYesterdayNodePackets" Config="_configPacketType"/>
-                    }
+                    <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
+                        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="_mqttServerFilters">
+                            @context.MqttServer
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="c => c.NodeName" Title="Noeud" Filterable>
+                            <a href="/node/@context.NodeId" target="_blank">@context.NodeName</a>
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="_portNumFilters">
+                            @(context.PortNum?.ToString() ?? "Chiffrées") 
+                        </PropertyColumn>
+                        
+                        <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable DefaultSortOrder="SortDirection.Descending">
+                            <a href="/node/@context.NodeId/packets" target="_blank">@context.Nb</a>
+                        </PropertyColumn>
+                    </Table>
                 </ChildContent>
             </Card>
         </GridCol>
@@ -54,7 +64,7 @@
                     }
                     else
                     {
-                        <AntDesign.Charts.Column Data="DataProfileTypes" Config="_configPacketType"/>
+                        <AntDesign.Charts.Pie Data="DataProfileTypes" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
@@ -69,7 +79,7 @@
                     }
                     else
                     {
-                        <AntDesign.Charts.Column Data="DataHardwareTypes" Config="_configPacketType"/>
+                        <AntDesign.Charts.Pie Data="DataHardwareTypes" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
@@ -84,7 +94,7 @@
                     }
                     else
                     {
-                    <AntDesign.Charts.Column Data="DataNodeTypes" Config="_configPacketType"/>
+                    <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
@@ -99,7 +109,7 @@
                     }
                     else
                     {
-                    <AntDesign.Charts.Column Data="DataFirmwareVersions" Config="_configPacketType"/>
+                    <AntDesign.Charts.Pie Data="DataFirmwareVersions" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
@@ -116,9 +126,40 @@
     private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
     private List<ChartData<int>> DataFirmwareVersions { get; set; } = [];
-    private List<ChartData<int>> DataYesterdayNodePackets { get; set; } = [];
+    private List<PacketNodeType> DataYesterdayNodePackets { get; set; } = [];
     
-    private readonly ColumnConfig _configPacketType = new()
+    private readonly TableFilter<string?>[] _mqttServerFilters =
+    [
+        new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
+        new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
+    ];
+    
+    private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
+        .Select(p => new TableFilter<PortNum?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
+        .OrderBy(p => p.Text)
+        .ToArray();
+    
+    private readonly PieConfig _configPieType = new()
+    {
+        AngleField = "value",
+        ColorField = "type",
+        Label = new PieLabelConfig
+        {
+            Style = new TextStyle
+            {
+                FontSize = 20,
+                Fill = "black",
+                Stroke = "white",
+            }
+        },
+    };
+    
+    private readonly ColumnConfig _configBarType = new()
     {
         XField = "type",
         YField = "value",
@@ -141,9 +182,13 @@
 
         DataPacketTypes = await Context.Packets
             .Where(a => a.PortNum != PortNum.MapReportApp)
-            .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
+            .GroupBy(a => new
             {
-                type = (portNum.HasValue ? portNum.ToString() : "Chiffrés")!,
+                a.MqttServer,
+                a.PortNum
+            }, (grouped, packets) => new ChartData<int>
+            {
+                type = $"[{grouped.MqttServer}] {(grouped.PortNum.HasValue ? grouped.PortNum.ToString() : "Chiffrés")!}",
                 value = packets.Count()
             })
             .OrderByDescending(v => v.value)
@@ -193,7 +238,7 @@
             .OrderByDescending(v => v.value)
             .ToListAsync();
 
-        var yesterday = DateTime.Today.AddDays(-1).ToUniversalTime().Date;
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         
         DataYesterdayNodePackets = await Context.Packets
             .Include(a => a.From)
@@ -202,15 +247,19 @@
             .GroupBy(a => new
             {
                 a.MqttServer,
-                a.From.AllNames,
+                NodeId = a.From.Id,
+                NodeName = a.From.AllNames,
                 a.PortNum
-            }, (grouped, packets) => new ChartData<int>
+            }, (grouped, packets) => new PacketNodeType
             {
-                type = $"[{grouped.MqttServer}] {grouped.AllNames} --> {(grouped.PortNum != null ? grouped.PortNum.ToString() : "Chiffrés")}",
-                value = packets.Count()
+                MqttServer = grouped.MqttServer,
+                NodeId = grouped.NodeId,
+                NodeName = grouped.NodeName!,
+                PortNum = grouped.PortNum,
+                Nb = packets.Count()
             })
-            .OrderByDescending(v => v.value)
-            .Take(50)
+            .OrderByDescending(v => v.Nb)
+            .Take(100)
             .ToListAsync();
         
         Loading = false;
@@ -221,5 +270,14 @@
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync();
+    }
+    
+    public class PacketNodeType
+    {
+        public required string? MqttServer { get; set; }
+        public required long NodeId { get; set; }
+        public required string NodeName { get; set; }
+        public required PortNum? PortNum { get; set; }
+        public required int Nb { get; set; }
     }
 }

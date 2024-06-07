@@ -45,4 +45,5 @@ public class Packet : IEntity
     public long? ReplyId { get; set; }
     
     public string? MqttServer { get; set; }
+    public string? MqttTopic { get; set; }
 }

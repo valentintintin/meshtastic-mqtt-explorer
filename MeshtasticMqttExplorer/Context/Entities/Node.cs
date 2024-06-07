@@ -30,6 +30,8 @@ public class Node : IEntity
     public DateTime? LastSeen { get; set; }
     
     public bool? HasDefaultChannel { get; set; }
+    
+    public bool? IsMqttGateway { get; set; }
 
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];

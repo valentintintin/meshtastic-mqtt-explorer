@@ -29,6 +29,9 @@
         <PropertyColumn Property="c => c.LongName" Title="Nom long" Sortable Filterable>
             <a href="/node/@context.Id" target="_blank">@(!string.IsNullOrWhiteSpace(context.LongName) ? context.LongName : "-")</a>
         </PropertyColumn>
+        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
+           @(context.IsMqttGateway == true ? "Oui" : "Non")
+        </PropertyColumn>
         <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable>
            <Date Value="context.LastSeen" Fallback="-"></Date>
         </PropertyColumn>

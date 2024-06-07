@@ -55,7 +55,7 @@ else
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="_mqttServerFilters">
-            @context.MqttServer
+            @context.MqttServer - @context.MqttTopic
         </PropertyColumn>
         <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Sortable Filters="_channelFilters">
             @context.Channel.Name
@@ -126,7 +126,7 @@ else
         MqttService.NewPacket
             .Where(p => !Id.HasValue || p.FromId == Id)
             .Where(p => p.PortNum != PortNum.MapReportApp)
-            .Delay(TimeSpan.FromSeconds(1))
+            .Delay(TimeSpan.FromSeconds(10))
             .SubscribeAsync(async packet =>
             {
                 Total++;

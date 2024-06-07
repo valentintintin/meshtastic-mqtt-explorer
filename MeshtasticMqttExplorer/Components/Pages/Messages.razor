@@ -54,13 +54,13 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
-        _channels = Context.Channels
+        _channels = await Context.Channels
             .Include(c => c.TextMessages)
             .ThenInclude(c => c.From)
             .Include(c => c.TextMessages)
             .ThenInclude(c => c.To)
             .Where(a => a.TextMessages.Count > 0)
-            .ToList();
+            .ToListAsync();
 
         Subtitle = $"{_channels.Sum(a => a.TextMessages.Count)} messages";
 
