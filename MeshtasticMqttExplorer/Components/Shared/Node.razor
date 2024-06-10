@@ -354,45 +354,51 @@
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (NodeInfo?.Positions.Any() == true && Map != null && !HasRenderMapData && NodeInfo.Latitude != 0 && NodeInfo.Longitude != 0)
+        if (Map != null && !HasRenderMapData && NodeInfo != null)
         {
-            await Map.AddMarker(new Osm.Marker
+            if (NodeInfo.Latitude != 0 && NodeInfo.Longitude != 0)
             {
-                Id = NodeInfo.NodeId,
-                Latitude = NodeInfo.Latitude!.Value,
-                Longitude = NodeInfo.Longitude!.Value,
-                Color = "blue",
-                Label = NodeInfo.FullName()
-            });
-
-            await Map.AddPolyline(NodeInfo.Positions
-                .Select(a => new[] { a.Latitude, a.Longitude })
-                .ToList(), "blue");
-
-            if (NodeInfo?.MyNeighbors.Any() == true)
-            {
-                foreach (var neighbor in NodeInfo.MyNeighbors)
+                await Map.AddMarker(new Osm.Marker
                 {
-                    if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
-                    {
-                        await Map.AddPolyline([
-                            new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
-                            new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
-                        ], "red");
-
-                        await Map.AddMarker(new Osm.Marker
-                        {
-                            Id = neighbor.NeighborId,
-                            Latitude = neighbor.Neighbor.Latitude.Value,
-                            Longitude = neighbor.Neighbor.Longitude.Value,
-                            Color = "red",
-                            Label = $"Voisin : {neighbor.Neighbor.FullName()}"
-                        });
-                    }
-                }
+                    Id = NodeInfo.NodeId,
+                    Latitude = NodeInfo.Latitude!.Value,
+                    Longitude = NodeInfo.Longitude!.Value,
+                    Color = "blue",
+                    Label = NodeInfo.FullName()
+                });
             }
 
-            HasRenderMapData = true;
+            if (NodeInfo.Positions.Any() == true)
+            {
+                await Map.AddPolyline(NodeInfo.Positions
+                    .Select(a => new[] { a.Latitude, a.Longitude })
+                    .ToList(), "blue");
+
+                if (NodeInfo.MyNeighbors.Any() == true)
+                {
+                    foreach (var neighbor in NodeInfo.MyNeighbors)
+                    {
+                        if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
+                        {
+                            await Map.AddPolyline([
+                                new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
+                            ], "red");
+
+                            await Map.AddMarker(new Osm.Marker
+                            {
+                                Id = neighbor.NeighborId,
+                                Latitude = neighbor.Neighbor.Latitude.Value,
+                                Longitude = neighbor.Neighbor.Longitude.Value,
+                                Color = "red",
+                                Label = $"Voisin : {neighbor.Neighbor.FullName()}"
+                            });
+                        }
+                    }
+                }
+
+                HasRenderMapData = true;
+            }
         }
 
         await base.OnAfterRenderAsync(firstRender);

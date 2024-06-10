@@ -3,6 +3,7 @@
 @implements IAsyncDisposable
 
 @using System.Reactive.Linq
+@using AntDesign.TableModels
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
@@ -11,23 +12,23 @@
 @using MeshtasticMqttExplorer.Services
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
-@inject MqttService MqttService
 @inject IDbContextFactory<DataContext> ContextFactory;
 
 <PageTitle>Noeuds</PageTitle>
 
-<PageHeader Title="Noeuds" Subtitle="@Subtitle" />
+<PageHeader Title="Noeuds">
+    <SubtitleTemplate>
+        @Total noeuds
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
 
-<Table TItem="Node" DataSource="_nodes" Responsive Loading="Loading">
+<Table @ref="Table" TItem="Node" DataSource="_nodes" Responsive Total="Total" OnChange="OnTableChange">
     <ChildContent>
-        <PropertyColumn Property="c => c.NodeIdString" Title="ID" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
-            <a href="/node/@context.Id" target="_blank">@context.NodeIdString</a>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.ShortName" Title="Nom court" Sortable Filterable>
-            <a href="/node/@context.Id" target="_blank">@(!string.IsNullOrWhiteSpace(context.ShortName) ? context.ShortName : "-")</a>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.LongName" Title="Nom long" Sortable Filterable>
-            <a href="/node/@context.Id" target="_blank">@(!string.IsNullOrWhiteSpace(context.LongName) ? context.LongName : "-")</a>
+        <PropertyColumn Property="c => c.AllNames" Title="ID - Nom" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
+            <a href="/node/@context.Id" target="_blank">@context.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
            @(context.IsMqttGateway == true ? "Oui" : "Non")
@@ -44,12 +45,6 @@
         <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="_roleFilters">
             @(context.Role?.ToString() ?? "-")
         </PropertyColumn>
-        <PropertyColumn Property="c => c.HardwareModel" Title="Carte" Sortable Filters="_hardwareModelFilters">
-            @(context.HardwareModel?.ToString() ?? "-")
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.FirmwareVersion" Title="Version" Sortable Filterable>
-            @(context.FirmwareVersion ?? "-")
-        </PropertyColumn>
     </ChildContent>
 </Table>
 
@@ -58,11 +53,11 @@
     [Parameter]
     public long? Id { get; set; }
     
-    private bool Loading { get; set; } = true;
-    private string Subtitle { get; set; } = "Chargement en cours";
+    private int Total { get; set; }
     private List<Node> _nodes = [];
     private DataContext Context { get; set; } = null!;
-    
+    private Table<Node>? Table { get; set; }
+
     private readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] _regionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
         .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
         {
@@ -99,41 +94,26 @@
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
-
-        _nodes = Context.Nodes
-            .Where(a => a.LastSeen.HasValue && a.NodeId != MqttService.NodeBroadcast)
-            .ToList();
-
-        Subtitle = $"{_nodes.Count} noeuds";
-
-        MqttService.NewNode
-            .Where(a => a.NodeId != MqttService.NodeBroadcast)
-            .Delay(TimeSpan.FromSeconds(1))
-            .SubscribeAsync(async node =>
-        {
-            var index = _nodes.FindIndex(n => n.Id == node.Id);
-
-            if (index == -1)
-            {
-                _nodes.Add(node);
-
-                _nodes = _nodes
-                    .OrderByDescending(n => n.NodeIdAsString())
-                    .ToList();
-                
-                Subtitle = $"{_nodes.Count} noeuds";
-            }
-            else
-            {
-                _nodes[index] = node;
-            }
-
-            await InvokeAsync(StateHasChanged); 
-        });
-
-        Loading = false;
         
         await base.OnInitializedAsync();
+    }
+
+    private void OnTableChange(QueryModel<Node> queryModel)
+    {
+        _nodes = queryModel.CurrentPagedRecords(
+            queryModel.ExecuteQuery(Context.Nodes
+                .Where(a => a.LastSeen.HasValue && a.NodeId != MqttService.NodeBroadcast))
+        ).ToList();
+        
+        Total = Context.Nodes.Count(a => a.Id != MqttService.NodeBroadcast);
+    }
+
+    private void FetchData()
+    {
+        if (Table != null)
+        {
+            OnTableChange((QueryModel<Node>) Table.GetQueryModel());
+        }
     }
 
     public async ValueTask DisposeAsync()

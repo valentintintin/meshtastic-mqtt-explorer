@@ -22,17 +22,29 @@
 
 @if (Id.HasValue)
 {
-    <PageHeader Title="Trames" Subtitle="@Subtitle" OnBack="OnBack"/>   
+    <PageHeader Title="Trames" OnBack="OnBack">
+        <SubtitleTemplate>
+            @Total trames @(_node?.AllNames)
+        </SubtitleTemplate>
+        <PageHeaderExtra>
+            <Button OnClick="FetchData">Actualiser</Button>
+        </PageHeaderExtra>
+    </PageHeader>
 }
 else
 {
-    <PageHeader Title="Trames" Subtitle="@Subtitle"/>
+    <PageHeader Title="Trames" OnBack="OnBack">
+        <SubtitleTemplate>
+            @Total trames
+        </SubtitleTemplate>
+        <PageHeaderExtra>
+            <Button OnClick="FetchData">Actualiser</Button>
+        </PageHeaderExtra>
+    </PageHeader>
 }
 
-<Table TItem="Packet" DataSource="_packets" Responsive
-       Total="Total"
-       RowClassName="@(x => x.Data.PortNum == null ? "red" : "" )"
-       OnChange="OnTableChange">
+<Table @ref="Table" TItem="Packet" DataSource="_packets" Responsive Total="Total" OnChange="OnTableChange"
+       RowClassName="@(x => x.Data.PortNum == null ? "red" : "" )">
     <ChildContent>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Sortable Filterable>
             <div style="width: 150px">
@@ -79,11 +91,13 @@ else
 {
     [Parameter]
     public long? Id { get; set; }
-    
-    private string Subtitle { get; set; } = "Chargement en cours";
+
+    private Node? _node { get; set; }
     private List<Packet> _packets = [];
     private int Total { get; set; }
     private DataContext? Context { get; set; }
+
+    private Table<Packet>? Table { get; set; }
 
     private TableFilter<long>[] _channelFilters = [];
     private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
@@ -103,7 +117,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        Node? node = null;
         var context = await ContextFactory.CreateDbContextAsync();
 
         _channelFilters = await context.Channels
@@ -116,27 +129,10 @@ else
         
         if (Id.HasValue)
         {
-            node = await context.Nodes.FindAsync(Id);
+            _node = await context.Nodes.FindAsync(Id);
         }
 
         Total = await context.Packets.CountAsync(a => !Id.HasValue || a.FromId == Id);
-
-        Subtitle = $"{Total} trames {(node != null ? $" pour {node.AllNames}" : "")}";
-        
-        MqttService.NewPacket
-            .Where(p => !Id.HasValue || p.FromId == Id)
-            .Where(p => p.PortNum != PortNum.MapReportApp)
-            .Delay(TimeSpan.FromSeconds(10))
-            .SubscribeAsync(async packet =>
-            {
-                Total++;
-                
-                _packets.Insert(0, packet);
-
-                Subtitle = $"{Total} trames {(node != null ? $" pour {node.AllNames}" : "")}";
-
-                await InvokeAsync(StateHasChanged); 
-            });
 
         await context.DisposeAsync();
         
@@ -155,6 +151,14 @@ else
                     .Include(a => a.To)
                     .Where(a => !Id.HasValue || a.From.Id == Id))
             ).ToList();
+    }
+
+    private void FetchData()
+    {
+        if (Table != null)
+        {
+            OnTableChange((QueryModel<Packet>) Table.GetQueryModel());
+        }
     }
 
     public async ValueTask DisposeAsync()

@@ -1,10 +1,14 @@
 window.initializeLeafletMap = (center, zoom) => {
-    window.leafletMap = L.map('map').setView(center, zoom);
+    window.leafletMap = L.map('map', {
+        preferCanvas: true
+    }).setView(center, zoom);
     window.leafletMarkers = [];
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(window.leafletMap);
+    
+    console.debug('Map created');
 };
 
 window.addMarkersToMap = (markers) => {
@@ -73,10 +77,22 @@ window.addPolylineToMap = (points, color) => {
         .addTo(window.leafletMap);
 };
 
+window.clearMarkersMap = () => {
+    for (let m of window.leafletMarkers) {
+        if (m) {
+            m.remove();
+        }
+    }
+    
+    window.leafletMarkers.length = 0;
+};
+
 window.disposeLeafletMap = () => {
     if (window.leafletMap && window.leafletMap.remove) {
         window.leafletMap.off();
         window.leafletMap.remove();
         window.leafletMarkers.length = 0;
+
+        console.debug('Map destroyed');
     }
 }

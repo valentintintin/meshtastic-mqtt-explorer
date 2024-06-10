@@ -16,7 +16,14 @@
 
 <PageTitle>Messages</PageTitle>
 
-<PageHeader Title="Messages" Subtitle="@Subtitle" />
+<PageHeader Title="Messages">
+    <SubtitleTemplate>
+        @Total messages
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
 
 <Spin Spinning="Loading">
     <Tabs Size="TabSize.Default">
@@ -46,25 +53,19 @@
     public long? Id { get; set; }
     
     private bool Loading { get; set; } = true;
-    private string Subtitle { get; set; } = "Chargement en cours";
+    private int Total { get; set; }
     private List<Channel> _channels = [];
     private DataContext Context { get; set; } = null!;
+
+    private List<IDisposable> Disposables { get; } = [];
     
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
-        _channels = await Context.Channels
-            .Include(c => c.TextMessages)
-            .ThenInclude(c => c.From)
-            .Include(c => c.TextMessages)
-            .ThenInclude(c => c.To)
-            .Where(a => a.TextMessages.Count > 0)
-            .ToListAsync();
+        await FetchData();
 
-        Subtitle = $"{_channels.Sum(a => a.TextMessages.Count)} messages";
-
-        MqttService.NewTextMessage.SubscribeAsync(async message =>
+        Disposables.Add(MqttService.NewTextMessage.SubscribeAsync(async message =>
         {
             var channel = _channels.Find(c => c.Id == message.ChannelId);
 
@@ -77,25 +78,45 @@
                 channel.TextMessages.Add(message);
             }
 
-            Subtitle = $"{_channels.Sum(a => a.TextMessages.Count)} messages";
-
-            await InvokeAsync(StateHasChanged); 
-        });
-
-        MqttService.NewChannel.Where(c => _channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
-        {
-            _channels.Add(channel);
+            Total++;
             
             await InvokeAsync(StateHasChanged); 
-        });
+        }));
+
+        Disposables.Add(MqttService.NewChannel.Where(c => _channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
+        {
+            _channels.Add(channel);
+
+            await InvokeAsync(StateHasChanged);
+        }));
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        
+        _channels = await Context.Channels
+            .Include(c => c.TextMessages)
+            .ThenInclude(c => c.From)
+            .Include(c => c.TextMessages)
+            .ThenInclude(c => c.To)
+            .Where(a => a.TextMessages.Count > 0)
+            .ToListAsync();
+
+        Total = _channels.Sum(a => a.TextMessages.Count);
 
         Loading = false;
-        
-        await base.OnInitializedAsync();
     }
 
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync();
+
+        foreach (var disposable in Disposables)
+        {
+            disposable.Dispose();
+        }
     }
 }

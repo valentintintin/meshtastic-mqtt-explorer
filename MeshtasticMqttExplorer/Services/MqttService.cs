@@ -95,7 +95,7 @@ public class MqttService : AService, IAsyncDisposable
                 var rootPacket = new ServiceEnvelope();
                 rootPacket.MergeFrom(data);
 
-                await DoReceive(rootPacket, mqttClientAndConfiguration, e.ApplicationMessage.Topic);
+                await DoReceive(rootPacket, mqttClientAndConfiguration, topicSegments);
             };
 
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
@@ -133,7 +133,7 @@ public class MqttService : AService, IAsyncDisposable
         await mqtt.Context.SaveChangesAsync();
     }
 
-    private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt, string topic)
+    private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt, string[] topics)
     {
         var nodeGatewayId = uint.Parse(rootPacket.GatewayId[1..], NumberStyles.HexNumber);
         var nodeGateway = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeGatewayId) ?? new Node
@@ -242,7 +242,7 @@ public class MqttService : AService, IAsyncDisposable
             From = nodeFrom,
             To = nodeTo,
             MqttServer = mqtt.Configuration.Name,
-            MqttTopic = topic
+            MqttTopic = topics.Take(topics.Length - 1).JoinString("/")
         };
 
         mqtt.Context.Add(packet);

@@ -66,6 +66,13 @@
         await JSRuntime.InvokeVoidAsync("addPolylineToMap", points, color);
     }
 
+    public async Task ClearMarkers()
+    {
+        await _mapInitialized.Task;
+
+        await JSRuntime.InvokeVoidAsync("clearMarkersMap");
+    }
+
     public async ValueTask DisposeAsync()
     {
         try

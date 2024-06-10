@@ -32,11 +32,15 @@
         </GridCol>
         
         <GridCol Xs="24" Md="12">
-            <Card Title="Paquets par serveur MQTT, noeud et type hier">
+            <Card Title="Paquets par serveur MQTT, Bande, noeud et type pour hier">
                 <ChildContent>
                     <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
                         <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="_mqttServerFilters">
                             @context.MqttServer
+                        </PropertyColumn>
+
+                        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="_regionCodeFilters">
+                            @context.RegionCode
                         </PropertyColumn>
                         
                         <PropertyColumn Property="c => c.NodeName" Title="Noeud" Filterable>
@@ -133,6 +137,15 @@
         new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
         new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
     ];
+    
+    private readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] _regionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
+        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
+        {
+            Text = p.ToString(),
+            Value = p
+        })
+        .OrderBy(p => p.Text)
+        .ToArray();
     
     private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
         .Select(p => new TableFilter<PortNum?>
@@ -241,18 +254,19 @@
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         
         DataYesterdayNodePackets = await Context.Packets
-            .Include(a => a.From)
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date == yesterday)
             .GroupBy(a => new
             {
                 a.MqttServer,
+                a.From.RegionCode,
                 NodeId = a.From.Id,
                 NodeName = a.From.AllNames,
                 a.PortNum
             }, (grouped, packets) => new PacketNodeType
             {
                 MqttServer = grouped.MqttServer,
+                RegionCode = grouped.RegionCode,
                 NodeId = grouped.NodeId,
                 NodeName = grouped.NodeName!,
                 PortNum = grouped.PortNum,
@@ -275,6 +289,7 @@
     public class PacketNodeType
     {
         public required string? MqttServer { get; set; }
+        public required Config.Types.LoRaConfig.Types.RegionCode? RegionCode { get; set; }
         public required long NodeId { get; set; }
         public required string NodeName { get; set; }
         public required PortNum? PortNum { get; set; }

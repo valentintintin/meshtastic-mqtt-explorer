@@ -2,15 +2,11 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-@using System.Reactive.Linq
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Services
 
-@inject MqttService MqttService
 @inject IDbContextFactory<DataContext> ContextFactory
 
 <PageTitle>Détails du noeud @Node?.FullName()</PageTitle>
@@ -18,7 +14,41 @@
 <Spin Spinning="Loading">
     @if (Node != null)
     {
-        <PageHeader Title="@Node?.Name()" Subtitle="@Node?.NodeIdAsString()" />
+        <PageHeader Title="@Node?.Name()" Subtitle="@Node?.NodeIdAsString()">
+            <PageHeaderTags>
+                @if (Alive)
+                {
+                    <Tag Color="@PresetColor.Blue.ToString()">Vue il y a moins de 3h</Tag>
+                }
+                else
+                {
+                    <Tag Color="@PresetColor.Red.ToString()">Vue il y a plus de 3h</Tag>
+                }
+                
+                @if (Node?.IsMqttGateway == true)
+                {
+                    <Tag Color="@PresetColor.Green.ToString()">Passerelle MQTT</Tag>
+                }
+                
+                @if (Node?.RegionCode != null)
+                {
+                    <Tag>@Node.RegionCode</Tag>
+                }
+                
+                @if (Node?.ModemPreset != null)
+                {
+                    <Tag>@Node.ModemPreset</Tag>
+                }
+                
+                @if (Node?.Role != null)
+                {
+                    <Tag>@Node.Role</Tag>
+                }
+            </PageHeaderTags>
+            <PageHeaderExtra>
+                <Button OnClick="FetchData">Actualiser</Button>
+            </PageHeaderExtra>
+        </PageHeader>
 
         <Node NodeInfo="Node" NbPackets="NbPackets"></Node>
     }
@@ -38,60 +68,44 @@
     public long Id { get; set; }
 
     private bool Loading { get; set; } = true;
+    private bool Alive { get; set; } = false;
     private Context.Entities.Node? Node { get; set; }
     private Node.NbPacketsMetrics NbPackets { get; set; } = new();
     private DataContext Context { get; set; } = null!;
-    
+
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
         await FetchData();
 
-        MqttService.NewNode.Where(n => Node != null && n.Id == Node.Id).SubscribeAsync(async _ =>
-        {
-            await FetchData();
-            
-            await InvokeAsync(StateHasChanged); 
-        });
-
-        MqttService.NewTelemetry.Where(n => Node != null && n.NodeId == Node.Id).SubscribeAsync(async telemetry =>
-        {
-            Node!.Telemetries.Add(telemetry);
-            
-            await InvokeAsync(StateHasChanged); 
-        });
-
-        MqttService.NewPacket.Where(n => Node != null && n.FromId == Node.Id && n.PortNum != PortNum.MapReportApp).SubscribeAsync(async _ =>
-        {
-            NbPackets.Today++;
-            NbPackets.Total++;
-            
-            await InvokeAsync(StateHasChanged); 
-        });
-
-        Loading = false;
-        
         await base.OnInitializedAsync();
     }
 
     private async Task FetchData()
     {
+        Node = null;
+        Loading = true;
+        
         var today = DateTime.UtcNow.Date;
+        var threeHours = DateTime.UtcNow.AddHours(-3);
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
-        var threeHours = DateTime.UtcNow.AddHours(-3);
         
         Node = await Context.Nodes
             .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= threeDays)).ThenInclude(n => n.Neighbor)
-            .Include(n => n.Positions.Where(a => a.CreatedAt >= threeHours))
+            .Include(n => n.Positions.Where(a => a.CreatedAt >= today))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
             .FirstOrDefaultAsync(a => a.Id == Id);
 
+        Alive = Node.LastSeen >= threeHours;
+        
         var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
         NbPackets.Total = await countPackets.CountAsync();
         NbPackets.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
         NbPackets.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
+        
+        Loading = false;
     }
 
     public async ValueTask DisposeAsync()

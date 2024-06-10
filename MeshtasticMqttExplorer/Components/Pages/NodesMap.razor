@@ -12,53 +12,73 @@
 @using MeshtasticMqttExplorer.Services
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
-@inject MqttService MqttService
 @inject IDbContextFactory<DataContext> ContextFactory;
 
 <PageTitle>Carte des noeuds</PageTitle>
 
-<PageHeader Title="Cartes des noeuds" Subtitle="@Subtitle" />
+<PageHeader Title="Cartes des noeuds">
+    <SubtitleTemplate>
+        @Total noeuds avec position depuis les 3 derniers jours
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+@* <Segmented Size="SegmentedSize.Large" Labels="Filters" /> *@
 
 <Spin Spinning="Loading">
     <Osm Height="calc(100vh - 270px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
-
+    
     <Card Title="Légende" Size="small" Bordered="true">
         <ChildContent>
             <GridRow Gutter="(16, 16)" Justify="center">
                 <GridCol Xs="24" Md="8">
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Red))</i>
-                        433Mhz | Hors ligne depuis plus de 3h
+                        Eu433Mhz | Hors ligne depuis plus de 3h
                     </div>
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Green))</i>
-                        433Mhz | En ligne - Passerelle MQTT
+                        Eu433Mhz | En ligne - Passerelle MQTT
                     </div>
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Square, SvgColor.Blue))</i>
-                        433Mhz | En ligne - Pas de MQTT
+                        Eu433Mhz | En ligne - Pas de MQTT
                     </div>
                 </GridCol>
-
+    
                 <GridCol Xs="24" Md="8">
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Red))</i>
-                        868Mhz | Hors ligne depuis plus de 3h
+                        Eu868Mhz | Hors ligne depuis plus de 3h
                     </div>
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Green))</i>
-                        868Mhz | En ligne - Passerelle MQTT
+                        Eu868Mhz | En ligne - Passerelle MQTT
                     </div>
                     <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Circle, SvgColor.Blue))</i>
-                        868Mhz | En ligne - Pas de MQTT
+                        Eu868Mhz | En ligne - Pas de MQTT
                     </div>
                 </GridCol>
-
+    
                 <GridCol Xs="24" Md="8">
                     <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Triangle, SvgColor.Red))</i>
+                        Autres bandes | Manque de données | Hors ligne depuis plus de 3h
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Triangle, SvgColor.Green))</i>
+                        Autres bandes | Manque de données | En ligne - Passerelle MQTT
+                    </div>
+                    <div style="display: flex; align-content: center">
+                        <i>@((MarkupString)GetSvg(SvgShape.Triangle, SvgColor.Blue))</i>
+                        Autres bandes | Manque de données | En ligne - Pas de MQTT
+                    </div>
+                    <div style="display: flex; align-content: center">
                         <i>@((MarkupString)GetSvg(SvgShape.Triangle, SvgColor.Gray))</i>
-                        Pas de bande définie | Manque de données
+                        Autres bandes | Manque de données
                     </div>
                 </GridCol>
             </GridRow>
@@ -69,16 +89,19 @@
 @code
 {
     private bool Loading { get; set; } = true;
-    private string Subtitle { get; set; } = "Chargement en cours";
-    private List<Node> Nodes { get; set; } = [];
+    private bool HasRenderMapData { get; set; } = true;
+    private int Total { get; set; }
+    private List<NodesGrouped> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
+    private string[] Filters { get; set; } = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender && Map != null)
+        if (!firstRender && Map != null && !HasRenderMapData)
         {
-            await Map.AddMarkers(Nodes.Select(GetMarker).ToList());
+            await Map.AddMarkers(Nodes.SelectMany(a => a.Nodes).Select(GetMarker).ToList());
+            HasRenderMapData = true;
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -88,38 +111,44 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
-        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
-        
-        Nodes = await Context.Nodes
-            .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => n.LastSeen >= threeDays)
-            .ToListAsync();
-
-        Subtitle = $"{Nodes.Count} noeuds avec position depuis les 3 derniers jours";
-
-        MqttService.NewNode
-            .Where(n => n is { Latitude: not null, Longitude: not null })
-            .Delay(TimeSpan.FromSeconds(1))
-            .SubscribeAsync(async node =>
-        {
-            if (Nodes.All(n => n.Id != node.Id))
-            {
-                Nodes.Add(node);
-
-                Subtitle = $"{Nodes.Count} noeuds avec position depuis les 3 derniers jours";
-            }
-
-            if (Map != null)
-            {
-                await Map.AddMarker(GetMarker(node));
-            }
-
-            await InvokeAsync(StateHasChanged); 
-        });
-        
-        Loading = false;
+        await FetchData();
 
         await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        HasRenderMapData = false;
+
+        if (Map != null)
+        {
+            await Map.ClearMarkers();
+        }
+        
+        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
+        
+        Nodes = (await Context.Nodes
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays))
+            .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
+            .Where(n => n.LastSeen >= threeDays).GroupBy(a => new
+            {
+                a.RegionCode,
+                a.ModemPreset
+            }, (grouped, nodes) => new NodesGrouped
+            {
+                RegionCode = grouped.RegionCode,
+                ModemPreset = grouped.ModemPreset,
+                Nodes = nodes.ToList()
+            })
+            .ToListAsync())
+            .OrderByDescending(a => a.Nodes.Count)
+            .ToList();
+
+        Filters = Nodes.Select(n => n.Label).ToArray();
+        Total = Nodes.Sum(a => a.Nodes.Count);
+        
+        Loading = false;
     }
 
     private Osm.Marker GetMarker(Node node)
@@ -188,5 +217,14 @@
         Green,
         Blue,
         Gray
+    }
+    
+    private class NodesGrouped
+    {
+        public required List<Node> Nodes { get; set; }
+        public required Config.Types.LoRaConfig.Types.RegionCode? RegionCode { get; set; }
+        public required Config.Types.LoRaConfig.Types.ModemPreset? ModemPreset { get; set; }
+
+        public string Label => RegionCode != null && ModemPreset != null ? $"{RegionCode} {ModemPreset}" : "Sans données";
     }
 }
