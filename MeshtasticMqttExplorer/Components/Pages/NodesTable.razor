@@ -36,13 +36,13 @@
         <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable>
            <Date Value="context.LastSeen" Fallback="-"></Date>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable Filters="_regionCodeFilters">
+        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable Filters="Utils.RegionCodeFilters">
             @(context.RegionCode?.ToString() ?? "-")
         </PropertyColumn>
-        <PropertyColumn Property="c => c.ModemPreset" Title="Profile de modulation" Sortable Filters="_modemPresetFilters">
+        <PropertyColumn Property="c => c.ModemPreset" Title="Profile de modulation" Sortable Filters="Utils.ModemPresetFilters">
             @(context.ModemPreset?.ToString() ?? "-")
         </PropertyColumn>
-        <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="_roleFilters">
+        <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="Utils.RoleFilters">
             @(context.Role?.ToString() ?? "-")
         </PropertyColumn>
     </ChildContent>
@@ -57,39 +57,6 @@
     private List<Node> _nodes = [];
     private DataContext Context { get; set; } = null!;
     private Table<Node>? Table { get; set; }
-
-    private readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] _regionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
-        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .OrderBy(p => p.Text)
-        .ToArray();
-    private readonly TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>[] _modemPresetFilters = ((Config.Types.LoRaConfig.Types.ModemPreset[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.ModemPreset)))
-        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .OrderBy(p => p.Text)
-        .ToArray();
-    private readonly TableFilter<HardwareModel?>[] _hardwareModelFilters = ((HardwareModel[])Enum.GetValues(typeof(HardwareModel)))
-        .Select(p => new TableFilter<HardwareModel?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .OrderBy(p => p.Text)
-        .ToArray();
-    private readonly TableFilter<Config.Types.DeviceConfig.Types.Role?>[] _roleFilters = ((Config.Types.DeviceConfig.Types.Role[])Enum.GetValues(typeof(Config.Types.DeviceConfig.Types.Role)))
-        .Select(p => new TableFilter<Config.Types.DeviceConfig.Types.Role?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .OrderBy(p => p.Text)
-        .ToArray();
     
     protected override async Task OnInitializedAsync()
     {

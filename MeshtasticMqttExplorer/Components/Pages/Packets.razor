@@ -61,13 +61,13 @@ else
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
             <Date Value="context.CreatedAt"></Date>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="_mqttServerFilters">
+        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="Utils.MqttServerFilters">
             @context.MqttServer - @context.MqttTopic
         </PropertyColumn>
         <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Sortable Filters="_channelFilters">
             @context.Channel.Name
         </PropertyColumn>
-        <PropertyColumn Property="c => c.PortNum" Title="Type" Sortable Filters="_portNumFilters">
+        <PropertyColumn Property="c => c.PortNum" Title="Type" Sortable Filters="Utils.PortNumFilters">
             @(context.PortNum?.ToString() ?? "Chiffrée")
         </PropertyColumn>
         <PropertyColumn Property="c => c.PayloadJson" Title="Contenu" Filterable>
@@ -95,20 +95,6 @@ else
     private Table<Packet>? Table { get; set; }
 
     private TableFilter<long>[] _channelFilters = [];
-    private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
-        .Select(p => new TableFilter<PortNum?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
-        .OrderBy(p => p.Text)
-        .ToArray();
-    private readonly TableFilter<string?>[] _mqttServerFilters =
-    [
-        new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
-        new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
-    ];
 
     protected override async Task OnInitializedAsync()
     {
