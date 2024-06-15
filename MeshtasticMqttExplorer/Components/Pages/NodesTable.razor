@@ -104,8 +104,6 @@
             queryModel.ExecuteQuery(Context.Nodes
                 .Where(a => a.LastSeen.HasValue && a.NodeId != MqttService.NodeBroadcast))
         ).ToList();
-        
-        Total = Context.Nodes.Count(a => a.Id != MqttService.NodeBroadcast);
     }
 
     private void FetchData()
@@ -113,6 +111,7 @@
         if (Table != null)
         {
             OnTableChange((QueryModel<Node>) Table.GetQueryModel());
+            Total = Context.Nodes.Count(a => a.Id != MqttService.NodeBroadcast);
         }
     }
 

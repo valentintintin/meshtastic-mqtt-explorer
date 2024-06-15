@@ -263,7 +263,7 @@
             Visible = false
         },
         SeriesField = nameof(DateChartData<object>.type),
-        Color = new [] { "blue", "red" }
+        Color = new [] { Utils.Blue, Utils.Red }
     };
     
     private readonly LineConfig _configVoltageBattery = new()
@@ -293,7 +293,7 @@
             Visible = false
         },
         SeriesField = nameof(DateChartData<object>.type),
-        Color = new [] { "blue" }
+        Color = new [] { Utils.Blue }
     };
     
     private readonly LineConfig _configTemperature = new()
@@ -321,7 +321,7 @@
             Position = "bottom"
         },
         SeriesField = nameof(DateChartData<object>.type),
-        Color = new [] { "blue", "red" }
+        Color = new [] { Utils.Blue, Utils.Red }
     };
     
     private readonly LineConfig _configPressure = new()
@@ -349,7 +349,7 @@
             Position = "bottom"
         },
         SeriesField = nameof(DateChartData<object>.type),
-        Color = new [] { "blue" }
+        Color = new [] { Utils.Blue }
     };
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -370,29 +370,53 @@
 
             if (NodeInfo.Positions.Any() == true)
             {
-                await Map.AddPolyline(NodeInfo.Positions
+                await Map.AddPolyline($"{NodeInfo.Id}-positions", 
+                    NodeInfo.Positions
                     .Select(a => new[] { a.Latitude, a.Longitude })
-                    .ToList(), "blue");
+                    .ToList(), Utils.Blue);
 
-                if (NodeInfo.MyNeighbors.Any() == true)
+                if (NodeInfo.MyNeighbors.Any())
                 {
-                    foreach (var neighbor in NodeInfo.MyNeighbors)
+                    if (NodeInfo.PacketsFrom.Any())
                     {
-                        if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
+                        foreach (var grouping in NodeInfo.PacketsFrom.GroupBy(a => a.Gateway))
                         {
-                            await Map.AddPolyline([
-                                new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
-                                new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
-                            ], "red");
-
-                            await Map.AddMarker(new Osm.Marker
+                            if (grouping.Key is { Latitude: not null, Longitude: not null })
                             {
-                                Id = neighbor.NeighborId,
-                                Latitude = neighbor.Neighbor.Latitude.Value,
-                                Longitude = neighbor.Neighbor.Longitude.Value,
-                                Color = "red",
-                                Label = $"Voisin : {neighbor.Neighbor.FullName()}"
-                            });
+                                await Map.AddPolyline($"{NodeInfo.Id}-gateway-{grouping.Key.Id}", [
+                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                    new[] { grouping.Key.Latitude.Value, grouping.Key.Longitude.Value }
+                                ], Utils.Green);
+
+                                await Map.AddMarker(new Osm.Marker
+                                {
+                                    Id = grouping.Key.Id,
+                                    Latitude = grouping.Key.Latitude.Value,
+                                    Longitude = grouping.Key.Longitude.Value,
+                                    Color = "green",
+                                    Label = $"Passerelle MQTT : {grouping.Key.FullName()}"
+                                });
+                            }
+                        }
+                        
+                        foreach (var neighbor in NodeInfo.MyNeighbors)
+                        {
+                            if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
+                            {
+                                await Map.AddPolyline($"{NodeInfo.Id}-neighbor-{neighbor.Id}", [
+                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                    new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
+                                ], Utils.Red);
+
+                                await Map.AddMarker(new Osm.Marker
+                                {
+                                    Id = neighbor.NeighborId,
+                                    Latitude = neighbor.Neighbor.Latitude.Value,
+                                    Longitude = neighbor.Neighbor.Longitude.Value,
+                                    Color = "red",
+                                    Label = $"Voisin : {neighbor.Neighbor.FullName()}"
+                                });
+                            }
                         }
                     }
                 }

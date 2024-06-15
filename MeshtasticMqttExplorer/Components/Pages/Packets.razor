@@ -24,7 +24,7 @@
 {
     <PageHeader Title="Trames" OnBack="OnBack">
         <SubtitleTemplate>
-            @Total trames @(_node?.AllNames)
+            @Total trames @(Node?.AllNames) depuis les 15 derniers jours
         </SubtitleTemplate>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
@@ -46,25 +46,20 @@ else
 <Table @ref="Table" TItem="Packet" DataSource="_packets" Responsive Total="Total" OnChange="OnTableChange"
        RowClassName="@(x => x.Data.PortNum == null ? "red" : "" )">
     <ChildContent>
+        <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
+            @context.PacketId
+        </PropertyColumn>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Sortable Filterable>
-            <div style="width: 150px">
-                <a href="/node/@context.FromId" target="_blank">@context.From.AllNames</a>
-            </div>
+            <a href="/node/@context.FromId" target="_blank">@context.From.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Sortable Filterable>
-            <div style="width: 150px">
-                <a href="/node/@context.ToId" target="_blank">@context.To.AllNames</a>
-            </div>
+            <a href="/node/@context.ToId" target="_blank">@context.To.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Sortable Filterable>
-            <div style="width: 150px">
-                <a href="/node/@context.GatewayId" target="_blank">@context.Gateway.AllNames</a>
-            </div>
+            <a href="/node/@context.GatewayId" target="_blank">@context.Gateway.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
-            <div style="width: 150px">
-                <Date Value="context.CreatedAt"></Date>
-            </div>
+            <Date Value="context.CreatedAt"></Date>
         </PropertyColumn>
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="_mqttServerFilters">
             @context.MqttServer - @context.MqttTopic
@@ -92,10 +87,10 @@ else
     [Parameter]
     public long? Id { get; set; }
 
-    private Node? _node { get; set; }
+    private Node? Node { get; set; }
     private List<Packet> _packets = [];
     private int Total { get; set; }
-    private DataContext? Context { get; set; }
+    private DataContext Context { get; set; } = null!;
 
     private Table<Packet>? Table { get; set; }
 
@@ -117,11 +112,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var context = await ContextFactory.CreateDbContextAsync();
+        Context = await ContextFactory.CreateDbContextAsync();
+        var localContext = await ContextFactory.CreateDbContextAsync();
 
-        _channelFilters = await context.Channels
+        _channelFilters = await localContext.Channels
             .OrderBy(c => c.Name)
-            .Select(c => new TableFilter<long>()
+            .Select(c => new TableFilter<long>
             {
                 Text = c.Name,
                 Value = c.Id
@@ -129,20 +125,18 @@ else
         
         if (Id.HasValue)
         {
-            _node = await context.Nodes.FindAsync(Id);
+            Node = await Context.Nodes.FindAsync(Id);
         }
+        
+        Total = localContext.Packets.Count(a => !Id.HasValue || a.FromId == Id);
 
-        Total = await context.Packets.CountAsync(a => !Id.HasValue || a.FromId == Id);
-
-        await context.DisposeAsync();
+        await localContext.DisposeAsync();
         
         await base.OnInitializedAsync();
     }
 
     private void OnTableChange(QueryModel<Packet> queryModel)
     {
-        Context ??= ContextFactory.CreateDbContext();
-
         _packets = queryModel.CurrentPagedRecords(
                 queryModel.ExecuteQuery(Context.Packets
                     .Include(a => a.Channel)
@@ -158,15 +152,13 @@ else
         if (Table != null)
         {
             OnTableChange((QueryModel<Packet>) Table.GetQueryModel());
+            Total = Context.Packets.Count(a => !Id.HasValue || a.FromId == Id);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (Context != null)
-        {
-            await Context.DisposeAsync();
-        }
+        await Context.DisposeAsync();
     }
 
     private void OnBack()

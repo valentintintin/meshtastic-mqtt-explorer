@@ -68,9 +68,9 @@
     public long Id { get; set; }
 
     private bool Loading { get; set; } = true;
-    private bool Alive { get; set; } = false;
+    private bool Alive { get; set; }
     private Context.Entities.Node? Node { get; set; }
-    private Node.NbPacketsMetrics NbPackets { get; set; } = new();
+    private Node.NbPacketsMetrics NbPackets { get; } = new();
     private DataContext Context { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
@@ -93,9 +93,11 @@
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         Node = await Context.Nodes
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId && a.Gateway.Latitude != null).OrderByDescending(a => a.CreatedAt).Take(100)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= threeDays)).ThenInclude(n => n.Neighbor)
-            .Include(n => n.Positions.Where(a => a.CreatedAt >= today))
+            .Include(n => n.Positions.Where(a => a.CreatedAt >= yesterday).OrderByDescending(a => a.CreatedAt).Take(100))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
+            .AsSplitQuery()
             .FirstOrDefaultAsync(a => a.Id == Id);
 
         Alive = Node.LastSeen >= threeHours;

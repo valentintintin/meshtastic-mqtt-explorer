@@ -2,12 +2,13 @@ window.initializeLeafletMap = (center, zoom) => {
     window.leafletMap = L.map('map', {
         preferCanvas: true
     }).setView(center, zoom);
+
     window.leafletMarkers = [];
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(window.leafletMap);
-    
+
     console.debug('Map created');
 };
 
@@ -20,70 +21,93 @@ window.addMarkersToMap = (markers) => {
 window.addMarkerToMap = (marker) => {
     let pin = window.leafletMarkers[marker.id];
 
-    if (pin) {
-        pin.setLatLng([marker.latitude, marker.longitude]);
-        pin.setIcon(marker.svg ? new L.divIcon({
-            html: marker.svg,
-            className: "",
-            iconSize: [40, 40],
-            iconAnchor: [10, 0],
-        }) : new L.Icon({
+    if (marker.iconType === 0) {
+        const icon = new L.Icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-' + (marker.color ?? 'blue') + '.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             popupAnchor: [1, -34],
             shadowSize: [41, 41]
-        }));
+        });
 
-        if (marker.popup) {
-            pin.getPopup().setContent(marker.popup);
+        if (pin) {
+            pin.setLatLng([marker.latitude, marker.longitude]);
+            pin.setIcon(icon);
+
+            if (marker.popup) {
+                pin.getPopup().setContent(marker.popup);
+            }
+
+            return;
         }
-        
-        return;
+
+        pin = L.marker([marker.latitude, marker.longitude], {
+            title: marker.label ?? '',
+            alt: marker.label ?? '',
+            icon: icon
+        });
     }
+    else if (marker.iconType === 1) {
+        if (pin) {
+            pin.setLatLng([marker.latitude, marker.longitude]);
+            pin.setStyle({
+                color: marker.color ?? 'blue',
+                fillColor: marker.fillColor ?? '*',
+            });
+
+            if (marker.popup) {
+                pin.getPopup().setContent(marker.popup);
+            }
+
+            return;
+        }
+
+        pin = L.circleMarker([marker.latitude, marker.longitude], {
+            radius: 5,
+            fillOpacity: marker.opacity ?? 0.2,
+            color: marker.color ?? 'blue',
+            fillColor: marker.fillColor ?? '*',
+            weight: 2,
+        });
+    }
+
+    const label = marker.popup ?? marker.label;
     
-    pin = L.marker([marker.latitude, marker.longitude], {
-        title: marker.label ?? '',
-        icon: marker.svg ? new L.divIcon({
-            html: marker.svg,
-            className: "",
-            iconSize: [40, 40],
-            iconAnchor: [10, 0],
-        }) : new L.Icon({
-            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-' + (marker.color ?? 'blue') + '.png',
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        })
-    }).addTo(window.leafletMap);
-    
-    if (marker.popup) {
-        pin = pin.bindPopup(marker.popup, {
+    if (label) {
+        pin = pin.bindPopup(label, {
             keepInView: true,
             closeButton: true,
-            autoClose: false,
+            autoClose: true,
             closeOnEscapeKey: true
-        })
+        }).on({
+            click(e) {
+                window.leafletMap.panTo(e.latlng);
+            },
+            mouseover(e) {
+                // this.openPopup();
+            }
+        });
     }
 
+    pin.addTo(window.leafletMap);
+    
     window.leafletMarkers[marker.id] = pin;
 };
 
-window.addPolylineToMap = (points, color) => {
-    L.polyline(points, { color })
-        .addTo(window.leafletMap);
+window.addPolylineToMap = (id, points, color) => {
+    window.leafletMarkers[id] = L.polyline(points, {
+        color,
+        weight: 1
+    }).addTo(window.leafletMap);
 };
 
 window.clearMarkersMap = () => {
-    for (let m of window.leafletMarkers) {
-        if (m) {
-            m.remove();
-        }
+    for (let leafletMarkersKey in window.leafletMarkers) {
+        const leafletMarkers = window.leafletMarkers[leafletMarkersKey];
+        leafletMarkers.remove();
     }
-    
+
     window.leafletMarkers.length = 0;
 };
 

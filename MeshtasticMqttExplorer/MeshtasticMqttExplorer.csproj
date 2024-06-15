@@ -38,6 +38,10 @@
       <Content Update="appsettings.Production.json">
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
+      <None Remove="Components\Pages\NodesMap.razor.css" />
+      <Content Include="Components\Pages\NodesMap.razor.css">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

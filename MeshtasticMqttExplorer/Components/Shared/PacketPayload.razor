@@ -1,10 +1,7 @@
-@using System.Text
-@using System.Text.Json
 @using Google.Protobuf
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context.Entities
 @using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Services
 @using NeighborInfo = Meshtastic.Protobufs.NeighborInfo
 @using Position = Meshtastic.Protobufs.Position
 @using Telemetry = Meshtastic.Protobufs.Telemetry
@@ -172,18 +169,26 @@
 
     protected override void OnParametersSet()
     {
-        if (Packet.PortNum == null)
-        {
+        // if (Packet.PortNum == null)
+        // {
         //     try
         //     {
-        //         Packet.Payload = EncryptionHelper.DecryptPacket(Packet.Payload, "AQ==", (ulong) Packet.PacketId, (int) Packet.From.NodeId);
+        //         var rootPacket = new ServiceEnvelope();
+        //         rootPacket.MergeFrom(Packet.Payload);
+        //
+        //         AES_CTR forDecrypting = new AES_CTR(EncryptionHelper.PadKeyTo16Bytes(Convert.FromBase64String("AQ==")), EncryptionHelper.CreateNonce((ulong) Packet.PacketId, (int) Packet.From.NodeId));
+        //         byte[] decryptPacket = new byte[rootPacket.Packet.Encrypted.Length];
+        //         forDecrypting.DecryptBytes(decryptPacket, rootPacket.Packet.Encrypted.ToByteArray());
+        //
+        //         Console.WriteLine(Encoding.UTF8.GetString(decryptPacket));
+        //         rootPacket.Packet.MergeFrom(decryptPacket);
+        //         Console.WriteLine(rootPacket.Packet.Decoded?.Portnum);
         //     }
         //     catch (Exception ex)
         //     {
         //         Console.WriteLine("Error: " + ex.Message);
         //     }
-            return;
-        }
+        // }
 
         try
         {
@@ -213,7 +218,7 @@
                     break;
             }
         }
-        catch (Exception)
+        catch (Exception e)
         {
             try
             {
@@ -249,6 +254,8 @@
             {
                 // Ignored
             }
+            
+            Console.WriteLine(e.ToString());
             // Ignored
         }
 

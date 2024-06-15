@@ -28,13 +28,14 @@
 @code
 {
     private bool Loading { get; set; } = true;
+    private bool HasRenderMapData { get; set; }
     private List<Telemetry> Telemetries { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender && Map != null)
+        if (!firstRender && Map != null && !HasRenderMapData)
         {
             await Map.AddMarkers(Telemetries.Select(GetMarker).ToList());
         }
@@ -54,6 +55,7 @@
     private async Task FetchData()
     {
         Loading = true;
+        HasRenderMapData = false;
      
         if (Map != null)
         {
@@ -72,6 +74,8 @@
             .ToListAsync();
 
         Loading = false;
+            
+        await InvokeAsync(StateHasChanged); 
     }
 
     private Osm.Marker GetMarker(Telemetry telemetry)

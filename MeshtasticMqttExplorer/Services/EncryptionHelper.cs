@@ -15,9 +15,6 @@ public class EncryptionHelper
         // Write fromNode (32-bit)
         BitConverter.GetBytes(fromNode).CopyTo(nonce, 8);
 
-        // Write blockCounter (32-bit, starts at zero)
-        BitConverter.GetBytes(0).CopyTo(nonce, 12);
-
         return nonce;
     }
 
@@ -25,6 +22,8 @@ public class EncryptionHelper
     {
         // Convert decryption key from Base64
         var key = Convert.FromBase64String(decryptionKeyBase64);
+
+        key = PadKeyTo16Bytes(key);
 
         // Create decryption nonce for this packet
         var nonce = CreateNonce(packetId, fromNode);
@@ -82,5 +81,17 @@ public class EncryptionHelper
                 break;
             }
         }
+    }
+    
+    public static byte[] PadKeyTo16Bytes(byte[] key)
+    {
+        if (key.Length >= 16)
+        {
+            return key;
+        }
+
+        byte[] paddedKey = new byte[16];
+        Buffer.BlockCopy(key, 0, paddedKey, 0, key.Length);
+        return paddedKey;
     }
 }

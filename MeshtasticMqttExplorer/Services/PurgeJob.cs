@@ -7,6 +7,7 @@ public class PurgeJob(MqttService mqttService) : BackgroundService
         while (!cancellationToken.IsCancellationRequested)
         {
             await mqttService.PurgePackets();
+            await mqttService.PurgeEncryptedPackets();
 
             await Task.Delay(TimeSpan.FromHours(1), cancellationToken);
         }

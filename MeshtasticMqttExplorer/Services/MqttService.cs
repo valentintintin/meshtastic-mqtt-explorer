@@ -127,7 +127,10 @@ public class MqttService : AService, IAsyncDisposable
         else if (node.NodeId != NodeBroadcast)
         {
             node.IsMqttGateway = status == "online";
-            node.LastSeen = DateTime.UtcNow;
+            if (node.IsMqttGateway == true)
+            {
+                node.LastSeen = DateTime.UtcNow;
+            }
             mqtt.Context.Update(node);
         }
         await mqtt.Context.SaveChangesAsync();
@@ -301,9 +304,18 @@ public class MqttService : AService, IAsyncDisposable
 
         nodeFrom.ShortName = mapReport.ShortName;
         nodeFrom.LongName = mapReport.LongName;
-        nodeFrom.Latitude = mapReport.LatitudeI * 0.0000001;
-        nodeFrom.Longitude = mapReport.LongitudeI * 0.0000001;
-        nodeFrom.Altitude = mapReport.Altitude;
+
+        if (mapReport is not { LatitudeI: 0, LongitudeI: 0 })
+        {
+            nodeFrom.Latitude = mapReport.LatitudeI * 0.0000001;
+            nodeFrom.Longitude = mapReport.LongitudeI * 0.0000001;
+            nodeFrom.Altitude = mapReport.Altitude;
+        }
+        else
+        {
+            Logger.LogWarning("Position of {node} is incorrect", nodeFrom);
+        }
+
         nodeFrom.Role = mapReport.Role;
         nodeFrom.HardwareModel = mapReport.HwModel;
         nodeFrom.ModemPreset = mapReport.ModemPreset;
@@ -324,6 +336,12 @@ public class MqttService : AService, IAsyncDisposable
     {
         if (positionPayload == null)
         {
+            return;
+        }
+
+        if (positionPayload is { LatitudeI: 0, LongitudeI: 0 })
+        {
+            Logger.LogWarning("Position of {node} is incorrect", nodeFrom);
             return;
         }
 
@@ -510,7 +528,25 @@ public class MqttService : AService, IAsyncDisposable
 
         Logger.LogInformation("Delete {nbPackets} packets because they are too old < {date}", packets.Count, minDate);
         
-        Context.RemoveRange(packets);
+        context.RemoveRange(packets);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task PurgeEncryptedPackets()
+    {
+        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
+        var context = await DbContextFactory.CreateDbContextAsync();
+        
+        var packets = context.Packets.Where(a => a.CreatedAt < threeDays && a.Encrypted).ToList();
+
+        if (packets.Count == 0)
+        {
+            return;
+        }
+
+        Logger.LogInformation("Delete {nbPackets} packets because they are too old < {date} and encrypted", packets.Count, threeDays);
+        
+        context.RemoveRange(packets);
         await context.SaveChangesAsync();
     }
 

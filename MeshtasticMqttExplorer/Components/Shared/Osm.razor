@@ -59,11 +59,11 @@
         await JSRuntime.InvokeVoidAsync("addMarkersToMap", markers);
     }
 
-    public async Task AddPolyline(List<double[]> points, string color)
+    public async Task AddPolyline(string id, List<double[]> points, string color)
     {
         await _mapInitialized.Task;
 
-        await JSRuntime.InvokeVoidAsync("addPolylineToMap", points, color);
+        await JSRuntime.InvokeVoidAsync("addPolylineToMap", id, points, color);
     }
 
     public async Task ClearMarkers()
@@ -71,6 +71,8 @@
         await _mapInitialized.Task;
 
         await JSRuntime.InvokeVoidAsync("clearMarkersMap");
+
+        await Task.Delay(1000);
     }
 
     public async ValueTask DisposeAsync()
@@ -90,9 +92,17 @@
         public required long Id { get; set; }
         public required double Latitude { get; set; }
         public required double Longitude { get; set; }
+        public IconType IconType { get; set; } = IconType.Classic;
         public string? Label { get; set; }
         public string? Popup { get; set; }
-        public string? Svg { get; set; }
         public string? Color { get; set; }
+        public string? FillColor { get; set; }
+        public float? Opacity { get; set; }
+    }
+    
+    public enum IconType
+    {
+        Classic,
+        Circle,
     }
 }

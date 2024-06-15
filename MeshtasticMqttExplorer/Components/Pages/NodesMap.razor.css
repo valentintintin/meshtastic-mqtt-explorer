@@ -1,0 +1,21 @@
+.legend {
+    display: flex; 
+    align-items: center; 
+    margin-bottom: 5px;
+}
+
+.legend-circle {
+    display: inline-block;
+    margin-right: 10px;
+    width: 25px; 
+    height: 25px; 
+    border: 2px solid; 
+    border-radius: 50%; 
+}
+
+.legend-bar {
+    display: inline-block;
+    margin-right: 10px;
+    width: 75px;
+    height: 2px; 
+}
