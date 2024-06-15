@@ -19,6 +19,9 @@ public class Packet : IEntity
     public long GatewayId { get; set; }
     public virtual Node Gateway { get; set; } = null!;
     
+    public long? GatewayPositionId { get; set; }
+    public virtual Position? GatewayPosition { get; set; }
+    
     public long FromId { get; set; }
     public virtual Node From { get; set; } = null!;
 
@@ -32,6 +35,7 @@ public class Packet : IEntity
     public float? RxRssi { get; set; }
     public DateTimeOffset? RxTime { get; set; }
     
+    public uint? HopStart { get; set; }
     public uint? HopLimit { get; set; }
     public bool? WantAck { get; set; }
     public MeshPacket.Types.Priority? Priority { get; set; }

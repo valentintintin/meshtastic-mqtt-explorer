@@ -139,7 +139,9 @@ public class MqttService : AService, IAsyncDisposable
     private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt, string[] topics)
     {
         var nodeGatewayId = uint.Parse(rootPacket.GatewayId[1..], NumberStyles.HexNumber);
-        var nodeGateway = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeGatewayId) ?? new Node
+        var nodeGateway = await mqtt.Context.Nodes
+            .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
+            .FindByNodeIdAsync(nodeGatewayId) ?? new Node
         {
             NodeId = nodeGatewayId,
             LastSeen = DateTime.UtcNow,
@@ -228,12 +230,14 @@ public class MqttService : AService, IAsyncDisposable
         {
             Channel = channel,
             Gateway = nodeGateway,
+            GatewayPosition = nodeGateway.Positions.FirstOrDefault(),
             Encrypted = rootPacket.Packet.Decoded?.Portnum == null,
             Priority = rootPacket.Packet.Priority,
             PacketId = rootPacket.Packet.Id,
             WantAck = rootPacket.Packet.WantAck,
             RxSnr = rootPacket.Packet.RxSnr,
             RxRssi = rootPacket.Packet.RxRssi,
+            HopStart = rootPacket.Packet.HopStart,
             HopLimit = rootPacket.Packet.HopLimit,
             ChannelIndex = rootPacket.Packet.Channel,
             RxTime = rootPacket.Packet.RxTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(rootPacket.Packet.RxTime) : null,
@@ -307,9 +311,7 @@ public class MqttService : AService, IAsyncDisposable
 
         if (mapReport is not { LatitudeI: 0, LongitudeI: 0 })
         {
-            nodeFrom.Latitude = mapReport.LatitudeI * 0.0000001;
-            nodeFrom.Longitude = mapReport.LongitudeI * 0.0000001;
-            nodeFrom.Altitude = mapReport.Altitude;
+            await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, mqtt.Context);
         }
         else
         {
@@ -345,27 +347,7 @@ public class MqttService : AService, IAsyncDisposable
             return;
         }
 
-        var position = new Position
-        {
-            Node = nodeFrom,
-            Packet = packet,
-            Latitude =  positionPayload.LatitudeI * 0.0000001,
-            Longitude =  positionPayload.LongitudeI * 0.0000001,
-            Altitude = positionPayload.Altitude
-        };
-        
-        mqtt.Context.Add(position);
-
-        nodeFrom.Latitude = position.Latitude;
-        nodeFrom.Longitude = position.Longitude;
-        nodeFrom.Altitude = position.Altitude;
-        
-        Logger.LogInformation("Update {node} with new Position", nodeFrom);
-        
-        mqtt.Context.Update(nodeFrom);
-        await mqtt.Context.SaveChangesAsync();
-        NewPosition.OnNext(position);
-        NewNode.OnNext(nodeFrom);
+        await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, mqtt.Context);
     }
 
     private async Task DoNodeInfoPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
@@ -506,6 +488,51 @@ public class MqttService : AService, IAsyncDisposable
         
         await base.DisposeAsync();
     }
+
+    private async Task<Position> UpdatePosition(Node node, int latitude, int longitude, int altitude, DataContext context)
+    {
+        node.Latitude = latitude * 0.0000001;
+        node.Longitude = longitude * 0.0000001;
+        node.Altitude = altitude;
+
+        var position = context.Positions
+            .OrderByDescending(a => a.Node == node 
+                                    && a.Latitude == node.Latitude 
+                                    && a.Longitude == node.Longitude 
+                                    && a.Altitude == node.Altitude)
+            .FirstOrDefault() ?? new Position
+        {
+            Latitude = node.Latitude.Value,
+            Longitude = node.Longitude.Value,
+            Altitude = node.Altitude,
+            Node = node
+        };
+
+        if (position.Id > 0)
+        {
+            position.UpdatedAt = DateTime.UtcNow;
+            context.Update(position);
+        }
+        else
+        {
+            context.Add(position);
+        
+            Logger.LogInformation("Update {node} with new Position", node);
+        }
+        
+        node.Latitude = position.Latitude;
+        node.Longitude = position.Longitude;
+        node.Altitude = position.Altitude;
+        
+        context.Update(node);
+
+        await context.SaveChangesAsync();
+        
+        NewNode.OnNext(node);
+        NewPosition.OnNext(position);
+
+        return position;
+    }
     
     private class MqttClientAndConfiguration
     {
@@ -547,6 +574,44 @@ public class MqttService : AService, IAsyncDisposable
         Logger.LogInformation("Delete {nbPackets} packets because they are too old < {date} and encrypted", packets.Count, threeDays);
         
         context.RemoveRange(packets);
+        await context.SaveChangesAsync();
+    }
+
+    public async Task PurgeData()
+    {
+        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
+        var context = await DbContextFactory.CreateDbContextAsync();
+        
+        var telemetries = context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
+
+        if (telemetries.Count > 0)
+        {
+            Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", telemetries.Count,
+                minDate);
+
+            context.RemoveRange(telemetries);
+        }
+
+        var positions = context.Positions.Where(a => a.CreatedAt < minDate).ToList();
+
+        if (positions.Count > 0)
+        {
+            Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", positions.Count,
+                minDate);
+
+            context.RemoveRange(positions);
+        }
+
+        var neighbors = context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
+
+        if (neighbors.Count > 0)
+        {
+            Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", neighbors.Count,
+                minDate);
+
+            context.RemoveRange(neighbors);
+        }
+
         await context.SaveChangesAsync();
     }
 

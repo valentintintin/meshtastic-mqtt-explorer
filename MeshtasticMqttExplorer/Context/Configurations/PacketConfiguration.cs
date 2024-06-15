@@ -28,6 +28,10 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
             .WithMany()
             .HasForeignKey(a => a.GatewayId);
 
+        builder.HasOne(a => a.GatewayPosition)
+            .WithMany()
+            .HasForeignKey(a => a.GatewayPositionId);
+
         builder.HasOne(a => a.From)
             .WithMany(a => a.PacketsFrom)
             .HasForeignKey(a => a.FromId);

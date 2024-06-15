@@ -8,6 +8,7 @@ public class PurgeJob(MqttService mqttService) : BackgroundService
         {
             await mqttService.PurgePackets();
             await mqttService.PurgeEncryptedPackets();
+            await mqttService.PurgeData();
 
             await Task.Delay(TimeSpan.FromHours(1), cancellationToken);
         }
