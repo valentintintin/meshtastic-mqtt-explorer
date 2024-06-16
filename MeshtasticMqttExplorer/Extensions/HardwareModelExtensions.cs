@@ -4,7 +4,7 @@ namespace MeshtasticMqttExplorer.Extensions;
 
 public static class HardwareModelExtensions
 {
-    public static string GetImageUrl(this HardwareModel hardwareModel)
+    public static string GetImageUrl(this HardwareModel? hardwareModel)
     {
         return hardwareModel switch
         {

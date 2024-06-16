@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using CS_AES_CTR;
 using Google.Protobuf;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Context;
@@ -221,9 +222,10 @@ public class MqttService : AService, IAsyncDisposable
             
             return;
         }
-        
-        // todo : Dechiffrer avec AQ== si chiffré : https://github.com/liamcottle/meshtastic-map/blob/1fb6a27ab035a708e674314c82b71ffe801f1f61/src/mqtt.js#L239
 
+        bool isEncrypted = rootPacket.Packet.Decoded == null;
+        rootPacket.Packet.Decoded ??= Decrypt(rootPacket.Packet.Encrypted.ToByteArray(), "1PG7OiApB1nwvP+rz05pAQ==", rootPacket.Packet.Id, rootPacket.Packet.From);
+        
         var payload = rootPacket.Packet.GetPayload();
         
         var packet = new Packet
@@ -231,7 +233,7 @@ public class MqttService : AService, IAsyncDisposable
             Channel = channel,
             Gateway = nodeGateway,
             GatewayPosition = nodeGateway.Positions.FirstOrDefault(),
-            Encrypted = rootPacket.Packet.Decoded?.Portnum == null,
+            Encrypted = isEncrypted,
             Priority = rootPacket.Packet.Priority,
             PacketId = rootPacket.Packet.Id,
             WantAck = rootPacket.Packet.WantAck,
@@ -288,12 +290,18 @@ public class MqttService : AService, IAsyncDisposable
         foreach (var mqttClientAndConfiguration in _mqttClientAndConfigurations.Where(m => !m.Client.IsConnected))
         {
             Logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
-            
-            await mqttClientAndConfiguration.Client.ConnectAsync(new MqttClientOptionsBuilder()
+
+            var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
                 .WithTcpServer(mqttClientAndConfiguration.Configuration.Host, mqttClientAndConfiguration.Configuration.Port)
-                .WithCredentials(mqttClientAndConfiguration.Configuration.Username, mqttClientAndConfiguration.Configuration.Password)
-                .WithClientId($"MeshtasticMqttExplorer_ValentinF4HVV_{_environment.EnvironmentName}")
-                .Build());   
+                .WithClientId($"MeshtasticMqttExplorer_ValentinF4HVV_{_environment.EnvironmentName}");
+
+            if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.Configuration.Username))
+            {
+                mqttClientOptionsBuilder = mqttClientOptionsBuilder
+                    .WithCredentials(mqttClientAndConfiguration.Configuration.Username, mqttClientAndConfiguration.Configuration.Password);
+            }
+
+            await mqttClientAndConfiguration.Client.ConnectAsync(mqttClientOptionsBuilder.Build());   
         }
     }
 
@@ -533,6 +541,42 @@ public class MqttService : AService, IAsyncDisposable
 
         return position;
     }
+
+    private Data? Decrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
+    {
+        var nonce = CreateNonce(packetId, nodeFromId);
+
+        var forDecrypting = new AES_CTR(Convert.FromBase64String(key), nonce);
+        var decryptedContent = new byte[input.Length];
+        forDecrypting.DecryptBytes(decryptedContent, input);
+        
+        try
+        {
+            var packet = new Data();
+            packet.MergeFrom(decryptedContent);
+
+            Logger.LogInformation("Decrypt packet {packetId} from {nodeId} with key {key} OK", packetId, nodeFromId, key);
+
+            return packet;
+        }
+        catch
+        {
+            Logger.LogWarning("Decrypt packet {packetId} from {nodeId} with key {key} KO", packetId, nodeFromId, key);
+
+            return null;
+        }
+    }
+    
+    private byte[] CreateNonce(ulong packetId, uint fromNode)
+    {
+        var nonce = new byte[16];
+
+        BitConverter.GetBytes(packetId).CopyTo(nonce, 0);
+        BitConverter.GetBytes(fromNode).CopyTo(nonce, 8);
+        BitConverter.GetBytes(0).CopyTo(nonce, 12);
+
+        return nonce;
+    }
     
     private class MqttClientAndConfiguration
     {
@@ -564,7 +608,7 @@ public class MqttService : AService, IAsyncDisposable
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         var context = await DbContextFactory.CreateDbContextAsync();
         
-        var packets = context.Packets.Where(a => a.CreatedAt < threeDays && a.Encrypted).ToList();
+        var packets = context.Packets.Where(a => a.CreatedAt < threeDays && a.Encrypted && string.IsNullOrWhiteSpace(a.PayloadJson)).ToList();
 
         if (packets.Count == 0)
         {

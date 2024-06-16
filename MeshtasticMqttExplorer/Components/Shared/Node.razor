@@ -119,9 +119,9 @@
                         </DescriptionsItem>
                     </Descriptions>
                     
-                    @if (NodeInfo?.HardwareModel != null && NodeInfo?.HardwareModel?.GetImageUrl() != "gray.jpg")
+                    @if (NodeInfo?.HardwareModel != null && NodeInfo?.HardwareModel.GetImageUrl() != "gray.jpg")
                     {
-                        <img height="150px" src="@NodeInfo?.HardwareModel?.GetImageUrl()" alt="@NodeInfo?.HardwareModel.ToString()" title="@NodeInfo?.HardwareModel.ToString()" />
+                        <img height="150px" src="@NodeInfo?.HardwareModel.GetImageUrl()" alt="@NodeInfo?.HardwareModel.ToString()" title="@NodeInfo?.HardwareModel.ToString()" />
                     }
                 </ChildContent>
             </Card>

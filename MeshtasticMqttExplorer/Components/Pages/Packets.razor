@@ -44,7 +44,7 @@ else
 }
 
 <Table @ref="Table" TItem="Packet" DataSource="_packets" Responsive Total="Total" OnChange="OnTableChange"
-       RowClassName="@(x => x.Data.PortNum == null ? "red" : "" )">
+       RowClassName="@(x => x.Data.Encrypted ? "red" : "" )">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
             @context.PacketId

@@ -37,7 +37,7 @@
                 @foreach (var message in channel.TextMessages.OrderByDescending(a => a.CreatedAt))
                 {
                     <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName())"
-                             Avatar="@message.From.HardwareModel?.GetImageUrl()"
+                             Avatar="@message.From.HardwareModel.GetImageUrl()"
                              Content="@message.Message"
                              Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)">
                     </Comment>
@@ -98,11 +98,12 @@
         Loading = true;
         
         _channels = await Context.Channels
-            .Include(c => c.TextMessages)
+            .Include(c => c.TextMessages.OrderByDescending(a => a.CreatedAt))
             .ThenInclude(c => c.From)
             .Include(c => c.TextMessages)
             .ThenInclude(c => c.To)
             .Where(a => a.TextMessages.Count > 0)
+            .OrderBy(a => a.Name)
             .ToListAsync();
 
         Total = _channels.Sum(a => a.TextMessages.Count);

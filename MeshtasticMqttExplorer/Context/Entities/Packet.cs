@@ -14,7 +14,7 @@ public class Packet : IEntity
     public long ChannelId { get; set; }
     public virtual Channel Channel { get; set; } = null!;
     
-    public required long PacketId { get; set; }
+    public required ulong PacketId { get; set; }
     
     public long GatewayId { get; set; }
     public virtual Node Gateway { get; set; } = null!;

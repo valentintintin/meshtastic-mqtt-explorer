@@ -9,6 +9,7 @@
     <ItemGroup>
       <PackageReference Include="AntDesign" Version="0.19.1" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
+      <PackageReference Include="LibAES-CTR" Version="1.0.1" />
       <PackageReference Include="Meshtastic" Version="1.0.41" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.6" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
