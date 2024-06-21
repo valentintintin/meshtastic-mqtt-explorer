@@ -1,5 +1,4 @@
 @page "/weather"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @using MeshtasticMqttExplorer.Components.Shared
@@ -10,14 +9,14 @@
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 
-<PageTitle>Météo</PageTitle>
+<PageTitle>Données météo</PageTitle>
 
 <PageHeader Title="Météo">
     <SubtitleTemplate>
-        @Telemetries.Count noeuds avec position depuis les 3 derniers jours
+        @Telemetries.Count données depuis les dernières 12h
     </SubtitleTemplate>
     <PageHeaderExtra>
-        <Button OnClick="FetchData">Actualiser</Button>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
 </PageHeader>
 
@@ -38,6 +37,8 @@
         if (!firstRender && Map != null && !HasRenderMapData)
         {
             await Map.AddMarkers(Telemetries.Select(GetMarker).ToList());
+
+            HasRenderMapData = true;
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -62,12 +63,12 @@
             await Map.ClearMarkers();
         }
         
-        var threeHours = DateTime.UtcNow.AddHours(-3);
+        var twelveHours = DateTime.UtcNow.AddHours(-12);
 
         Telemetries = await Context.Telemetries
             .Include(n => n.Node)
             .Where(n => n.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics)
-            .Where(n => n.CreatedAt >= threeHours)
+            .Where(n => n.CreatedAt >= twelveHours)
             .Where(n => n.Node.Latitude.HasValue && n.Node.Longitude.HasValue)
             .GroupBy(n => n.NodeId)
             .Select(a => a.OrderByDescending(b => b.CreatedAt).First())
@@ -99,11 +100,11 @@
         
         return new Osm.Marker
         {
-            Id = telemetry.NodeId,
+            Id = telemetry.Id.ToString(),
             Latitude = telemetry.Node.Latitude!.Value,
             Longitude = telemetry.Node.Longitude!.Value,
             Label = data.JoinString(" | "),
-            Popup = $"<p><a href=\"/node/{telemetry.NodeId}\" target=\"_blank\"><b>{telemetry.Node.FullName()}</b></a></p><p>{data.JoinString(" | ")}"
+            Popup = $"<p><a href=\"/node/{telemetry.Id}\" target=\"_blank\"><b>{telemetry.Node.AllNames}</b></a></p><p>{data.JoinString(" | ")}"
         };
     }
 

@@ -19,3 +19,9 @@
     width: 75px;
     height: 2px; 
 }
+
+.legend-image {
+    display: inline-block;
+    margin-right: 10px;
+    max-width: 75px;
+}

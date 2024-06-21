@@ -7,6 +7,7 @@ using Channel = MeshtasticMqttExplorer.Context.Entities.Channel;
 using NeighborInfo = MeshtasticMqttExplorer.Context.Entities.NeighborInfo;
 using Position = MeshtasticMqttExplorer.Context.Entities.Position;
 using Telemetry = MeshtasticMqttExplorer.Context.Entities.Telemetry;
+using Waypoint = MeshtasticMqttExplorer.Context.Entities.Waypoint;
 
 namespace MeshtasticMqttExplorer.Context;
 
@@ -19,6 +20,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public required DbSet<NeighborInfo> NeighborInfos { get; set; }
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
+    public required DbSet<Waypoint> Waypoints { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

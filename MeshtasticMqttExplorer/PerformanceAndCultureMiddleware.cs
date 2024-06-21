@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using AntDesign;
 
 namespace MeshtasticMqttExplorer;
 
@@ -13,11 +14,10 @@ public class PerformanceAndCultureMiddleware(
         var firstLanguage = headersAcceptLanguage.FirstOrDefault()?.Split(',').FirstOrDefault();
         var culture = CultureInfo.GetCultureInfo(firstLanguage ?? "fr");
         
-        CultureInfo.CurrentCulture = culture;
-        CultureInfo.DefaultThreadCurrentCulture = culture;
-        
         Thread.CurrentThread.CurrentCulture = culture;
         Thread.CurrentThread.CurrentUICulture = culture;
+
+        LocaleProvider.SetLocale(culture.Name);	
         
         Stopwatch watch = new();
         watch.Start();

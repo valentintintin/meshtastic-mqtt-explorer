@@ -36,6 +36,7 @@ public class Node : IEntity
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];
     public virtual ICollection<Position> Positions { get; set; } = [];
+    public virtual ICollection<Waypoint> Waypoints { get; set; } = [];
     public virtual ICollection<Telemetry> Telemetries { get; set; } = [];
     public virtual ICollection<NeighborInfo> MyNeighbors { get; set; } = [];
     public virtual ICollection<NeighborInfo> NeighborsFor { get; set; } = [];

@@ -1,13 +1,18 @@
 ﻿@inherits LayoutComponentBase
 
-<Layout Class="layout">
+<Layout>
     <Header Style="height: auto; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; color: white;">
-        <a href="/" style="color: unset; margin-right: 60px">Meshtastic MQTT Explorer</a>
+        <div style="margin-right: 60px">
+            <a href="/" style="color: unset; margin-right: 10px">Meshtastic MQTT Explorer</a>
+            <small>@Version</small>
+        </div>
+        
         <Menu Theme="MenuTheme.Dark" Mode="MenuMode.Horizontal">
             <MenuItem RouterLink="/map" RouterMatch="NavLinkMatch.All">Carte</MenuItem>
-            <MenuItem RouterLink="/nodes" RouterMatch="NavLinkMatch.All">Noeuds</MenuItem>
+            <MenuItem RouterLink="/nodes" RouterMatch="NavLinkMatch.All">Nœuds</MenuItem>
             <MenuItem RouterLink="/messages" RouterMatch="NavLinkMatch.All">Messages</MenuItem>
             <MenuItem RouterLink="/weather" RouterMatch="NavLinkMatch.All">Météo</MenuItem>
+            <MenuItem RouterLink="/waypoints" RouterMatch="NavLinkMatch.All">Points d'intérêts</MenuItem>
             <MenuItem RouterLink="/packets" RouterMatch="NavLinkMatch.All">Trames</MenuItem>
             <MenuItem RouterLink="/stats" RouterMatch="NavLinkMatch.All">Statistiques</MenuItem>
         </Menu>
@@ -24,7 +29,7 @@
 
 <div id="blazor-error-ui">
     <environment include="Staging,Production">
-    Une erreur est survenue
+        Une erreur est survenue
     </environment>
     <environment include="Development">
         Une exception a été lancée !
@@ -32,3 +37,15 @@
     <a href="" class="reload">Recharger</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code
+{
+    private string? Version { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Version = GetType().Assembly.GetName().Version?.ToString();
+        
+        base.OnInitialized();
+    }
+}

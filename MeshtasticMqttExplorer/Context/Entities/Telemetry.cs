@@ -11,8 +11,8 @@ public class Telemetry : IEntity
     public long NodeId { get; set; }
     public virtual Node Node { get; set; } = null!;
     
-    public long PacketId { get; set; }
-    public virtual Packet Packet { get; set; } = null!;
+    public long? PacketId { get; set; }
+    public virtual Packet? Packet { get; set; }
     
     public uint? BatteryLevel { get; set; }
     public float? Voltage { get; set; }

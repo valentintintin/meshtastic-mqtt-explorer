@@ -36,12 +36,16 @@ public static class ServiceEnvelopeExtensions
             if (typeof(TResult) == typeof(User) && packet?.Decoded?.Portnum == PortNum.NodeinfoApp)
                 return User.Parser.ParseFrom(packet.Decoded?.Payload) as TResult;
             if (typeof(TResult) == typeof(Waypoint) && packet?.Decoded?.Portnum == PortNum.WaypointApp)
-                return NodeInfo.Parser.ParseFrom(packet.Decoded?.Payload) as TResult;
+                return Waypoint.Parser.ParseFrom(packet.Decoded?.Payload) as TResult;
             if (typeof(TResult) == typeof(MapReport) && packet?.Decoded?.Portnum == PortNum.MapReportApp)
                 return MapReport.Parser.ParseFrom(packet.Decoded?.Payload) as TResult;
+            if (typeof(TResult) == typeof(StoreAndForward) && packet?.Decoded?.Portnum == PortNum.StoreForwardApp)
+                return StoreAndForward.Parser.ParseFrom(packet.Decoded?.Payload) as TResult;
             if (typeof(TResult) == typeof(string) && packet?.Decoded?.Portnum == PortNum.TextMessageApp)
                 return packet.Decoded?.Payload.ToStringUtf8() as TResult;
             if (typeof(TResult) == typeof(string) && packet?.Decoded?.Portnum == PortNum.SerialApp)
+                return packet.Decoded?.Payload.ToStringUtf8() as TResult;
+            if (typeof(TResult) == typeof(string) && packet?.Decoded?.Portnum == PortNum.RangeTestApp)
                 return packet.Decoded?.Payload.ToStringUtf8() as TResult;
 
             return null;
@@ -68,12 +72,13 @@ public static class ServiceEnvelopeExtensions
                 PortNum.PositionApp => Position.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.TelemetryApp => Telemetry.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.NodeinfoApp => User.Parser.ParseFrom(packet.Decoded?.Payload),
-                PortNum.WaypointApp => NodeInfo.Parser.ParseFrom(packet.Decoded?.Payload),
+                PortNum.WaypointApp => Waypoint.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.NeighborinfoApp => NeighborInfo.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.StoreForwardApp => StoreAndForward.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.MapReportApp => MapReport.Parser.ParseFrom(packet.Decoded?.Payload),
                 PortNum.TextMessageApp => packet.Decoded?.Payload.ToStringUtf8(),
                 PortNum.SerialApp => packet.Decoded?.Payload.ToStringUtf8(),
+                PortNum.RangeTestApp => packet.Decoded?.Payload.ToStringUtf8(),
                 _ => packet?.Decoded?.Payload
             };
         }

@@ -24,7 +24,8 @@ namespace MeshtasticMqttExplorer.Services;
 
 public class MqttService : AService, IAsyncDisposable
 {
-    public static readonly uint NodeBroadcast = 4294967295;
+    public static readonly uint NodeBroadcast = 0xFFFFFFFF;
+    public static readonly uint[] NodesAvoided = [NodeBroadcast, 0x1, 0x10];
     public static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         Converters =
@@ -96,6 +97,12 @@ public class MqttService : AService, IAsyncDisposable
                 var rootPacket = new ServiceEnvelope();
                 rootPacket.MergeFrom(data);
 
+                if (rootPacket.Packet.ViaMqtt)
+                {
+                    logger.LogTrace("Packet #{packetId} gated via MQTT so ignored", rootPacket.Packet.Id);
+                    return;
+                }
+
                 await DoReceive(rootPacket, mqttClientAndConfiguration, topicSegments);
             };
 
@@ -166,8 +173,8 @@ public class MqttService : AService, IAsyncDisposable
         {
             NodeId = rootPacket.Packet.From,
             LastSeen = DateTime.UtcNow,
-            ModemPreset = nodeGateway.ModemPreset,
-            RegionCode = nodeGateway.RegionCode
+            // ModemPreset = nodeGateway.ModemPreset,
+            // RegionCode = nodeGateway.RegionCode
         };
         if (nodeFrom.Id == 0)
         {
@@ -177,8 +184,8 @@ public class MqttService : AService, IAsyncDisposable
         else if (nodeFrom.NodeId != NodeBroadcast)
         {
             nodeFrom.LastSeen = DateTime.UtcNow;
-            nodeFrom.ModemPreset ??= nodeGateway.ModemPreset;
-            nodeFrom.RegionCode ??= nodeGateway.RegionCode;
+            // nodeFrom.ModemPreset ??= nodeGateway.ModemPreset;
+            // nodeFrom.RegionCode ??= nodeGateway.RegionCode;
             mqtt.Context.Update(nodeFrom);
         }
         await mqtt.Context.SaveChangesAsync();
@@ -187,21 +194,21 @@ public class MqttService : AService, IAsyncDisposable
         var nodeTo = await mqtt.Context.Nodes.FindByNodeIdAsync(rootPacket.Packet.To) ?? new Node
         {
             NodeId = rootPacket.Packet.To,
-            ModemPreset = nodeGateway.ModemPreset,
-            RegionCode = nodeGateway.RegionCode
+            // ModemPreset = nodeGateway.ModemPreset,
+            // RegionCode = nodeGateway.RegionCode
         };
         if (nodeTo.Id == 0)
         {
             mqtt.Context.Add(nodeTo);
             Logger.LogInformation("New node (to) created {node}", nodeTo);
-            await mqtt.Context.SaveChangesAsync();
         }
         else if (nodeTo.NodeId != NodeBroadcast)
         {
-            nodeTo.ModemPreset ??= nodeGateway.ModemPreset;
-            nodeTo.RegionCode ??= nodeGateway.RegionCode;
+            // nodeTo.ModemPreset ??= nodeGateway.ModemPreset;
+            // nodeTo.RegionCode ??= nodeGateway.RegionCode;
             mqtt.Context.Update(nodeTo);
         }
+        await mqtt.Context.SaveChangesAsync();
         NewNode.OnNext(nodeTo);
         
         var channel = await mqtt.Context.Channels.FirstOrDefaultAsync(c => c.Name == rootPacket.ChannelId) ?? new Channel
@@ -223,7 +230,7 @@ public class MqttService : AService, IAsyncDisposable
             return;
         }
 
-        bool isEncrypted = rootPacket.Packet.Decoded == null;
+        var isEncrypted = rootPacket.Packet.Decoded == null;
         rootPacket.Packet.Decoded ??= Decrypt(rootPacket.Packet.Encrypted.ToByteArray(), "1PG7OiApB1nwvP+rz05pAQ==", rootPacket.Packet.Id, rootPacket.Packet.From);
         
         var payload = rootPacket.Packet.GetPayload();
@@ -316,16 +323,6 @@ public class MqttService : AService, IAsyncDisposable
 
         nodeFrom.ShortName = mapReport.ShortName;
         nodeFrom.LongName = mapReport.LongName;
-
-        if (mapReport is not { LatitudeI: 0, LongitudeI: 0 })
-        {
-            await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, mqtt.Context);
-        }
-        else
-        {
-            Logger.LogWarning("Position of {node} is incorrect", nodeFrom);
-        }
-
         nodeFrom.Role = mapReport.Role;
         nodeFrom.HardwareModel = mapReport.HwModel;
         nodeFrom.ModemPreset = mapReport.ModemPreset;
@@ -333,7 +330,8 @@ public class MqttService : AService, IAsyncDisposable
         nodeFrom.NumOnlineLocalNodes = (int?)mapReport.NumOnlineLocalNodes;
         nodeFrom.FirmwareVersion = mapReport.FirmwareVersion;
         nodeFrom.HasDefaultChannel = mapReport.HasDefaultChannel;
-        
+        await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, null, mqtt.Context);
+
         Logger.LogInformation("Update {node} with MapReport", nodeFrom);
         
         mqtt.Context.Update(nodeFrom);
@@ -349,13 +347,7 @@ public class MqttService : AService, IAsyncDisposable
             return;
         }
 
-        if (positionPayload is { LatitudeI: 0, LongitudeI: 0 })
-        {
-            Logger.LogWarning("Position of {node} is incorrect", nodeFrom);
-            return;
-        }
-
-        await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, mqtt.Context);
+        await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet, mqtt.Context);
     }
 
     private async Task DoNodeInfoPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
@@ -497,43 +489,54 @@ public class MqttService : AService, IAsyncDisposable
         await base.DisposeAsync();
     }
 
-    private async Task<Position> UpdatePosition(Node node, int latitude, int longitude, int altitude, DataContext context)
+    public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet, DataContext context)
     {
+        if (latitude == 0 && longitude == 0)
+        {
+            Logger.LogWarning("Position given for {node} is incorrect", node);
+            
+            return null;
+        }
+        
         node.Latitude = latitude * 0.0000001;
         node.Longitude = longitude * 0.0000001;
         node.Altitude = altitude;
 
         var position = context.Positions
-            .OrderByDescending(a => a.Node == node 
-                                    && a.Latitude == node.Latitude 
-                                    && a.Longitude == node.Longitude 
-                                    && a.Altitude == node.Altitude)
-            .FirstOrDefault() ?? new Position
-        {
-            Latitude = node.Latitude.Value,
-            Longitude = node.Longitude.Value,
-            Altitude = node.Altitude,
-            Node = node
-        };
+            .OrderByDescending(a => a.UpdatedAt)
+            .FirstOrDefault(a => a.Node == node);
 
-        if (position.Id > 0)
+        if (position == null 
+            || position.Latitude != node.Latitude 
+            || position.Longitude != node.Longitude 
+            || position.Altitude != node.Altitude)
         {
-            position.UpdatedAt = DateTime.UtcNow;
-            context.Update(position);
-        }
-        else
-        {
+            position = new Position
+                    {
+                        Latitude = node.Latitude.Value,
+                        Longitude = node.Longitude.Value,
+                        Altitude = node.Altitude,
+                        Node = node,
+                        Packet = packet
+                    };
+            
             context.Add(position);
         
             Logger.LogInformation("Update {node} with new Position", node);
         }
-        
-        node.Latitude = position.Latitude;
-        node.Longitude = position.Longitude;
-        node.Altitude = position.Altitude;
-        
-        context.Update(node);
+        else
+        {
+            position.UpdatedAt = DateTime.UtcNow;
+            
+            if (packet != null)
+            {
+                position.Packet = packet;
+            }
 
+            context.Update(position);
+        }
+
+        context.Update(node);
         await context.SaveChangesAsync();
         
         NewNode.OnNext(node);

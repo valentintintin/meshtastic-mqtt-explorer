@@ -12,8 +12,8 @@ public class TextMessage : IEntity
     public long? ToId { get; set; }
     public virtual Node? To { get; set; }
     
-    public long PacketId { get; set; }
-    public virtual Packet Packet { get; set; } = null!;
+    public long? PacketId { get; set; }
+    public virtual Packet? Packet { get; set; }
     
     public long ChannelId { get; set; }
     public virtual Channel Channel { get; set; } = null!;

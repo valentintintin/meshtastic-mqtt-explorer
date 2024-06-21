@@ -1,4 +1,3 @@
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @inject IJSRuntime JSRuntime
@@ -38,6 +37,8 @@
                 await AddMarker(OneMarker);
             }
         }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
     
     public async Task AddMarker(Marker marker)
@@ -59,11 +60,18 @@
         await JSRuntime.InvokeVoidAsync("addMarkersToMap", markers);
     }
 
-    public async Task AddPolyline(string id, List<double[]> points, string color)
+    public async Task AddPolyline(Line line)
     {
         await _mapInitialized.Task;
 
-        await JSRuntime.InvokeVoidAsync("addPolylineToMap", id, points, color);
+        await JSRuntime.InvokeVoidAsync("addPolylineToMap", line);
+    }
+
+    public async Task AddPolylines(List<Line> lines)
+    {
+        await _mapInitialized.Task;
+
+        await JSRuntime.InvokeVoidAsync("addPolylinesToMap", lines);
     }
 
     public async Task ClearMarkers()
@@ -71,8 +79,12 @@
         await _mapInitialized.Task;
 
         await JSRuntime.InvokeVoidAsync("clearMarkersMap");
+    }
 
-        await Task.Delay(1000);
+    public async Task Reload()
+    {
+        await DisposeAsync();
+        await OnAfterRenderAsync(true);
     }
 
     public async ValueTask DisposeAsync()
@@ -85,11 +97,15 @@
         {
             // Ignore
         }
+        finally
+        {
+            _mapInitialized = new TaskCompletionSource<bool>();
+        }
     }
 
     public class Marker
     {
-        public required long Id { get; set; }
+        public required string Id { get; set; }
         public required double Latitude { get; set; }
         public required double Longitude { get; set; }
         public IconType IconType { get; set; } = IconType.Classic;
@@ -98,6 +114,14 @@
         public string? Color { get; set; }
         public string? FillColor { get; set; }
         public float? Opacity { get; set; }
+    }
+    
+    public class Line
+    {
+        public required string Id { get; set; }
+        public required List<double[]> Points { get; set; }
+        public string? Color { get; set; }
+        public string? Popup { get; set; }
     }
     
     public enum IconType

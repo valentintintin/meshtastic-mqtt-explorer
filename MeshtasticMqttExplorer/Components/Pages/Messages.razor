@@ -1,10 +1,9 @@
 @page "/messages"
-@rendermode InteractiveServer
+@page "/channel/{channelId:long}/messages"
 @implements IAsyncDisposable
 
 @using System.Globalization
 @using System.Reactive.Linq
-@using System.Text.RegularExpressions
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Extensions
@@ -14,27 +13,50 @@
 @inject MqttService MqttService
 @inject IDbContextFactory<DataContext> ContextFactory;
 
-<PageTitle>Messages</PageTitle>
+<PageTitle>
+    @if (Channel == null)
+    {
+        <text>Liste des messages</text>
+    }
+    else
+    {
+        <text>Liste des messages du canal @Channel.Name</text>
+    }
+</PageTitle>
 
 <PageHeader Title="Messages">
     <SubtitleTemplate>
-        @Total messages
+        @if (Channel == null)
+        {
+            <text>@Total messages dans @Channels.Count cannaux</text>
+        }
+        else
+        {
+            <text>@Total messages dans @Channel.Name</text>
+        }
     </SubtitleTemplate>
     <PageHeaderExtra>
-        <Button OnClick="FetchData">Actualiser</Button>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
 </PageHeader>
 
 <Spin Spinning="Loading">
-    <Tabs Size="TabSize.Default">
-        @foreach (var channel in _channels)
-        {
-            <TabPane Tab="@channel.Name" Key="@channel.Id.ToString()">
-                <p>
-                    @channel.TextMessages.Count messages
-                </p>
-                
-                @foreach (var message in channel.TextMessages.OrderByDescending(a => a.CreatedAt))
+    <Layout Class="site-layout-background" Style="padding: 24px 0;">
+        <Sider Class="site-layout-background" Width="250"
+               CollapsedWidth="0" 
+               Breakpoint="BreakpointType.Sm">
+            <Menu Mode="MenuMode.Inline"
+                  Style="height: 100%;">
+                @foreach (var channel in Channels)
+                {
+                    <MenuItem RouterLink="@("/channel/" + channel.Id + "/messages")" RouterMatch="NavLinkMatch.All">@channel.Name (@channel.TextMessages.Count messages)</MenuItem>
+                }
+            </Menu>
+        </Sider>
+        <Content Style="padding:0 24px; min-height: 280px;">
+            @if (Channel != null)
+            {
+                @foreach (var message in Channel.TextMessages)
                 {
                     <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName())"
                              Avatar="@message.From.HardwareModel.GetImageUrl()"
@@ -42,36 +64,42 @@
                              Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)">
                     </Comment>
                 }
-            </TabPane>
-        }
-    </Tabs>
+            }
+            else if (Channels.Count > 0)
+            {
+                <Result Title="Choisissez un canal à gauche"></Result>
+            }
+            else
+            {
+                <Result Title="Aucun canal" Status="warning"></Result>
+            }
+        </Content>
+    </Layout>
 </Spin>
 
 @code
 {
     [Parameter]
-    public long? Id { get; set; }
+    public long? ChannelId { get; set; }
     
     private bool Loading { get; set; } = true;
     private int Total { get; set; }
-    private List<Channel> _channels = [];
+    private List<Channel> Channels { get; set; } = [];
+    private Channel? Channel { get; set; }
     private DataContext Context { get; set; } = null!;
-
     private List<IDisposable> Disposables { get; } = [];
     
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
-        await FetchData();
-
         Disposables.Add(MqttService.NewTextMessage.SubscribeAsync(async message =>
         {
-            var channel = _channels.Find(c => c.Id == message.ChannelId);
+            var channel = Channels.Find(c => c.Id == message.ChannelId);
 
             if (channel == null)
             {
-                _channels.Add(message.Channel);
+                Channels.Add(message.Channel);
             }
             else
             {
@@ -83,9 +111,9 @@
             await InvokeAsync(StateHasChanged); 
         }));
 
-        Disposables.Add(MqttService.NewChannel.Where(c => _channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
+        Disposables.Add(MqttService.NewChannel.Where(c => Channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
         {
-            _channels.Add(channel);
+            Channels.Add(channel);
 
             await InvokeAsync(StateHasChanged);
         }));
@@ -93,11 +121,23 @@
         await base.OnInitializedAsync();
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!ChannelId.HasValue)
+        {
+            Channel = null;
+        }
+        
+        await FetchData();
+        
+        await base.OnParametersSetAsync();
+    }
+
     private async Task FetchData()
     {
         Loading = true;
         
-        _channels = await Context.Channels
+        Channels = await Context.Channels
             .Include(c => c.TextMessages.OrderByDescending(a => a.CreatedAt))
             .ThenInclude(c => c.From)
             .Include(c => c.TextMessages)
@@ -106,7 +146,17 @@
             .OrderBy(a => a.Name)
             .ToListAsync();
 
-        Total = _channels.Sum(a => a.TextMessages.Count);
+        Total = Channels.Sum(a => a.TextMessages.Count);
+
+        if (ChannelId.HasValue)
+        {
+            Channel = Channels.Find(c => c.Id == ChannelId);
+
+            if (Channel != null)
+            {
+                Total = Channel.TextMessages.Count;
+            }
+        }
 
         Loading = false;
     }

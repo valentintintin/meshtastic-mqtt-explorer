@@ -9,6 +9,7 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
     public void Configure(EntityTypeBuilder<Position> builder)
     {
         builder.HasIndex(a => a.CreatedAt);
+        builder.HasIndex(a => a.UpdatedAt);
         
         builder.HasOne(a => a.Node)
             .WithMany(a => a.Positions)
@@ -16,6 +17,7 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
         
         builder.HasOne(a => a.Packet)
             .WithMany()
-            .HasForeignKey(a => a.PacketId);
+            .HasForeignKey(a => a.PacketId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

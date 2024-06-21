@@ -8,6 +8,7 @@ using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Components.Shared;
 using MeshtasticMqttExplorer.Context;
+using MeshtasticMqttExplorer.Extensions;
 using MeshtasticMqttExplorer.Extensions.Entities;
 using MeshtasticMqttExplorer.Services;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +20,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-
-builder.Services.AddServerSideBlazor();
-
 builder.Services.AddAntDesign();
 
 builder.Services.Configure<HostOptions>(hostOptions =>
@@ -79,69 +77,53 @@ context.Database.Migrate();
 
 if (false)
 {
-    /*
-    var nodes = context.Nodes;
-    await foreach (var node in nodes)
+    var mqttService = app.Services.GetRequiredService<MqttService>();
+    
+    var nodes = context.Nodes
+        .Include(a => a.PacketsFrom.Where(p => p.PortNum == PortNum.MapReportApp || p.PortNum == PortNum.PositionApp).OrderByDescending(p => p.UpdatedAt).Take(1))
+        .Where(n => n.PacketsFrom.Any(p => p.PortNum == PortNum.MapReportApp || p.PortNum == PortNum.PositionApp))
+        .ToList();
+    var i = 0;
+    foreach (var node in nodes)
     {
-        node.NodeIdString = node.NodeIdAsString();
-        node.AllNames = node.FullName();
-    }
+        var packet = node.PacketsFrom.First();
+        
+        var rootPacket = new ServiceEnvelope();
+        rootPacket.MergeFrom(packet.Payload);
 
-    await context.SaveChangesAsync();
-      */  
-    /*
-    var packets = context.Packets.Include(n => n.From).Where(n => n.PortNum == PortNum.NeighborinfoApp).ToList();
-    foreach (var packet in packets)
-    {
-        NeighborInfo neighborInfoPayload = new();
-        neighborInfoPayload.MergeFrom(packet.Payload);
-
-        foreach (var neighbor in neighborInfoPayload.Neighbors)
+        switch (rootPacket.Packet.Decoded.Portnum)
         {
-            var neighborNode = await context.Nodes.FindByNodeIdAsync(neighbor.NodeId) ?? new Node
+            case PortNum.MapReportApp:
             {
-                NodeId = neighbor.NodeId,
-                ModemPreset = packet.From.ModemPreset,
-                RegionCode = packet.From.RegionCode
-            };
-            if (neighborNode.Id == 0)
-            {
-                context.Add(neighborNode);
-            }
-            else
-            {
-                neighborNode.RegionCode ??= packet.From.RegionCode;
-                neighborNode.ModemPreset ??= packet.From.ModemPreset;
-                context.Update(neighborNode);
-            }
-
-            await context.SaveChangesAsync();
-
-            var neighborInfo =
-                await context.NeighborInfos.FirstOrDefaultAsync(
-                    n => n.Node == packet.From && n.Neighbor == neighborNode) ??
-                new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
+                var data = rootPacket.Packet.GetPayload<MapReport>();
+            
+                if (data != null)
                 {
-                    Node = packet.From,
-                    Packet = packet,
-                    Neighbor = neighborNode,
-                    Snr = neighbor.Snr
-                };
-            if (neighborInfo.Id == 0)
-            {
-                context.Add(neighborInfo);
+                    node.ModemPreset = data.ModemPreset;
+                    node.RegionCode = data.Region;
+                
+                    await mqttService.UpdatePosition(node, data.LatitudeI, data.LongitudeI, data.Altitude, null, context);
+                }
+
+                break;
             }
-            else
+            case PortNum.PositionApp:
             {
-                neighborInfo.CreatedAt = packet.CreatedAt;
-                neighborInfo.UpdatedAt = packet.CreatedAt;
-                context.Update(neighborInfo);
+                var data = rootPacket.Packet.GetPayload<Position>();
+
+                if (data != null)
+                {
+                    await mqttService.UpdatePosition(node, data.LatitudeI, data.LongitudeI, data.Altitude, null, context);
+                }
+
+                break;
             }
         }
 
         await context.SaveChangesAsync();
+        
+        Console.WriteLine($"#{node.Id} | {++i}/{nodes.Count}");
     }
-    */
 }
 
 Console.WriteLine("Started");

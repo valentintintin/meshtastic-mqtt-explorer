@@ -1,0 +1,134 @@
+@page "/waypoints"
+@implements IAsyncDisposable
+
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Context
+@using MeshtasticMqttExplorer.Context.Entities
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Extensions
+@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Points d'intérêts</PageTitle>
+
+<PageHeader Title="Points d'intérêts">
+    <SubtitleTemplate>
+        @Nodes.Count points d'intérêts
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Spin Spinning="Loading">
+    <Osm Height="calc(100vh - 270px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+</Spin>
+
+@code
+{
+    private bool Loading { get; set; } = true;
+    private bool HasRenderMapData { get; set; }
+    private List<Node> Nodes { get; set; } = [];
+    private DataContext Context { get; set; } = null!;
+    private Osm? Map { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && Map != null && !HasRenderMapData)
+        {
+            var nodesWithPosition = Nodes
+                .Where(n => n is { Latitude: not null, Longitude: not null })
+                .ToList();
+            
+            await Map.AddMarkers(nodesWithPosition.Select(GetMarkerNode)
+                .Concat(
+                    Nodes.SelectMany(n => n.Waypoints.Select(GetMarkerWaypoint))
+                ).ToList());
+            
+            List<Osm.Line> lines = [];
+            
+            foreach (var node in nodesWithPosition)
+            {
+                lines.AddRange(
+                    node.Waypoints
+                        .Select(n => new Osm.Line
+                        {
+                            Id = $"waypoint-{n.Id}",
+                            Points =
+                            [
+                                new[] { node.Latitude!.Value, node.Longitude!.Value },
+                                new[] { n.Latitude, n.Longitude }
+                            ],
+                            Color = Utils.Orange
+                        })
+                );
+                
+                await Map.AddPolylines(lines);
+            }
+
+            HasRenderMapData = true;
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private Osm.Marker GetMarkerNode(Node node)
+    {
+        return new Osm.Marker
+        {
+            Id = node.Id.ToString(),
+            Latitude = node.Latitude!.Value,
+            Longitude = node.Longitude!.Value,
+            Label = node.AllNames,
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.AllNames}</b>"
+        };
+    }
+
+    private Osm.Marker GetMarkerWaypoint(Waypoint waypoint)
+    {
+        return new Osm.Marker
+        {
+            Id = $"waypoint-{waypoint.Id.ToString()}",
+            Latitude = waypoint.Latitude,
+            Longitude = waypoint.Longitude,
+            Color = "orange",
+            Label = $"Point d'intérêt : {waypoint.Name}",
+            Popup = !string.IsNullOrWhiteSpace(waypoint.Description) ? $"<p><b>{waypoint.Name}</b></p><p>{waypoint.Description}</p>" : null
+        };
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await FetchData();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        HasRenderMapData = false;
+     
+        if (Map != null)
+        {
+            await Map.ClearMarkers();
+        }
+        
+        Nodes = await Context.Nodes
+            .Include(n => n.Waypoints.Where(w => w.ExpiresAt >= DateTime.UtcNow))
+            .Where(n => n.Waypoints.Any(w => w.ExpiresAt >= DateTime.UtcNow))
+            .ToListAsync();
+
+        Loading = false;
+            
+        await InvokeAsync(StateHasChanged); 
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

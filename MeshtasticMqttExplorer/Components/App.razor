@@ -1,26 +1,45 @@
-﻿<!DOCTYPE html>
+﻿@inject IMessageService MessageService;
+
+<!DOCTYPE html>
 <html lang="fr">
 
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <base href="/"/>
-    <link href="_content/AntDesign/css/ant-design-blazor.css" rel="stylesheet" />
-    <link rel="stylesheet" href="MeshtasticMqttExplorer.styles.css"/>
-    <link rel="stylesheet" href="styles.css"/>
+    <link href="_content/AntDesign/css/ant-design-blazor.css?=@Version" rel="stylesheet" />
+    <link rel="stylesheet" href="MeshtasticMqttExplorer.styles.css?=@Version"/>
+    <link rel="stylesheet" href="styles.css?version?=@Version"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <HeadOutlet/>
+    <HeadOutlet @rendermode="InteractiveServer"/>
 </head>
 
 <body>
-<Routes />
-<AntContainer />
-<script src="_framework/blazor.web.js"></script>
-<script src="_content/AntDesign/js/ant-design-blazor.js"></script>
-<script src="_content/AntDesign.Charts/ant-design-charts-blazor.js"></script>
+<Routes @rendermode="InteractiveServer" />
+<AntContainer @rendermode="InteractiveServer" />
+<script src="_framework/blazor.web.js?=@Version"></script>
+<script src="_content/AntDesign/js/ant-design-blazor.js?=@Version"></script>
+<script src="_content/AntDesign.Charts/ant-design-charts-blazor.js?=@Version"></script>
 <script src="https://unpkg.com/@@antv/g2plot@1.1.28/dist/g2plot.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<script src="osm.js"></script>
+<script src="script.js?=@Version"></script>
+<script src="osm.js?=@Version"></script>
 </body>
 
 </html>
+
+@code {
+    private string? Version { get; set; }
+    
+    protected override void OnInitialized()
+    {
+        Version = GetType().Assembly.GetName().Version?.ToString();
+        
+        MessageService.Config(new MessageGlobalConfig {
+            Duration = 2000
+        });
+        
+        base.OnInitialized();
+    }
+
+}

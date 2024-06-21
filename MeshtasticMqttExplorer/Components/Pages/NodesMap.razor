@@ -1,5 +1,4 @@
 @page "/map"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @using System.Globalization
@@ -13,16 +12,17 @@
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 
-<PageTitle>Carte des noeuds</PageTitle>
+<PageTitle>Carte des nœuds</PageTitle>
 
-<PageHeader Title="Cartes des noeuds">
+<PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total noeuds avec position depuis hier
+        @Total nœuds avec position depuis hier
     </SubtitleTemplate>
     <PageHeaderExtra>
-        <Switch @bind-Checked="ShowNeighbors" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData" />
-        <Switch @bind-Checked="ShowPaths" CheckedChildren="Afficher les routes" UnCheckedChildren="Cacher les routes" OnChange="FetchData" />
-        <Button OnClick="FetchData">Actualiser</Button>
+        <Switch @bind-Checked="ShowNeighbors" Disabled="@Loading" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData" />
+        <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes" UnCheckedChildren="Cacher les routes" OnChange="FetchData" />
+        <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData" />
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
 </PageHeader>
 
@@ -84,11 +84,16 @@
                 <GridCol Xs="24" Md="6">
                     <div class="legend">
                         <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                        Voisin du noeud
+                        Voisin du nœud
                     </div>
                     <div class="legend">
                         <span style="background-color: @Utils.Green" class="legend-bar"></span>
                         Paquets relayés par cette passerelle MQTT
+                    </div>
+                    <div class="legend">
+                        <img src="https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-orange.png"
+                             alt="Marqueur orange d'un point d'intétêt" class="legend-image" />
+                        Point d'intétêt
                     </div>
                 </GridCol>
             </GridRow>
@@ -102,6 +107,7 @@
     private bool HasRenderMapData { get; set; }
     private bool ShowNeighbors { get; set; }
     private bool ShowPaths { get; set; }
+    private bool ShowPois { get; set; }
     private int Total { get; set; }
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
@@ -111,38 +117,80 @@
     {
         if (!firstRender && Map != null && !HasRenderMapData)
         {
-            await Map.AddMarkers(Nodes.OrderBy(n => n.LastSeen).Select(GetMarker).ToList());
-
+            var markers = Nodes.Select(GetMarker).ToList();
+            List<Osm.Line> lines = [];
+            
             foreach (var node in Nodes)
             {
                 if (ShowNeighbors && node.MyNeighbors.Any())
                 {
-                    foreach (var neighbor in node.MyNeighbors)
-                    {
-                        if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
-                        {
-                            await Map.AddPolyline($"{node.Id}-neighbor-{neighbor.Id}", [
-                                new[] { node.Latitude!.Value, node.Longitude!.Value },
-                                new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
-                            ], Utils.Red);
-                        }
-                    }
+                    lines.AddRange(
+                        node.MyNeighbors
+                            .Select(n => n.Neighbor)
+                            .Where(n => n is { Latitude: not null, Longitude: not null })
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"{node.Id}-neighbor-{n.Id}",
+                                Points = [
+                                    new[] { node.Latitude!.Value, node.Longitude!.Value },
+                                    new[] { n.Latitude!.Value, n.Longitude!.Value }
+                                ],
+                                Color = Utils.Red
+                            })
+                    );
                 }
 
                 if (ShowPaths && node.PacketsFrom.Any())
                 {
-                    foreach (var grouping in node.PacketsFrom.GroupBy(a => a.Gateway))
-                    {
-                        if (grouping.Key is { Latitude: not null, Longitude: not null })
-                        {
-                            await Map.AddPolyline($"{node.Id}-gateway-{grouping.Key.Id}", [
-                                new[] { node.Latitude!.Value, node.Longitude!.Value },
-                                new[] { grouping.Key.Latitude.Value, grouping.Key.Longitude.Value }
-                            ], Utils.Green);
-                        }
-                    }
+                    lines.AddRange(
+                        node.PacketsFrom
+                            .GroupBy(a => a.Gateway) // Useful when we do not take 1 packet but n
+                            .Select(n => n.Key)
+                            .Where(n => n is { Latitude: not null, Longitude: not null })
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"{node.Id}-gateway-{n.Id}",
+                                Points = [
+                                    new[] { node.Latitude!.Value, node.Longitude!.Value },
+                                    new[] { n.Latitude!.Value, n.Longitude!.Value }
+                                ],
+                                Color = Utils.Green
+                            })
+                    );
+                }
+
+                if (ShowPois && node.Waypoints.Any())
+                {
+                    lines.AddRange(
+                        node.Waypoints
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"{node.Id}-waypoint-{n.Id}",
+                                Points = [
+                                    new[] { node.Latitude!.Value, node.Longitude!.Value },
+                                    new[] { n.Latitude, n.Longitude }
+                                ],
+                                Color = Utils.Orange
+                            })
+                    );
+                    
+                    markers.AddRange(
+                        node.Waypoints
+                            .Select(n => new Osm.Marker
+                            {
+                                Id = $"waypoint-{n.Id}",
+                                Latitude = n.Latitude,
+                                Longitude = n.Longitude,
+                                Color = "orange",
+                                Label = $"Point d'intérêt : {n.Name}",
+                                Popup = !string.IsNullOrWhiteSpace(n.Description) ? $"<p><b>{n.Name}</b></p><p>{n.Description}</p>" : null
+                            })
+                    );
                 }
             }
+
+            await Map.AddPolylines(lines);
+            await Map.AddMarkers(markers);
 
             HasRenderMapData = true;
         }
@@ -166,14 +214,15 @@
 
         if (Map != null)
         {
-            await Map.ClearMarkers();
+            await Map.Reload();
         }
 
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
 
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= yesterday && a.GatewayId != a.FromId && a.Gateway.Latitude != null).OrderByDescending(a => a.CreatedAt).Take(100)).ThenInclude(n => n.Gateway)
+            .Include(n => n.PacketsFrom.Where(a => a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= yesterday && a.Neighbor.Latitude != null)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => n.LastSeen >= yesterday)
             .AsSplitQuery()
@@ -193,11 +242,11 @@
         
         return new Osm.Marker
         {
-            Id = node.Id,
+            Id = node.Id.ToString(),
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
-            Label = node.FullName(),
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.FullName()}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Label = node.AllNames,
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             IconType = Osm.IconType.Circle,
             Color = style.color,
             FillColor = style.fillColor,

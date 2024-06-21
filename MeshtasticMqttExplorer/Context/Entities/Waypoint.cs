@@ -1,6 +1,6 @@
 namespace MeshtasticMqttExplorer.Context.Entities;
 
-public class Position : IEntity
+public class Waypoint : IEntity
 {
     public long Id { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -12,7 +12,14 @@ public class Position : IEntity
     public long? PacketId { get; set; }
     public virtual Packet? Packet { get; set; }
     
+    public required uint WaypointId { get; set; }
+    
+    public required string Name { get; set; }
+    public string? Description { get; set; }
+    public uint? Icon { get; set; }
+    
+    public required DateTime? ExpiresAt { get; set; }
+    
     public required double Latitude { get; set; }
     public required double Longitude { get; set; }
-    public int? Altitude { get; set; }
 }

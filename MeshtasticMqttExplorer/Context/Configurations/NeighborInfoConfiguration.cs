@@ -21,6 +21,7 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
         
         builder.HasOne(a => a.Packet)
             .WithMany()
-            .HasForeignKey(a => a.PacketId);
+            .HasForeignKey(a => a.PacketId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -1,5 +1,4 @@
 @page "/stats"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @using Meshtastic.Protobufs
@@ -16,8 +15,8 @@
 
 <Spin Spinning="Loading">
     <GridRow Gutter="(16, 16)" Justify="center">
-        <GridCol Xs="24" Md="12">
-            <Card Title="Type de paquet">
+        <GridCol Xs="24" Lg="12">
+            <Card Title="Type de paquet (hors chiffrés)">
                 <ChildContent>
                     @if (Loading)
                     {
@@ -31,23 +30,23 @@
             </Card>
         </GridCol>
         
-        <GridCol Xs="24" Md="12">
-            <Card Title="Paquets par serveur MQTT, Bande, noeud et type pour hier">
+        <GridCol Xs="24" Lg="12">
+            <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour hier">
                 <ChildContent>
                     <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
-                        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="_mqttServerFilters">
+                        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
                             @context.MqttServer
                         </PropertyColumn>
 
-                        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="_regionCodeFilters">
+                        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="Utils.RegionCodeFilters">
                             @context.RegionCode
                         </PropertyColumn>
                         
-                        <PropertyColumn Property="c => c.NodeName" Title="Noeud" Filterable>
+                        <PropertyColumn Property="c => c.NodeName" Title="Nœud" Filterable>
                             <a href="/node/@context.NodeId" target="_blank">@context.NodeName</a>
                         </PropertyColumn>
                         
-                        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="_portNumFilters">
+                        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
                             @(context.PortNum?.ToString() ?? "Chiffrées") 
                         </PropertyColumn>
                         
@@ -59,7 +58,7 @@
             </Card>
         </GridCol>
         
-        <GridCol Xs="24" Md="12">
+        <GridCol Xs="24" Lg="12">
             <Card Title="Profil de modulation">
                 <ChildContent>
                     @if (Loading)
@@ -74,7 +73,7 @@
             </Card>
         </GridCol>
         
-        <GridCol Xs="24" Md="12">
+        <GridCol Xs="24" Lg="12">
             <Card Title="Type de carte">
                 <ChildContent>
                     @if (Loading)
@@ -89,8 +88,8 @@
             </Card>
         </GridCol>
 
-        <GridCol Xs="24" Md="12">
-            <Card Title="Type de noeud">
+        <GridCol Xs="24" Lg="12">
+            <Card Title="Type de nœud">
                 <ChildContent>
                     @if (Loading)
                     {
@@ -104,7 +103,7 @@
             </Card>
         </GridCol>
 
-        <GridCol Xs="24" Md="12">
+        <GridCol Xs="24" Lg="12">
             <Card Title="Versions de firmware installées">
                 <ChildContent>
                     @if (Loading)
@@ -131,31 +130,6 @@
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
     private List<ChartData<int>> DataFirmwareVersions { get; set; } = [];
     private List<PacketNodeType> DataYesterdayNodePackets { get; set; } = [];
-    
-    private readonly TableFilter<string?>[] _mqttServerFilters =
-    [
-        new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
-        new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
-    ];
-    
-    private readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] _regionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
-        .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .OrderBy(p => p.Text)
-        .ToArray();
-    
-    private readonly TableFilter<PortNum?>[] _portNumFilters = ((PortNum[])Enum.GetValues(typeof(PortNum)))
-        .Select(p => new TableFilter<PortNum?>
-        {
-            Text = p.ToString(),
-            Value = p
-        })
-        .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
-        .OrderBy(p => p.Text)
-        .ToArray();
     
     private readonly PieConfig _configPieType = new()
     {
@@ -194,7 +168,7 @@
         Context = await ContextFactory.CreateDbContextAsync();
 
         DataPacketTypes = await Context.Packets
-            .Where(a => a.PortNum != PortNum.MapReportApp)
+            .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))
             .GroupBy(a => new
             {
                 a.MqttServer,
@@ -254,7 +228,7 @@
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         
         DataYesterdayNodePackets = await Context.Packets
-            .Where(a => a.PortNum != PortNum.MapReportApp)
+            .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))
             .Where(a => a.CreatedAt.Date == yesterday)
             .GroupBy(a => new
             {

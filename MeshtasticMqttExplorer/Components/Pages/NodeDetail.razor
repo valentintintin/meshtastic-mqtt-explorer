@@ -1,5 +1,4 @@
 @page "/node/{id:long}"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
 @using Meshtastic.Protobufs
@@ -9,7 +8,7 @@
 
 @inject IDbContextFactory<DataContext> ContextFactory
 
-<PageTitle>Détails du noeud @Node?.FullName()</PageTitle>
+<PageTitle>Détails du nœud @Node?.AllNames</PageTitle>
 
 <Spin Spinning="Loading">
     @if (Node != null)
@@ -46,7 +45,7 @@
                 }
             </PageHeaderTags>
             <PageHeaderExtra>
-                <Button OnClick="FetchData">Actualiser</Button>
+                <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
             </PageHeaderExtra>
         </PageHeader>
 
@@ -58,7 +57,7 @@
     }
     else
     {
-        <Result Title="Noeud introuvable" Status="404"></Result>
+        <Result Title="Nœud introuvable" Status="404"></Result>
     }
 </Spin>
 
@@ -93,10 +92,11 @@
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         Node = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId && a.Gateway.Latitude != null).OrderByDescending(a => a.CreatedAt).Take(100)).ThenInclude(n => n.Gateway)
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt).Take(10)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= threeDays)).ThenInclude(n => n.Neighbor)
             .Include(n => n.Positions.Where(a => a.CreatedAt >= yesterday).OrderByDescending(a => a.CreatedAt).Take(100))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
+            .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .AsSplitQuery()
             .FirstOrDefaultAsync(a => a.Id == Id);
 

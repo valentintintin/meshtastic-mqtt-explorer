@@ -30,7 +30,8 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
 
         builder.HasOne(a => a.GatewayPosition)
             .WithMany()
-            .HasForeignKey(a => a.GatewayPositionId);
+            .HasForeignKey(a => a.GatewayPositionId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(a => a.From)
             .WithMany(a => a.PacketsFrom)

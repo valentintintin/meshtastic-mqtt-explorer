@@ -95,11 +95,28 @@ window.addMarkerToMap = (marker) => {
     window.leafletMarkers[marker.id] = pin;
 };
 
-window.addPolylineToMap = (id, points, color) => {
-    window.leafletMarkers[id] = L.polyline(points, {
-        color,
+window.addPolylinesToMap = (lines) => {
+    lines.forEach(line => {
+        window.addPolylineToMap(line);
+    });
+};
+
+window.addPolylineToMap = (line) => {
+    let polyline = L.polyline(line.points, {
+        color: line.color,
         weight: 1
     }).addTo(window.leafletMap);
+
+    if (line.popup) {
+        polyline = polyline.bindPopup(line.popup, {
+            keepInView: true,
+            closeButton: true,
+            autoClose: true,
+            closeOnEscapeKey: true
+        });
+    }
+    
+    window.leafletMarkers[line.id] = polyline;
 };
 
 window.clearMarkersMap = () => {

@@ -1,24 +1,18 @@
 ﻿@page "/packets"
 @page "/node/{id:long}/packets"
-@rendermode InteractiveServer
 @implements IAsyncDisposable
 
-@using System.Reactive.Linq
 @using AntDesign.TableModels
-@using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context
 @using MeshtasticMqttExplorer.Context.Entities
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory;
-@inject MqttService MqttService
 @inject NavigationManager NavigationManager
 
-<PageTitle>Trames</PageTitle>
+<PageTitle>Liste des trames envoyés</PageTitle>
 
 @if (Id.HasValue)
 {
@@ -43,34 +37,35 @@ else
     </PageHeader>
 }
 
-<Table @ref="Table" TItem="Packet" DataSource="_packets" Responsive Total="Total" OnChange="OnTableChange"
-       RowClassName="@(x => x.Data.Encrypted ? "red" : "" )">
+<Table TItem="Packet" DataSource="PacketsQueryable" Responsive 
+       RowClassName="@(x => x.Data.Encrypted ? "red" : "" )"
+       PaginationPosition="bottomRight" Locale="Utils.TableLocale">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
             @context.PacketId
         </PropertyColumn>
-        <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Sortable Filterable>
+        <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Filterable>
             <a href="/node/@context.FromId" target="_blank">@context.From.AllNames</a>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Sortable Filterable>
+        <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Filterable>
             <a href="/node/@context.ToId" target="_blank">@context.To.AllNames</a>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Sortable Filterable>
+        <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Filterable>
             <a href="/node/@context.GatewayId" target="_blank">@context.Gateway.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
             <Date Value="context.CreatedAt"></Date>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Sortable Filters="Utils.MqttServerFilters">
+        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
             @context.MqttServer - @context.MqttTopic
         </PropertyColumn>
-        <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Sortable Filters="_channelFilters">
+        <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Filters="_channelFilters">
             @context.Channel.Name
         </PropertyColumn>
-        <PropertyColumn Property="c => c.PortNum" Title="Type" Sortable Filters="Utils.PortNumFilters">
+        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
             @(context.PortNum?.ToString() ?? "Chiffrée")
         </PropertyColumn>
-        <PropertyColumn Property="c => c.PayloadJson" Title="Contenu" Filterable>
+        <PropertyColumn Property="c => c.PayloadJson" Title="Contenu">
             <PacketPayload Packet="context"></PacketPayload>
         </PropertyColumn>
     </ChildContent>
@@ -88,17 +83,23 @@ else
     public long? Id { get; set; }
 
     private Node? Node { get; set; }
-    private List<Packet> _packets = [];
+    private IQueryable<Packet> PacketsQueryable { get; set; } = null!;
     private int Total { get; set; }
     private DataContext Context { get; set; } = null!;
-
-    private Table<Packet>? Table { get; set; }
 
     private TableFilter<long>[] _channelFilters = [];
 
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
+        
+        PacketsQueryable =  PacketsQueryable = Context.Packets
+            .Include(a => a.Channel)
+            .Include(a => a.Gateway)
+            .Include(a => a.From)
+            .Include(a => a.To)
+            .Where(a => !Id.HasValue || a.From.Id == Id);
+        
         var localContext = await ContextFactory.CreateDbContextAsync();
 
         _channelFilters = await localContext.Channels
@@ -121,25 +122,9 @@ else
         await base.OnInitializedAsync();
     }
 
-    private void OnTableChange(QueryModel<Packet> queryModel)
-    {
-        _packets = queryModel.CurrentPagedRecords(
-                queryModel.ExecuteQuery(Context.Packets
-                    .Include(a => a.Channel)
-                    .Include(a => a.Gateway)
-                    .Include(a => a.From)
-                    .Include(a => a.To)
-                    .Where(a => !Id.HasValue || a.From.Id == Id))
-            ).ToList();
-    }
-
     private void FetchData()
     {
-        if (Table != null)
-        {
-            OnTableChange((QueryModel<Packet>) Table.GetQueryModel());
-            Total = Context.Packets.Count(a => !Id.HasValue || a.FromId == Id);
-        }
+        Total = Context.Packets.Count(a => !Id.HasValue || a.FromId == Id);
     }
 
     public async ValueTask DisposeAsync()

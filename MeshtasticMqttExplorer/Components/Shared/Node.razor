@@ -13,32 +13,32 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Activité">
                 <ChildContent>
-                <Descriptions Bordered="true" Column="1">
-                    <DescriptionsItem Title="Vu pour la dernière fois" ContentStyle="font-weight: bold">
-                        <Date Value="NodeInfo.LastSeen" Fallback="-"></Date>
-                    </DescriptionsItem>
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Vu pour la dernière fois" ContentStyle="font-weight: bold">
+                            <Date Value="NodeInfo.LastSeen" Fallback="-"></Date>
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Vu il y a" ContentStyle="font-weight: bold">
-                        <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Vu il y a" ContentStyle="font-weight: bold">
+                            <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
+                        </DescriptionsItem>
                     
-                    <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                        @(NbPackets?.Today ?? 0)/@(NbPackets?.Yesterday ?? 0)/@(NbPackets?.Total ?? 0)
-                        <a href="/node/@NodeInfo.Id/packets">Voir</a>
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                            @(NbPackets?.Today ?? 0)/@(NbPackets?.Yesterday ?? 0)/@(NbPackets?.Total ?? 0)
+                            <a href="/node/@NodeInfo.Id/packets">Voir</a>
+                        </DescriptionsItem>
                     
-                    <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
+                            @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
+                        </DescriptionsItem>
                     
-                    <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
+                            @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
+                        </DescriptionsItem>
                     
-                    <DescriptionsItem Title="Nombre de noeuds locaux entendus" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.NumOnlineLocalNodes ?? 0)
-                    </DescriptionsItem>
-                </Descriptions>
+                        <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold">
+                            @(NodeInfo?.NumOnlineLocalNodes ?? 0)
+                        </DescriptionsItem>
+                    </Descriptions>
                 </ChildContent>
             </Card>
         </GridCol>
@@ -46,35 +46,35 @@
         <GridCol Xs="24" Md="12">
             <Card Title="Télémétrie">
                 <ChildContent>
-                <Descriptions Bordered="true" Column="1">
-                    <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
-                        <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
-                    </DescriptionsItem>
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
+                            <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
-                    </DescriptionsItem>
+                        <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
+                        </DescriptionsItem>
 
-                    <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
-                    </DescriptionsItem>
-                </Descriptions>
+                        <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
+                        </DescriptionsItem>
+                    </Descriptions>
                 </ChildContent>
             </Card>
         </GridCol>
@@ -121,30 +121,43 @@
                     
                     @if (NodeInfo?.HardwareModel != null && NodeInfo?.HardwareModel.GetImageUrl() != "gray.jpg")
                     {
-                        <img height="150px" src="@NodeInfo?.HardwareModel.GetImageUrl()" alt="@NodeInfo?.HardwareModel.ToString()" title="@NodeInfo?.HardwareModel.ToString()" />
+                        <div style="text-align: center">
+                            <img height="150px" src="@NodeInfo?.HardwareModel.GetImageUrl()" alt="@NodeInfo?.HardwareModel.ToString()" title="@NodeInfo?.HardwareModel.ToString()" />
+                        </div>
                     }
                 </ChildContent>
             </Card>
         </GridCol>
 
-        <GridCol Xs="24" Md="12">
-            <Card Title="Voisins">
+        <GridCol Xs="24" Md="8">
+            <Card Title="10 derniers nœuds relais MQTT">
                 <ChildContent>
-                    @if (NodeInfo?.MyNeighbors.Any() == true)
+                    @if (NodeInfo?.PacketsFrom.Any() == true)
                     {
-                        @foreach (var neighbor in NodeInfo?.MyNeighbors ?? [])
+                        @foreach (var grouped in NodeInfo?.PacketsFrom.GroupBy(a => a.Gateway, (node, packets) => new
+                                  {
+                                      node,
+                                      packet = packets.OrderByDescending(p => p.CreatedAt).First()
+                                  }) ?? [])
                         {
                             <Descriptions Bordered="true" Column="1">
-                                <DescriptionsItem Title="Noeud" ContentStyle="font-weight: bold">
-                                    <a href="/node/@neighbor.NeighborId" target="_blank">@neighbor.Neighbor.FullName()</a>
+                                <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">
+                                    <a href="/node/@grouped.node.Id" target="_blank">@grouped.node.AllNames</a>
                                 </DescriptionsItem>
-
-                                <DescriptionsItem Title="Vue le" ContentStyle="font-weight: bold">
-                                    <Date Value="neighbor.UpdatedAt"></Date>
+                                
+                                <DescriptionsItem Title="Date du dernier paquet" ContentStyle="font-weight: bold">
+                                    <Date Value="grouped.packet.CreatedAt" />
                                 </DescriptionsItem>
-
-                                <DescriptionsItem Title="SNR" ContentStyle="font-weight: bold">
-                                    @neighbor.Snr
+                                
+                                <DescriptionsItem Title="Distance" ContentStyle="font-weight: bold">
+                                    @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue && grouped.node.Latitude.HasValue && grouped.node.Longitude.HasValue)
+                                    {
+                                    @(Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, grouped.node.Latitude!.Value, grouped.node.Longitude!.Value) + " Km")
+                                    }
+                                    else
+                                    {
+                                    <text>-</text>
+                                    }
                                 </DescriptionsItem>
                             </Descriptions>
                         }
@@ -152,6 +165,88 @@
                     else
                     {
                         <Empty></Empty>
+                    }
+                </ChildContent>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Md="8">
+            <Card Title="Voisins">
+                <ChildContent>
+                    @if (NodeInfo?.MyNeighbors.Any() == true)
+                    {
+                    @foreach (var neighbor in NodeInfo?.MyNeighbors ?? [])
+                    {
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Nœud" ContentStyle="font-weight: bold">
+                            <a href="/node/@neighbor.NeighborId" target="_blank">@neighbor.Neighbor.AllNames</a>
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Vue le" ContentStyle="font-weight: bold">
+                            <Date Value="neighbor.UpdatedAt"></Date>
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Distance" ContentStyle="font-weight: bold">
+                            @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue && neighbor.Neighbor.Latitude.HasValue && neighbor.Neighbor.Longitude.HasValue)
+                            {
+                                @(Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, neighbor.Neighbor.Latitude!.Value, neighbor.Neighbor.Longitude!.Value) + " Km")
+                            }
+                            else
+                            {
+                                <text>-</text>
+                            }
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="SNR" ContentStyle="font-weight: bold">
+                            @neighbor.Snr
+                        </DescriptionsItem>
+                    </Descriptions>
+                    }
+                    }
+                    else
+                    {
+                    <Empty></Empty>
+                    }
+                </ChildContent>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Md="8">
+            <Card Title="Points d'intérêts">
+                <ChildContent>
+                    @if (NodeInfo?.Waypoints.Any() == true)
+                    {
+                        @foreach (var waypoint in NodeInfo?.Waypoints ?? [])
+                        {
+                            <Descriptions Bordered="true" Column="1">
+                                <DescriptionsItem Title="Point" ContentStyle="font-weight: bold">
+                                    @waypoint.Name @waypoint.Icon
+                                    @if (!string.IsNullOrWhiteSpace(waypoint.Description))
+                                    {
+                                        @waypoint.Description
+                                    }
+                                </DescriptionsItem>
+
+                                <DescriptionsItem Title="Expire le" ContentStyle="font-weight: bold">
+                                    <Date Value="waypoint.ExpiresAt"></Date>
+                                </DescriptionsItem>
+
+                                <DescriptionsItem Title="Distance" ContentStyle="font-weight: bold">
+                                    @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                                    {
+                                        @(Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, waypoint.Latitude, waypoint.Longitude) + " Km")
+                                    }
+                                    else
+                                    {
+                                        <text>-</text>
+                                    }
+                                </DescriptionsItem>
+                            </Descriptions>
+                        }
+                    }
+                    else
+                    {
+                    <Empty></Empty>
                     }
                 </ChildContent>
             </Card>
@@ -166,7 +261,7 @@
                     }
                     else
                     {
-                    <Empty></Empty>
+                        <Empty></Empty>
                     }
                 </ChildContent>
             </Card>
@@ -356,73 +451,145 @@
     {
         if (Map != null && !HasRenderMapData && NodeInfo != null)
         {
-            if (NodeInfo.Latitude != 0 && NodeInfo.Longitude != 0)
+            List<Osm.Marker> markers = [];
+            List<Osm.Line> lines = [];
+            
+            if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
             {
-                await Map.AddMarker(new Osm.Marker
+                markers.Add(new Osm.Marker
                 {
-                    Id = NodeInfo.NodeId,
+                    Id = NodeInfo.Id.ToString(),
                     Latitude = NodeInfo.Latitude!.Value,
                     Longitude = NodeInfo.Longitude!.Value,
                     Color = "blue",
-                    Label = NodeInfo.FullName()
+                    Label = NodeInfo.AllNames
                 });
             }
 
-            if (NodeInfo.Positions.Any() == true)
+            if (NodeInfo.Positions.Any())
             {
-                await Map.AddPolyline($"{NodeInfo.Id}-positions", 
-                    NodeInfo.Positions
-                    .Select(a => new[] { a.Latitude, a.Longitude })
-                    .ToList(), Utils.Blue);
-
-                if (NodeInfo.MyNeighbors.Any())
+                lines.Add(new Osm.Line
                 {
-                    if (NodeInfo.PacketsFrom.Any())
-                    {
-                        foreach (var grouping in NodeInfo.PacketsFrom.GroupBy(a => a.Gateway))
-                        {
-                            if (grouping.Key is { Latitude: not null, Longitude: not null })
-                            {
-                                await Map.AddPolyline($"{NodeInfo.Id}-gateway-{grouping.Key.Id}", [
-                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
-                                    new[] { grouping.Key.Latitude.Value, grouping.Key.Longitude.Value }
-                                ], Utils.Green);
-
-                                await Map.AddMarker(new Osm.Marker
-                                {
-                                    Id = grouping.Key.Id,
-                                    Latitude = grouping.Key.Latitude.Value,
-                                    Longitude = grouping.Key.Longitude.Value,
-                                    Color = "green",
-                                    Label = $"Passerelle MQTT : {grouping.Key.FullName()}"
-                                });
-                            }
-                        }
-                        
-                        foreach (var neighbor in NodeInfo.MyNeighbors)
-                        {
-                            if (neighbor.Neighbor is { Latitude: not null, Longitude: not null })
-                            {
-                                await Map.AddPolyline($"{NodeInfo.Id}-neighbor-{neighbor.Id}", [
-                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
-                                    new[] { neighbor.Neighbor.Latitude.Value, neighbor.Neighbor.Longitude.Value }
-                                ], Utils.Red);
-
-                                await Map.AddMarker(new Osm.Marker
-                                {
-                                    Id = neighbor.NeighborId,
-                                    Latitude = neighbor.Neighbor.Latitude.Value,
-                                    Longitude = neighbor.Neighbor.Longitude.Value,
-                                    Color = "red",
-                                    Label = $"Voisin : {neighbor.Neighbor.FullName()}"
-                                });
-                            }
-                        }
-                    }
-                }
-
-                HasRenderMapData = true;
+                    Id = $"{NodeInfo.Id}-positions",
+                    Points = NodeInfo.Positions
+                        .Select(a => new[] { a.Latitude, a.Longitude })
+                        .ToList(),
+                    Color = Utils.Blue
+                });
             }
+
+            if (NodeInfo.PacketsFrom.Any())
+            {
+                var gateways = NodeInfo.PacketsFrom.GroupBy(a => a.Gateway)
+                    .Select(n => n.Key)
+                    .ToList();
+                
+                if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                {
+                    lines.AddRange(
+                        gateways
+                            .Where(n => n is { Latitude: not null, Longitude: not null })
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"gateway-{n.Id}",
+                                Points =
+                                [
+                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                    new[] { n.Latitude!.Value, n.Longitude!.Value }
+                                ],
+                                Color = Utils.Green
+                            })
+                    );
+                }
+                
+                markers.AddRange(
+                    gateways
+                        .Where(n => n is { Latitude: not null, Longitude: not null })
+                        .Select(n => new Osm.Marker
+                        {
+                            Id = n.Id.ToString(),
+                            Latitude = n.Latitude!.Value,
+                            Longitude = n.Longitude!.Value,
+                            Color = "green",
+                            Label = $"Passerelle MQTT : {n.AllNames}",
+                            Popup = $"<p>Passerelle MQTT : <a href=\"/node/{n.Id}\" target=\"_blank\"><b>{n.AllNames}</b></p>"
+                        })
+                );
+            }
+                
+            if (NodeInfo.MyNeighbors.Any()) {
+                if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                {
+                    lines.AddRange(
+                        NodeInfo.MyNeighbors
+                            .Select(n => n.Neighbor)
+                            .Where(n => n is { Latitude: not null, Longitude: not null })
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"neighbor-{n.Id}",
+                                Points =
+                                [
+                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                    new[] { n.Latitude!.Value, n.Longitude!.Value }
+                                ],
+                                Color = Utils.Red
+                            })
+                    );
+                }
+                    
+                markers.AddRange(
+                    NodeInfo.MyNeighbors
+                        .Select(n => n.Neighbor)
+                        .Where(n => n is { Latitude: not null, Longitude: not null })
+                        .Select(n => new Osm.Marker
+                        {
+                            Id = n.Id.ToString(),
+                            Latitude = n.Latitude!.Value,
+                            Longitude = n.Longitude!.Value,
+                            Color = "red",
+                            Label = $"Voisin : {n.AllNames}",
+                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\"><b>{n.AllNames}</b>"
+                        })
+                );
+            }
+
+            if (NodeInfo.Waypoints.Any())
+            {
+                if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                {
+                    lines.AddRange(
+                        NodeInfo.Waypoints
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"waypoint-{n.Id}",
+                                Points =
+                                [
+                                    new[] { NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value },
+                                    new[] { n.Latitude, n.Longitude }
+                                ],
+                                Color = Utils.Orange
+                            })
+                    );
+                }
+                    
+                markers.AddRange(
+                    NodeInfo.Waypoints
+                        .Select(n => new Osm.Marker
+                        {
+                            Id = n.Id.ToString(),
+                            Latitude = n.Latitude,
+                            Longitude = n.Longitude,
+                            Color = "orange",
+                            Label = $"Point d'intérêt : {n.Name}",
+                            Popup = !string.IsNullOrWhiteSpace(n.Description) ? $"<p><b>{n.Name}</b></p><p>{n.Description}</p>" : null
+                        })
+                );
+            }
+
+            await Map.AddPolylines(lines);
+            await Map.AddMarkers(markers);
+
+            HasRenderMapData = true;
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -454,38 +621,38 @@
         DataVoltageBattery = NodeInfo?.Telemetries
             .Where(a => a.Voltage > 0)
             .Select(a => new DateChartData<float>
-        {
-            date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-            type = "Batterie",
-            value = a.Voltage ?? 0
-        }).ToList();
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Batterie",
+                value = a.Voltage ?? 0
+            }).ToList();
         
         DataWeather = NodeInfo?.Telemetries
             .Where(a => a.Temperature > 0 || a.RelativeHumidity > 0)
             .SelectMany(a => new List<DateChartData<float>>
-        {
-            new()
             {
-                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                type = "Humidité",
-                value = a.RelativeHumidity ?? 0
-            },
-            new()
-            {
-                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                type = "Température",
-                value = a.Temperature ?? 0
-            }
-        }).ToList();
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Humidité",
+                    value = a.RelativeHumidity ?? 0
+                },
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Température",
+                    value = a.Temperature ?? 0
+                }
+            }).ToList();
         
         DataWeatherPressure = NodeInfo?.Telemetries
             .Where(a => a.BarometricPressure > 0)
             .Select(a => new DateChartData<float>
-        {
-            date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-            type = "Pression",
-            value = a.BarometricPressure ?? 0
-        }).ToList();
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Pression",
+                value = a.BarometricPressure ?? 0
+            }).ToList();
         
         base.OnParametersSet();
     }

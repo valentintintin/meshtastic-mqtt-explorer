@@ -10,6 +10,7 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
     public void Configure(EntityTypeBuilder<Node> builder)
     {
         builder.HasIndex(a => a.CreatedAt);
+        builder.HasIndex(a => a.UpdatedAt);
         
         builder.HasIndex(a => a.NodeId);
         

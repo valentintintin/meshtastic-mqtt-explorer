@@ -3,6 +3,7 @@ using System;
 using MeshtasticMqttExplorer.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MeshtasticMqttExplorer.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20240620142207_Waypoint")]
+    partial class Waypoint
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -493,9 +496,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("WaypointId")
-                        .HasColumnType("bigint");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
@@ -509,8 +509,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.HasIndex("PacketId");
 
                     b.HasIndex("UpdatedAt");
-
-                    b.HasIndex("WaypointId");
 
                     b.ToTable("Waypoints");
                 });

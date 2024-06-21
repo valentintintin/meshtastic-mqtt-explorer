@@ -1,3 +1,28 @@
 .ant-page-header {
     margin-bottom: 20px !important;
 }
+
+.ant-page-header-heading-left {
+    flex-wrap: wrap;
+}
+
+.ant-layout-sider-zero-width-trigger {
+    top: -40px;
+    left: -10px;
+}
+
+@media screen and (max-width: 576px) {
+    td.ant-table-cell:first-child {
+        background-color: #d0d0d0 !important;
+    }   
+}
+
+.ant-page-header-heading-extra {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.ant-tag {
+    margin-bottom: 5px;
+}

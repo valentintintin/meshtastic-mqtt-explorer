@@ -3,6 +3,7 @@ using System;
 using MeshtasticMqttExplorer.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MeshtasticMqttExplorer.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20240619130615_DataPacketNullable")]
+    partial class DataPacketNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -188,8 +191,6 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasIndex("ShortName");
 
-                    b.HasIndex("UpdatedAt");
-
                     b.ToTable("Nodes");
                 });
 
@@ -337,8 +338,6 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasIndex("PacketId");
 
-                    b.HasIndex("UpdatedAt");
-
                     b.ToTable("Positions");
                 });
 
@@ -401,8 +400,6 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasIndex("Type");
 
-                    b.HasIndex("UpdatedAt");
-
                     b.ToTable("Telemetries");
                 });
 
@@ -452,69 +449,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.ToTable("TextMessages");
                 });
 
-            modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.Waypoint", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTime?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("Icon")
-                        .HasColumnType("bigint");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<long>("NodeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PacketId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("WaypointId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("Name");
-
-                    b.HasIndex("NodeId");
-
-                    b.HasIndex("PacketId");
-
-                    b.HasIndex("UpdatedAt");
-
-                    b.HasIndex("WaypointId");
-
-                    b.ToTable("Waypoints");
-                });
-
             modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.NeighborInfo", b =>
                 {
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "Neighbor")
@@ -531,8 +465,7 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
                         .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("PacketId");
 
                     b.Navigation("Neighbor");
 
@@ -563,8 +496,7 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Position", "GatewayPosition")
                         .WithMany()
-                        .HasForeignKey("GatewayPositionId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("GatewayPositionId");
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "To")
                         .WithMany("PacketsTo")
@@ -593,8 +525,7 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
                         .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("PacketId");
 
                     b.Navigation("Node");
 
@@ -611,8 +542,7 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
                         .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("PacketId");
 
                     b.Navigation("Node");
 
@@ -635,8 +565,7 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
                         .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("PacketId");
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "To")
                         .WithMany("TextMessagesTo")
@@ -649,24 +578,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.Navigation("Packet");
 
                     b.Navigation("To");
-                });
-
-            modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.Waypoint", b =>
-                {
-                    b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "Node")
-                        .WithMany("Waypoints")
-                        .HasForeignKey("NodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
-                        .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Node");
-
-                    b.Navigation("Packet");
                 });
 
             modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.Channel", b =>
@@ -691,8 +602,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.Navigation("TextMessagesFrom");
 
                     b.Navigation("TextMessagesTo");
-
-                    b.Navigation("Waypoints");
                 });
 #pragma warning restore 612, 618
         }

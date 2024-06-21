@@ -10,6 +10,7 @@ public static class Utils
     public static readonly string Green = Color.LimeGreen.Name.ToLower();
     public static readonly string Blue = Color.DodgerBlue.Name.ToLower();
     public static readonly string Gray = Color.DarkGray.Name.ToLower();
+    public static readonly string Orange = Color.OrangeRed.Name.ToLower();
     
     public static readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] RegionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
         .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>
@@ -57,4 +58,67 @@ public static class Utils
         new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
         new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
     ];
+
+    public static readonly TableLocale TableLocale = new()
+    {
+        FilterTitle = "Menu de filtre",
+        FilterConfirm = "OK",
+        FilterReset = "Réinitialiser",
+        FilterEmptyText = "",
+        SelectAll = "Sélectionner la page actuelle",
+        SelectInvert = "Inverser la page actuelle",
+        SelectionAll = "Sélectionner toutes les données",
+        SortTitle = "Trier",
+        Expand = "Développer la ligne",
+        Collapse = "Réduire la ligne",
+        TriggerDesc = "Cliquez pour trier par ordre décroissant",
+        TriggerAsc = "Cliquez pour trier par ordre croissant",
+        CancelSort = "Cliquez pour annuler le tri",
+        FilterOptions = new FilterOptionsLocale
+        {
+            True = "Vrai",
+            False = "Faux",
+            And = "Et",
+            Or = "Ou",
+            Equals = "Égal",
+            NotEquals = "Pas égal",
+            Contains = "Contient",
+            NotContains = "Ne contient pas",
+            StartsWith = "Commence par",
+            EndsWith = "Finit par",
+            GreaterThan = "Plus grand que",
+            LessThan = "Moins que",
+            GreaterThanOrEquals = "Plus grand ou égal",
+            LessThanOrEquals = "Moins ou égal",
+            IsNull = "Est nul",
+            IsNotNull = "N'est pas nul",
+            TheSameDateWith = "La même date que"
+        }
+    };
+    
+    public static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double r = 6371; // Rayon de la Terre en kilomètres
+        var lat1Rad = DegreesToRadians(lat1);
+        var lon1Rad = DegreesToRadians(lon1);
+        var lat2Rad = DegreesToRadians(lat2);
+        var lon2Rad = DegreesToRadians(lon2);
+
+        var dlat = lat2Rad - lat1Rad;
+        var dlon = lon2Rad - lon1Rad;
+
+        var a = Math.Sin(dlat / 2) * Math.Sin(dlat / 2) +
+                Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
+                Math.Sin(dlon / 2) * Math.Sin(dlon / 2);
+
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        var distance = r * c;
+
+        return Math.Round(distance, 2);
+    }
+
+    public static double DegreesToRadians(double degrees)
+    {
+        return degrees * Math.PI / 180;
+    }
 }
