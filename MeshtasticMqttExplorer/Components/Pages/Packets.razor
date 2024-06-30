@@ -37,24 +37,32 @@ else
     </PageHeader>
 }
 
-<Table TItem="Packet" DataSource="PacketsQueryable" Responsive 
-       RowClassName="@(x => x.Data.Encrypted ? "red" : "" )"
+<Table TItem="Packet" DataSource="PacketsQueryable" Responsive
        PaginationPosition="bottomRight" Locale="Utils.TableLocale">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
             @context.PacketId
         </PropertyColumn>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Filterable>
-            <a href="/node/@context.FromId" target="_blank">@context.From.AllNames</a>
+            <a href="/node/@context.FromId" target="_blank" rel="nofollow">@context.From.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Filterable>
-            <a href="/node/@context.ToId" target="_blank">@context.To.AllNames</a>
+            <a href="/node/@context.ToId" target="_blank" rel="nofollow">@context.To.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Filterable>
-            <a href="/node/@context.GatewayId" target="_blank">@context.Gateway.AllNames</a>
+            <a href="/node/@context.GatewayId" target="_blank" rel="nofollow">@context.Gateway.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
             <Date Value="context.CreatedAt"></Date>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="Sauts">
+            <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
+                @(context.HopStart - context.HopLimit)
+                @if (context.GatewayDistanceKm.HasValue)
+                {
+                    @(" | " + Math.Round(context.GatewayDistanceKm.Value, 2) + " Km")   
+                }
+            </Tooltip>
         </PropertyColumn>
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
             @context.MqttServer - @context.MqttTopic
@@ -62,11 +70,18 @@ else
         <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Filters="_channelFilters">
             @context.Channel.Name
         </PropertyColumn>
-        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
+        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
+                        Class="@(context.Encrypted ? "red" : "" )">
             @(context.PortNum?.ToString() ?? "Chiffrée")
+            @if (context.Encrypted && context.PortNum != null)
+            {
+                <div>mais chiffrée avec AQ==</div>
+            }
         </PropertyColumn>
         <PropertyColumn Property="c => c.PayloadJson" Title="Contenu">
-            <PacketPayload Packet="context"></PacketPayload>
+            <div style="max-height: 150px; overflow-y: scroll;">
+                <PacketPayload Packet="context"></PacketPayload>
+            </div>
         </PropertyColumn>
     </ChildContent>
 </Table>

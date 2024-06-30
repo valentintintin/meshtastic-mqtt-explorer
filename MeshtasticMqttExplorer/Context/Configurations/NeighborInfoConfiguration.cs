@@ -23,5 +23,15 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
             .WithMany()
             .HasForeignKey(a => a.PacketId)
             .OnDelete(DeleteBehavior.SetNull);
+        
+        builder.HasOne(a => a.NodePosition)
+            .WithMany()
+            .HasForeignKey(a => a.NodePositionId)
+            .OnDelete(DeleteBehavior.SetNull);
+        
+        builder.HasOne(a => a.NeighborPosition)
+            .WithMany()
+            .HasForeignKey(a => a.NeighborPositionId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

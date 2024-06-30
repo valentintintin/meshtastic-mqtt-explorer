@@ -1,5 +1,8 @@
 using AntDesign;
+using AntDesign.Charts;
 using Meshtastic.Protobufs;
+using MeshtasticMqttExplorer.Context.Entities;
+using MeshtasticMqttExplorer.Models;
 using Color = System.Drawing.Color;
 
 namespace MeshtasticMqttExplorer.Components;
@@ -18,7 +21,20 @@ public static class Utils
             Text = p.ToString(),
             Value = p
         })
-        .OrderBy(p => p.Text)
+        .OrderBy(p =>
+        {
+            if (p.Value == Config.Types.LoRaConfig.Types.RegionCode.Eu433)
+            {
+                return "1";
+            }
+
+            if (p.Value == Config.Types.LoRaConfig.Types.RegionCode.Eu868)
+            {
+                return "0";
+            }
+            
+            return p.Text;
+        })
         .ToArray();
     public static readonly TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>[] ModemPresetFilters = ((Config.Types.LoRaConfig.Types.ModemPreset[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.ModemPreset)))
         .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>
@@ -26,7 +42,20 @@ public static class Utils
             Text = p.ToString(),
             Value = p
         })
-        .OrderBy(p => p.Text)
+        .OrderBy(p =>
+        {
+            if (p.Value == Config.Types.LoRaConfig.Types.ModemPreset.LongFast)
+            {
+                return "1";
+            }
+
+            if (p.Value == Config.Types.LoRaConfig.Types.ModemPreset.LongModerate)
+            {
+                return "0";
+            }
+            
+            return p.Text;
+        })
         .ToArray();
     public static readonly TableFilter<HardwareModel?>[] HardwareModelFilters = ((HardwareModel[])Enum.GetValues(typeof(HardwareModel)))
         .Select(p => new TableFilter<HardwareModel?>
@@ -120,5 +149,37 @@ public static class Utils
     public static double DegreesToRadians(double degrees)
     {
         return degrees * Math.PI / 180;
+    }
+
+    public static LineConfig GetLineConfig(string yAxisText, double min, double max)
+    {
+        return new()
+        {
+            Padding = "auto",
+            AutoFit = true,
+            XField = nameof(DateChartData<object>.date),
+            YField = nameof(DateChartData<object>.value),
+            YAxis = new ValueAxis
+            {
+                Label = new BaseAxisLabel
+                {
+                    Visible = true
+                },
+                Title = new BaseAxisTitle
+                {
+                    Text = yAxisText,
+                    Visible = true
+                },
+                Min = min,
+                Max = max,
+                Visible = true,
+            },
+            Legend = new Legend
+            {
+                Visible = false
+            },
+            SeriesField = nameof(DateChartData<object>.type),
+            Color = new [] { Blue, Red }
+        };
     }
 }

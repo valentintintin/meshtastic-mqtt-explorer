@@ -33,6 +33,11 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
             .HasForeignKey(a => a.GatewayPositionId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(a => a.Position)
+            .WithMany()
+            .HasForeignKey(a => a.PositionId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(a => a.From)
             .WithMany(a => a.PacketsFrom)
             .HasForeignKey(a => a.FromId);

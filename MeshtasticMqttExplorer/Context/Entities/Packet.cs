@@ -22,6 +22,9 @@ public class Packet : IEntity
     public long? GatewayPositionId { get; set; }
     public virtual Position? GatewayPosition { get; set; }
     
+    public long? PositionId { get; set; }
+    public virtual Position? Position { get; set; }
+    
     public long FromId { get; set; }
     public virtual Node From { get; set; } = null!;
 
@@ -50,4 +53,6 @@ public class Packet : IEntity
     
     public string? MqttServer { get; set; }
     public string? MqttTopic { get; set; }
+    
+    public double? GatewayDistanceKm { get; set; }
 }

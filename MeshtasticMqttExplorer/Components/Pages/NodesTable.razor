@@ -1,11 +1,15 @@
 @page "/nodes"
 @implements IAsyncDisposable
 
+@using System.Text
+@using System.Text.Json
+@using System.Text.Json.Serialization
 @using AntDesign.TableModels
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using MeshtasticMqttExplorer.Services
+@using Microsoft.AspNetCore.WebUtilities
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory;
@@ -26,25 +30,25 @@
     </PageHeaderContent>
 </PageHeader>
 
-<Table TItem="Node" DataSource="NodesQueryable" Responsive Locale="Utils.TableLocale">
+<Table @ref="Table" TItem="Node" DataSource="NodesQueryable" Responsive Locale="Utils.TableLocale" OnChange="OnChange">
     <ChildContent>
         <PropertyColumn Property="c => c.AllNames" Title="ID - Nom" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
-            <a href="/node/@context.Id" target="_blank">@context.AllNames</a>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
-           @(context.IsMqttGateway == true ? "Oui" : "Non")
+            <a href="/node/@context.Id" target="_blank" rel="nofollow">@context.AllNames</a>
         </PropertyColumn>
         <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable>
-           <Date Value="context.LastSeen" Fallback="-"></Date>
+            <Date Value="context.LastSeen" Fallback="-"></Date>
         </PropertyColumn>
         <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable Filters="Utils.RegionCodeFilters">
             @(context.RegionCode?.ToString() ?? "-")
         </PropertyColumn>
-        <PropertyColumn Property="c => c.ModemPreset" Title="Profile de modulation" Sortable Filters="Utils.ModemPresetFilters">
+        <PropertyColumn Property="c => c.ModemPreset" Title="Profil de modulation" Sortable Filters="Utils.ModemPresetFilters">
             @(context.ModemPreset?.ToString() ?? "-")
         </PropertyColumn>
         <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="Utils.RoleFilters">
             @(context.Role?.ToString() ?? "-")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
+            @(context.IsMqttGateway == true ? "Oui" : "Non")
         </PropertyColumn>
     </ChildContent>
 </Table>
@@ -58,6 +62,7 @@
     private IQueryable<Node> NodesQueryable { get; set; } = null!;
     private DataContext Context { get; set; } = null!;
 
+    private Table<Node>? Table { get; set; }
     private string SearchValue { get; set; } = "";
     
     protected override async Task OnInitializedAsync()
@@ -73,6 +78,25 @@
         await localContext.DisposeAsync();
 
         await base.OnInitializedAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("query", out var query))
+            {
+                var settings = new JsonSerializerOptions();
+                settings.Converters.Add(new SortModelConverter());
+                settings.Converters.Add(new FilterModelConverter());
+                var json = Encoding.Default.GetString(Convert.FromBase64String(query));
+                // Console.WriteLine(json);
+                // Table?.ReloadData(JsonSerializer.Deserialize<QueryModel<Node>>(json, settings));
+            }
+        }
+        
+        base.OnAfterRender(firstRender);
     }
 
     private void FetchData()
@@ -101,8 +125,42 @@
         }
     }
 
+    private void OnChange(QueryModel<Node> query)
+    {
+        var settings = new JsonSerializerOptions();
+        settings.Converters.Add(new SortModelConverter());
+        settings.Converters.Add(new FilterModelConverter());
+        var json = JsonSerializer.Serialize(query, settings);
+        // Console.WriteLine(json);
+        // Navigation.NavigateTo("/nodes?query=" + Convert.ToBase64String(Encoding.Default.GetBytes(json)), false, true);
+    }
+
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync();
+    }
+
+    public class FilterModelConverter : JsonConverter<ITableFilterModel>
+    {
+        public override ITableFilterModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return JsonSerializer.Deserialize<FilterModel<string>>(ref reader, options);
+        }
+
+        public override void Write(Utf8JsonWriter writer, ITableFilterModel value, JsonSerializerOptions options)
+        {
+        }
+    }
+
+    public class SortModelConverter : JsonConverter<ITableSortModel>
+    {
+        public override ITableSortModel Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return JsonSerializer.Deserialize<SortModel<string>>(ref reader, options);
+        }
+
+        public override void Write(Utf8JsonWriter writer, ITableSortModel value, JsonSerializerOptions options)
+        {
+        }
     }
 }

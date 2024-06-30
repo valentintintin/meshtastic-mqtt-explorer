@@ -43,7 +43,7 @@
                         </PropertyColumn>
                         
                         <PropertyColumn Property="c => c.NodeName" Title="Nœud" Filterable>
-                            <a href="/node/@context.NodeId" target="_blank">@context.NodeName</a>
+                            <a href="/node/@context.NodeId" target="_blank" rel="nofollow">@context.NodeName</a>
                         </PropertyColumn>
                         
                         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
@@ -51,7 +51,7 @@
                         </PropertyColumn>
                         
                         <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable DefaultSortOrder="SortDirection.Descending">
-                            <a href="/node/@context.NodeId/packets" target="_blank">@context.Nb</a>
+                            <a href="/node/@context.NodeId/packets" target="_blank" rel="nofollow">@context.Nb</a>
                         </PropertyColumn>
                     </Table>
                 </ChildContent>

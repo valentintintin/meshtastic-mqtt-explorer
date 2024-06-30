@@ -17,11 +17,11 @@
             <PageHeaderTags>
                 @if (Alive)
                 {
-                    <Tag Color="@PresetColor.Blue.ToString()">Vue il y a moins de 3h</Tag>
+                    <Tag Color="@PresetColor.Blue.ToString()">Vue il y a moins de 24h</Tag>
                 }
                 else
                 {
-                    <Tag Color="@PresetColor.Red.ToString()">Vue il y a plus de 3h</Tag>
+                    <Tag Color="@PresetColor.Red.ToString()">Vue il y a plus de 24h</Tag>
                 }
                 
                 @if (Node?.IsMqttGateway == true)
@@ -87,20 +87,30 @@
         Loading = true;
         
         var today = DateTime.UtcNow.Date;
-        var threeHours = DateTime.UtcNow.AddHours(-3);
+        var aDay = DateTime.UtcNow.AddHours(-24);
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         Node = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt).Take(10)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors.Where(a => a.CreatedAt >= threeDays)).ThenInclude(n => n.Neighbor)
-            .Include(n => n.Positions.Where(a => a.CreatedAt >= yesterday).OrderByDescending(a => a.CreatedAt).Take(100))
-            .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays))
-            .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
+            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
+            .Include(n => n.MyNeighbors.Where(a => a.UpdatedAt >= threeDays).OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.NeighborsFor.Where(a => a.UpdatedAt >= threeDays).OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Node)
+            .Include(n => n.Positions.Where(a => a.UpdatedAt >= aDay).OrderByDescending(a => a.UpdatedAt))
+            .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays).OrderBy(a => a.CreatedAt))
+            .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
             .AsSplitQuery()
             .FirstOrDefaultAsync(a => a.Id == Id);
 
-        Alive = Node.LastSeen >= threeHours;
+        if (Node == null)
+        {
+            Loading = false;
+
+            return;
+        }
+        
+        Alive = Node.LastSeen >= aDay;
         
         var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
         NbPackets.Total = await countPackets.CountAsync();

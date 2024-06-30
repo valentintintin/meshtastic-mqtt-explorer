@@ -30,11 +30,12 @@
     </GridCol>
     
     <GridCol Xs="24" Md="4">
-        <Card Title="Inspiration">
+        <Card Title="Inspiration & liens">
             <ChildContent>
                 <ul>
-                    <li><a href="https://meshmap.net/" target="_blank">MeshMap</a></li>
-                    <li><a href="https://meshtastic.liamcottle.net/" target="_blank">Liam Cottle</a></li>
+                    <li><a href="https://meshmap.net/" rel="nofollow" target="_blank">MeshMap</a></li>
+                    <li><a href="https://meshtastic.liamcottle.net/" rel="nofollow" target="_blank">Liam Cottle</a></li>
+                    <li><a href="https://wiki.fr-emcom.com/gaulix_reseau_meshtastic_-_france:1:start" target="_blank">Le Wiki du réseau Gaulix</a></li>
                 </ul>
             </ChildContent>
         </Card>
@@ -48,12 +49,12 @@
                     <Descriptions Bordered Column="1">
                         <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Name</DescriptionsItem>
                         <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Host</DescriptionsItem>
-                        <DescriptionsItem Title="Topics">
-                            @foreach (var topic in mqtt.Topics)
-                            {
-                            <Tag>@topic</Tag>
-                            }
-                        </DescriptionsItem>
+                        @* <DescriptionsItem Title="Topics"> *@
+                        @*     @foreach (var topic in mqtt.Topics) *@
+                        @*     { *@
+                        @*     <Tag>@topic</Tag> *@
+                        @*     } *@
+                        @* </DescriptionsItem> *@
                     </Descriptions>
                     <Divider></Divider>
                 }

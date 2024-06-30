@@ -11,12 +11,6 @@
     left: -10px;
 }
 
-@media screen and (max-width: 576px) {
-    td.ant-table-cell:first-child {
-        background-color: #d0d0d0 !important;
-    }   
-}
-
 .ant-page-header-heading-extra {
     display: flex;
     flex-wrap: wrap;
@@ -25,4 +19,14 @@
 
 .ant-tag {
     margin-bottom: 5px;
+}
+
+@media screen and (max-width: 576px) {
+    td.ant-table-cell:first-child {
+        background-color: #d0d0d0 !important;
+    }
+    
+    .leaflet-popup {
+        max-width: 200px;
+    }
 }

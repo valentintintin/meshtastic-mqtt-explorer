@@ -57,8 +57,8 @@
                             Id = $"waypoint-{n.Id}",
                             Points =
                             [
-                                new[] { node.Latitude!.Value, node.Longitude!.Value },
-                                new[] { n.Latitude, n.Longitude }
+                                [node.Latitude!.Value, node.Longitude!.Value],
+                                [n.Latitude, n.Longitude]
                             ],
                             Color = Utils.Orange
                         })
@@ -81,7 +81,7 @@
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
             Label = node.AllNames,
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\"><b>{node.AllNames}</b>"
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b>"
         };
     }
 

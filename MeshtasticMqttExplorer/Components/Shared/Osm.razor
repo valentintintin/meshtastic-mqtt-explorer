@@ -22,24 +22,8 @@
 
     [Parameter]
     public Marker? OneMarker { get; set; }
-    
+
     private TaskCompletionSource<bool> _mapInitialized = new();
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await JSRuntime.InvokeVoidAsync("initializeLeafletMap", new[] { Latitude, Longitude }, Zoom);
-            _mapInitialized.SetResult(true);
-
-            if (OneMarker != null)
-            {
-                await AddMarker(OneMarker);
-            }
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
-    }
     
     public async Task AddMarker(Marker marker)
     {
@@ -83,11 +67,32 @@
 
     public async Task Reload()
     {
-        await DisposeAsync();
-        await OnAfterRenderAsync(true);
+        await DeInit();
+        await Init();
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Init();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task Init()
+    {
+        await JSRuntime.InvokeVoidAsync("initializeLeafletMap", new[] { Latitude, Longitude }, Zoom);
+        _mapInitialized.SetResult(true);
+
+        if (OneMarker != null)
+        {
+            await AddMarker(OneMarker);
+        }
+    }
+
+    private async Task DeInit()
     {
         try
         {
@@ -103,6 +108,11 @@
         }
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        await DeInit();
+    }
+
     public class Marker
     {
         public required string Id { get; set; }
@@ -114,6 +124,8 @@
         public string? Color { get; set; }
         public string? FillColor { get; set; }
         public float? Opacity { get; set; }
+        public bool PopupOnHover { get; set; }
+        public List<Line>? LinesOnHover { get; set; }
     }
     
     public class Line
@@ -128,5 +140,6 @@
     {
         Classic,
         Circle,
+        Square,
     }
 }

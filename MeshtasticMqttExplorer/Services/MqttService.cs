@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using CS_AES_CTR;
 using Google.Protobuf;
 using Meshtastic.Protobufs;
+using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Context.Entities;
 using MeshtasticMqttExplorer.Extensions;
@@ -19,6 +20,7 @@ using Channel = MeshtasticMqttExplorer.Context.Entities.Channel;
 using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
 using Position = MeshtasticMqttExplorer.Context.Entities.Position;
 using Telemetry = MeshtasticMqttExplorer.Context.Entities.Telemetry;
+using Waypoint = Meshtastic.Protobufs.Waypoint;
 
 namespace MeshtasticMqttExplorer.Services;
 
@@ -43,6 +45,7 @@ public class MqttService : AService, IAsyncDisposable
     public readonly Subject<Position> NewPosition = new();
     public readonly Subject<MeshtasticMqttExplorer.Context.Entities.NeighborInfo> NewNeighborInfoMessage = new();
     public readonly Subject<TextMessage> NewTextMessage = new();
+    public readonly Subject<Waypoint> NewWaypoint = new();
 
     private readonly List<MqttClientAndConfiguration> _mqttClientAndConfigurations;
     private readonly IConfiguration _configuration;
@@ -119,10 +122,11 @@ public class MqttService : AService, IAsyncDisposable
     private async Task DoReceiveStatus(string nodeIdString, string status, MqttClientAndConfiguration mqtt)
     {
         var nodeId = uint.Parse(nodeIdString[1..], NumberStyles.HexNumber);
+        var isMqttGateway = status == "online";
         var node = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
         {
             NodeId = nodeId,
-            IsMqttGateway = status == "online"
+            IsMqttGateway = isMqttGateway
         };
         if (node.Id == 0)
         {
@@ -134,12 +138,16 @@ public class MqttService : AService, IAsyncDisposable
         }
         else if (node.NodeId != NodeBroadcast)
         {
-            node.IsMqttGateway = status == "online";
-            if (node.IsMqttGateway == true)
+            if (node.IsMqttGateway != isMqttGateway)
             {
-                node.LastSeen = DateTime.UtcNow;
+                node.IsMqttGateway = isMqttGateway;
+                if (node.IsMqttGateway == true)
+                {
+                    node.LastSeen = DateTime.UtcNow;
+                }
+
+                mqtt.Context.Update(node);
             }
-            mqtt.Context.Update(node);
         }
         await mqtt.Context.SaveChangesAsync();
     }
@@ -169,12 +177,14 @@ public class MqttService : AService, IAsyncDisposable
         await mqtt.Context.SaveChangesAsync();
         NewNode.OnNext(nodeGateway);
         
-        var nodeFrom = await mqtt.Context.Nodes.FindByNodeIdAsync(rootPacket.Packet.From) ?? new Node
+        var nodeFrom = await mqtt.Context.Nodes
+            .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
+            .FindByNodeIdAsync(rootPacket.Packet.From) ?? new Node
         {
             NodeId = rootPacket.Packet.From,
             LastSeen = DateTime.UtcNow,
-            // ModemPreset = nodeGateway.ModemPreset,
-            // RegionCode = nodeGateway.RegionCode
+            ModemPreset = nodeGateway.ModemPreset,
+            RegionCode = nodeGateway.RegionCode
         };
         if (nodeFrom.Id == 0)
         {
@@ -184,9 +194,8 @@ public class MqttService : AService, IAsyncDisposable
         else if (nodeFrom.NodeId != NodeBroadcast)
         {
             nodeFrom.LastSeen = DateTime.UtcNow;
-            // nodeFrom.ModemPreset ??= nodeGateway.ModemPreset;
-            // nodeFrom.RegionCode ??= nodeGateway.RegionCode;
             mqtt.Context.Update(nodeFrom);
+            await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, $"Gateway-{nodeGateway}", mqtt.Context);
         }
         await mqtt.Context.SaveChangesAsync();
         NewNode.OnNext(nodeFrom);
@@ -194,8 +203,8 @@ public class MqttService : AService, IAsyncDisposable
         var nodeTo = await mqtt.Context.Nodes.FindByNodeIdAsync(rootPacket.Packet.To) ?? new Node
         {
             NodeId = rootPacket.Packet.To,
-            // ModemPreset = nodeGateway.ModemPreset,
-            // RegionCode = nodeGateway.RegionCode
+            ModemPreset = nodeGateway.ModemPreset,
+            RegionCode = nodeGateway.RegionCode
         };
         if (nodeTo.Id == 0)
         {
@@ -235,11 +244,22 @@ public class MqttService : AService, IAsyncDisposable
         
         var payload = rootPacket.Packet.GetPayload();
         
+        var nodeGatewayPosition = nodeGateway.Positions.FirstOrDefault();
+        var nodeFromPosition =nodeFrom.Positions.FirstOrDefault();
+        double? distance = null;
+        
+        if (nodeFromPosition != null && nodeGatewayPosition != null)
+        {
+            distance = Utils.CalculateDistance(nodeFromPosition.Latitude, nodeFromPosition.Longitude, nodeGatewayPosition.Latitude, nodeGatewayPosition.Longitude);
+        }
+        
         var packet = new Packet
         {
             Channel = channel,
             Gateway = nodeGateway,
-            GatewayPosition = nodeGateway.Positions.FirstOrDefault(),
+            GatewayPosition = nodeGatewayPosition,
+            Position = nodeFromPosition,
+            GatewayDistanceKm = distance,
             Encrypted = isEncrypted,
             Priority = rootPacket.Packet.Priority,
             PacketId = rootPacket.Packet.Id,
@@ -287,6 +307,9 @@ public class MqttService : AService, IAsyncDisposable
             case PortNum.TextMessageApp:
                 await DoTextMessagePacket(mqtt, nodeFrom, nodeTo, packet, rootPacket.Packet.GetPayload<string>());
                 break;
+            case PortNum.WaypointApp:
+                await DoWaypointPacket(mqtt, nodeFrom, nodeTo, packet, rootPacket.Packet.GetPayload<Waypoint>());
+                break;
         }
         
         NewPacket.OnNext(packet);
@@ -321,12 +344,12 @@ public class MqttService : AService, IAsyncDisposable
         
         await KeepNbPacketsTypeForNode(nodeFrom, PortNum.MapReportApp, 10);
 
+        await UpdateRegionCodeAndModemPreset(nodeFrom, mapReport.Region, mapReport.ModemPreset, $"MapReport", mqtt.Context);
+        
         nodeFrom.ShortName = mapReport.ShortName;
         nodeFrom.LongName = mapReport.LongName;
         nodeFrom.Role = mapReport.Role;
         nodeFrom.HardwareModel = mapReport.HwModel;
-        nodeFrom.ModemPreset = mapReport.ModemPreset;
-        nodeFrom.RegionCode = mapReport.Region;
         nodeFrom.NumOnlineLocalNodes = (int?)mapReport.NumOnlineLocalNodes;
         nodeFrom.FirmwareVersion = mapReport.FirmwareVersion;
         nodeFrom.HasDefaultChannel = mapReport.HasDefaultChannel;
@@ -409,7 +432,9 @@ public class MqttService : AService, IAsyncDisposable
 
         foreach (var neighbor in neighborInfoPayload.Neighbors)
         {
-            var neighborNode = await mqtt.Context.Nodes.FindByNodeIdAsync(neighbor.NodeId) ?? new Node
+            var neighborNode = await mqtt.Context.Nodes
+                .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
+                .FindByNodeIdAsync(neighbor.NodeId) ?? new Node
             {
                 NodeId = neighbor.NodeId,
                 ModemPreset = nodeFrom.ModemPreset,
@@ -422,19 +447,31 @@ public class MqttService : AService, IAsyncDisposable
             }
             else
             {
-                neighborNode.RegionCode ??= nodeFrom.RegionCode;
-                neighborNode.ModemPreset ??= nodeFrom.ModemPreset;
-                mqtt.Context.Update(neighborNode);
+                await UpdateRegionCodeAndModemPreset(neighborNode, nodeFrom.RegionCode, nodeFrom.ModemPreset,
+                    $"Neighbor-{nodeFrom}", mqtt.Context);
             }
             NewNode.OnNext(neighborNode);
             await mqtt.Context.SaveChangesAsync();
+
+            var nodePosition = nodeFrom.Positions.FirstOrDefault();
+            var neighborPosition = neighborNode.Positions.FirstOrDefault();
+            double? distance = null;
+            
+            if (nodePosition != null && neighborPosition != null)
+            {
+                distance = Utils.CalculateDistance(nodePosition.Latitude, nodePosition.Longitude,
+                    neighborPosition.Latitude, neighborPosition.Longitude);
+            }
             
             var neighborInfo = await mqtt.Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
             {
                 Node = nodeFrom,
+                NodePosition = nodePosition,
                 Packet = packet,
                 Neighbor = neighborNode,
-                Snr = neighbor.Snr
+                NeighborPosition = neighborPosition,
+                Snr = neighbor.Snr,
+                Distance = distance
             };
             if (neighborInfo.Id == 0)
             {
@@ -445,6 +482,11 @@ public class MqttService : AService, IAsyncDisposable
             {
                 Logger.LogInformation("Update neighbor {neighbor} to {node}", neighborNode, nodeFrom);
                 neighborInfo.UpdatedAt = packet.CreatedAt;
+                neighborInfo.Packet = packet;
+                neighborInfo.Snr = neighbor.Snr;
+                neighborInfo.NodePosition = nodePosition;
+                neighborInfo.NeighborPosition = neighborPosition;
+                neighborInfo.Distance = distance;
                 mqtt.Context.Update(neighborInfo);
             }
 
@@ -475,6 +517,47 @@ public class MqttService : AService, IAsyncDisposable
         mqtt.Context.Add(textMessage);
         await mqtt.Context.SaveChangesAsync();
         NewTextMessage.OnNext(textMessage);
+    }
+
+    private async Task DoWaypointPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Node nodeTo, Packet packet, Waypoint? payload)
+    {
+        if (payload == null)
+        {
+            return;
+        }
+
+        var waypoint = await mqtt.Context.Waypoints.FirstOrDefaultAsync(a => a.WaypointId == payload.Id) ??
+                       new Context.Entities.Waypoint
+                       {
+                           Node = nodeFrom,
+                           Packet = packet,
+                           WaypointId = payload.Id,
+                           Latitude = payload.LatitudeI * 0.0000001,
+                           Longitude = payload.LongitudeI * 0.0000001,
+                           Name = payload.Name,
+                           ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime,
+                           Description = payload.Description,
+                           Icon = payload.Icon
+                       };
+
+        if (waypoint.Id == 0)
+        {
+            mqtt.Context.Add(waypoint);
+        }
+        else
+        {
+            waypoint.Latitude = payload.LatitudeI * 0.0000001;
+            waypoint.Longitude = payload.LongitudeI * 0.0000001;
+            waypoint.Name = payload.Name;
+            waypoint.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime;
+            waypoint.Description = payload.Description;
+            waypoint.Icon = payload.Icon;
+            waypoint.Packet = packet;
+            
+            mqtt.Context.Update(waypoint);
+        }
+        
+        await mqtt.Context.SaveChangesAsync();
     }
 
     public new async ValueTask DisposeAsync()
@@ -545,6 +628,29 @@ public class MqttService : AService, IAsyncDisposable
         return position;
     }
 
+    private async Task UpdateRegionCodeAndModemPreset(Node node, Config.Types.LoRaConfig.Types.RegionCode? regionCode, Config.Types.LoRaConfig.Types.ModemPreset? modemPreset, string source, DataContext context)
+    {
+        if (!node.RegionCode.HasValue || !node.ModemPreset.HasValue)
+        {
+            Logger.LogDebug("Node {node} does not have RegionCode or ModemPreset so we set it from {source} to {regionCode} {modemPreset}", node, source, regionCode, modemPreset);
+        }
+        else if (node.RegionCode != regionCode || node.ModemPreset != modemPreset)
+        {
+            Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) or ModemPreset ({oldModemPreset}) so we set it from {source} to {regionCode} {modemPreset}", node, node.RegionCode, node.ModemPreset, source, regionCode, modemPreset);
+        }
+        else
+        {
+            return;
+        }
+        
+        node.RegionCode = regionCode;
+        node.ModemPreset = modemPreset;
+
+        context.Update(node);
+
+        await context.SaveChangesAsync();
+    }
+    
     private Data? Decrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
     {
         var nonce = CreateNonce(packetId, nodeFromId);
