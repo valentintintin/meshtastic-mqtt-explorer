@@ -6,9 +6,13 @@ window.initializeLeafletMap = (center, zoom) => {
 
     window.leafletMarkers = [];
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    let layer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-    }).addTo(window.leafletMap);
+    })
+
+    // layer = protomapsL.leafletLayer({url: 'mymap.pmtiles', theme: "light"});
+    
+    layer.addTo(window.leafletMap);
 
     console.debug('Map created');
 };

@@ -143,12 +143,12 @@
                                         <a href="/node/@packet.Gateway.Id" target="_blank" rel="nofollow">@packet.Gateway.AllNames</a>
                                     </TitleTemplate>
                                     <DescriptionTemplate>
-                                        @if (packet.GatewayDistanceKm.HasValue)
-                                        {
-                                            <span>@(Math.Round(packet.GatewayDistanceKm.Value, 2)) Km</span>
-                                            <span> | </span>
-                                        }
                                         <Tooltip Title="@("Paquet ID : " + packet.PacketId)">
+                                            @if (packet.GatewayDistanceKm.HasValue)
+                                            {
+                                                <span>@(Math.Round(packet.GatewayDistanceKm.Value, 2)) Km</span>
+                                                <span> | </span>
+                                            }
                                             <Date Value="packet.CreatedAt"></Date>
                                         </Tooltip>
                                     </DescriptionTemplate>

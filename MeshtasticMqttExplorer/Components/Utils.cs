@@ -23,17 +23,12 @@ public static class Utils
         })
         .OrderBy(p =>
         {
-            if (p.Value == Config.Types.LoRaConfig.Types.RegionCode.Eu433)
+            return p.Value switch
             {
-                return "1";
-            }
-
-            if (p.Value == Config.Types.LoRaConfig.Types.RegionCode.Eu868)
-            {
-                return "0";
-            }
-            
-            return p.Text;
+                Config.Types.LoRaConfig.Types.RegionCode.Eu433 => "1",
+                Config.Types.LoRaConfig.Types.RegionCode.Eu868 => "0",
+                _ => p.Text
+            };
         })
         .ToArray();
     public static readonly TableFilter<Config.Types.LoRaConfig.Types.ModemPreset?>[] ModemPresetFilters = ((Config.Types.LoRaConfig.Types.ModemPreset[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.ModemPreset)))
@@ -44,17 +39,12 @@ public static class Utils
         })
         .OrderBy(p =>
         {
-            if (p.Value == Config.Types.LoRaConfig.Types.ModemPreset.LongFast)
+            return p.Value switch
             {
-                return "1";
-            }
-
-            if (p.Value == Config.Types.LoRaConfig.Types.ModemPreset.LongModerate)
-            {
-                return "0";
-            }
-            
-            return p.Text;
+                Config.Types.LoRaConfig.Types.ModemPreset.LongFast => "1",
+                Config.Types.LoRaConfig.Types.ModemPreset.LongModerate => "0",
+                _ => p.Text
+            };
         })
         .ToArray();
     public static readonly TableFilter<HardwareModel?>[] HardwareModelFilters = ((HardwareModel[])Enum.GetValues(typeof(HardwareModel)))
@@ -151,9 +141,9 @@ public static class Utils
         return degrees * Math.PI / 180;
     }
 
-    public static LineConfig GetLineConfig(string yAxisText, double min, double max)
+    public static LineConfig GetLineConfig(string yAxisText, double? min = null, double? max = null)
     {
-        return new()
+        return new LineConfig
         {
             Padding = "auto",
             AutoFit = true,

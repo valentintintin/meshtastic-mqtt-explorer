@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Reactive.Subjects;
 using System.Text;
@@ -6,6 +7,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using CS_AES_CTR;
 using Google.Protobuf;
+using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
@@ -93,7 +95,7 @@ public class MqttService : AService, IAsyncDisposable
                 var topicSegments = e.ApplicationMessage.Topic.Split("/");
                 if (topicSegments.Contains("stat"))
                 {
-                    await DoReceiveStatus(topicSegments.Last(), Encoding.Default.GetString(data), mqttClientAndConfiguration);
+                    await DoReceiveStatus(topicSegments.Last(), Encoding.UTF8.GetString(data), mqttClientAndConfiguration);
                     return;
                 }
                 
@@ -240,7 +242,7 @@ public class MqttService : AService, IAsyncDisposable
         }
 
         var isEncrypted = rootPacket.Packet.Decoded == null;
-        rootPacket.Packet.Decoded ??= Decrypt(rootPacket.Packet.Encrypted.ToByteArray(), "1PG7OiApB1nwvP+rz05pAQ==", rootPacket.Packet.Id, rootPacket.Packet.From);
+        rootPacket.Packet.Decoded ??= Decrypt(rootPacket.Packet.Encrypted.ToByteArray(), "AQ==", rootPacket.Packet.Id, rootPacket.Packet.From);
         
         var payload = rootPacket.Packet.GetPayload();
         
@@ -335,6 +337,54 @@ public class MqttService : AService, IAsyncDisposable
         }
     }
 
+    public async Task PublishMessage(PublishMessageDto dto)
+    {
+        var mqttConfiguration = string.IsNullOrWhiteSpace(dto.MqttServer) ? _mqttClientAndConfigurations.First() : 
+            _mqttClientAndConfigurations.First(a => a.Configuration.Name == dto.MqttServer);
+        
+        var packetId = (uint)Random.Shared.Next();
+        var nodeFromId = uint.Parse(dto.NodeFromId[1..], NumberStyles.HexNumber);
+        var nodeToId = string.IsNullOrWhiteSpace(dto.NodeToId) ? NodeBroadcast : uint.Parse(dto.NodeToId[1..], NumberStyles.HexNumber);
+        var topic = $"{dto.RootTopic}";
+
+        var data = new Data
+        {
+            Portnum = PortNum.TextMessageApp,
+            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(dto.Message))
+        };
+        
+        var packet = new ServiceEnvelope
+        {
+            ChannelId = dto.Channel,
+            GatewayId = dto.NodeFromId,
+            Packet = new MeshPacket
+            {
+                Id = packetId,
+                To = nodeToId,
+                From = nodeFromId,
+                Channel = GenerateHash(dto.Channel, dto.Key),
+                WantAck = false,
+                HopLimit = dto.HopLimit
+            }
+        };
+
+        if (string.IsNullOrWhiteSpace(dto.Key))
+        {
+            packet.Packet.Decoded = data;
+            topic += "e";
+        }
+        else
+        {
+            packet.Packet.Encrypted = ByteString.CopyFrom(Encrypt(data.ToByteArray(), dto.Key!, packetId, nodeFromId));
+            topic += "c";
+        }
+
+        topic += $"/{dto.Channel}/{dto.NodeFromId}";
+        Logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()));
+
+        // await mqttConfiguration.Client.PublishBinaryAsync(topic, packet.ToByteArray());
+    }
+    
     private async Task DoMapReportingPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, MapReport? mapReport)
     {
         if (mapReport == null)
@@ -370,7 +420,17 @@ public class MqttService : AService, IAsyncDisposable
             return;
         }
 
-        await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet, mqtt.Context);
+        var position = await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet, mqtt.Context);
+
+        if (packet.GatewayPosition != null && position != null)
+        {
+            packet.Position = position;
+            packet.GatewayDistanceKm = Utils.CalculateDistance(position.Latitude, position.Longitude,
+                packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude);
+
+            mqtt.Context.Update(packet);
+            await mqtt.Context.SaveChangesAsync();
+        }
     }
 
     private async Task DoNodeInfoPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
@@ -653,6 +713,11 @@ public class MqttService : AService, IAsyncDisposable
     
     private Data? Decrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
     {
+        if (key.ToLower() == "aq==")
+        {
+            key = "1PG7OiApB1nwvP+rz05pAQ==";
+        }
+        
         var nonce = CreateNonce(packetId, nodeFromId);
 
         var forDecrypting = new AES_CTR(Convert.FromBase64String(key), nonce);
@@ -676,6 +741,33 @@ public class MqttService : AService, IAsyncDisposable
         }
     }
     
+    private byte[] Encrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
+    {
+        if (key.ToLower() == "aq==")
+        {
+            key = "1PG7OiApB1nwvP+rz05pAQ==";
+        }
+        
+        var nonce = CreateNonce(packetId, nodeFromId);
+
+        var forCrypting = new AES_CTR(Convert.FromBase64String(key), nonce);
+        var crytedContent = new byte[input.Length];
+        forCrypting.EncryptBytes(crytedContent, input);
+        
+        try
+        {
+            Logger.LogInformation("Encrypt packet {packetId} from {nodeId} with key {key} OK", packetId, nodeFromId, key);
+
+            return crytedContent;
+        }
+        catch
+        {
+            Logger.LogWarning("Encrypt packet {packetId} from {nodeId} with key {key} KO", packetId, nodeFromId, key);
+
+            return null;
+        }
+    }
+    
     private byte[] CreateNonce(ulong packetId, uint fromNode)
     {
         var nonce = new byte[16];
@@ -685,6 +777,25 @@ public class MqttService : AService, IAsyncDisposable
         BitConverter.GetBytes(0).CopyTo(nonce, 12);
 
         return nonce;
+    }
+    
+    private uint GenerateHash(string name, string? key)
+    {
+        var replacedKey = key?.Replace('-', '+').Replace('_', '/');
+        
+        var keyBytes = string.IsNullOrWhiteSpace(replacedKey) ? [] : Convert.FromBase64String(replacedKey);
+        
+        var hName = XorHash(Encoding.UTF8.GetBytes(name));
+        var hKey = XorHash(keyBytes);
+        
+        var result = hName ^ hKey;
+        
+        return (uint)result;
+    }
+
+    private static int XorHash(byte[] bytes)
+    {
+        return bytes.Aggregate(0, (current, b) => current ^ b);
     }
     
     private class MqttClientAndConfiguration
@@ -808,4 +919,26 @@ public class MqttService : AService, IAsyncDisposable
         context.RemoveRange(packets);
         await context.SaveChangesAsync();
     }
+}
+
+public class PublishMessageDto
+{
+    public string? MqttServer { get; set; }
+
+    [Required]
+    public string NodeFromId { get; set; } = "!1000001";
+    
+    [Required]
+    public string Channel { get; set; } = "LongFast";
+    
+    [Required]
+    public string Message { get; set; } = "Test";
+    
+    public string? NodeToId { get; set; }
+    public uint HopLimit { get; set; } = 3;
+    
+    [Required]
+    public string RootTopic { get; set; } = "msh/EU_868/2/";
+
+    public string? Key { get; set; }// = "AQ==";
 }

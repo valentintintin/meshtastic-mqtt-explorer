@@ -1,5 +1,7 @@
+@using System.Globalization
 @using System.Text.Json
 @using Google.Protobuf
+@using Meshtastic.Extensions
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context.Entities
 @using MeshtasticMqttExplorer.Extensions
@@ -56,6 +58,11 @@
                         @(MapReport?.Altitude)m
                     </DescriptionsItem>
                 </Descriptions>
+                
+                @if (Marker != null)
+                {
+                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                }
                 break;
             case PortNum.NodeinfoApp:
                 <Descriptions Column="1">
@@ -88,6 +95,11 @@
                         @(Position?.Altitude)m
                     </DescriptionsItem>
                 </Descriptions>
+                
+                @if (Marker != null)
+                {
+                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                }
                 break;
             case PortNum.TelemetryApp:
                 <Descriptions Column="1">
@@ -211,16 +223,16 @@
                             <DescriptionsItem Title="Demande de réponses">
                                 @if (Routing?.RouteReply?.Route?.Any() == true)
                                 {
-                                <Timeline>
-                                    @foreach (var nodeId in Routing?.RouteReply?.Route ?? [])
-                                    {
-                                    <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
-                                    }
-                                </Timeline>
+                                    <Timeline>
+                                        @foreach (var nodeId in Routing?.RouteReply?.Route ?? [])
+                                        {
+                                            <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
+                                        }
+                                    </Timeline>
                                 }
                                 else
                                 {
-                                <text>Aucune</text>
+                                    <text>Aucune</text>
                                 }
                             </DescriptionsItem>
                             break;
@@ -255,6 +267,11 @@
                         @(Waypoint?.LongitudeI * 0.0000001)
                     </DescriptionsItem>
                 </Descriptions>
+                
+                @if (Marker != null)
+                {
+                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude/@Marker.Longitude" target="_blank">Carte</a>
+                }
                 break;
         }
 
@@ -290,6 +307,8 @@
     private string? TextMessage { get; set; }
     private string? RawJson { get; set; }
     private string? PayloadJson { get; set; }
+    
+    private Osm.Marker? Marker { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -316,12 +335,35 @@
                     break;
                 case PortNum.PositionApp:
                     Position = rootPacket.Packet.GetPayload<Position>();
+                    
+                    if (Position != null)
+                    {
+                        Marker = new Osm.Marker
+                        {
+                            Id = $"packet-{Packet.Id}",
+                            Latitude = Position.LatitudeI * 0.0000001,
+                            Longitude = Position.LongitudeI * 0.0000001
+                        };
+                    }
+
                     break;
                 case PortNum.NeighborinfoApp:
                     NeighborInfo = rootPacket.Packet.GetPayload<NeighborInfo>();
                     break;
                 case PortNum.MapReportApp:
                     MapReport = rootPacket.Packet.GetPayload<MapReport>();
+                    
+                    if (MapReport != null)
+                    {
+                        Marker = new Osm.Marker
+                        {
+                            Id = $"packet-{Packet.Id}",
+                            Label = MapReport.LongName,
+                            Latitude = MapReport.LatitudeI * 0.0000001,
+                            Longitude = MapReport.LongitudeI * 0.0000001
+                        };
+                    }
+
                     break;
                 case PortNum.TracerouteApp:
                     TraceRoute = rootPacket.Packet.GetPayload<RouteDiscovery>();
@@ -334,6 +376,18 @@
                     break;
                 case PortNum.WaypointApp:
                     Waypoint = rootPacket.Packet.GetPayload<Waypoint>();
+                    
+                    if (Waypoint != null)
+                    {
+                        Marker = new Osm.Marker
+                        {
+                            Id = $"packet-{Packet.Id}",
+                            Label = Waypoint.Name,
+                            Latitude = Waypoint.LatitudeI * 0.0000001,
+                            Longitude = Waypoint.LongitudeI * 0.0000001
+                        };
+                    }
+
                     break;
             }
         }

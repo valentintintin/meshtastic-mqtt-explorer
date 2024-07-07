@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using AntDesign;
 using Google.Protobuf;
+using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
@@ -21,6 +22,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddAntDesign();
+
+builder.Services.AddResponseCompression();
 
 builder.Services.Configure<HostOptions>(hostOptions =>
 {
@@ -55,7 +58,10 @@ if (!builder.Environment.IsDevelopment())
 
 app.UseMiddleware<PerformanceAndCultureMiddleware>();
 
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    ServeUnknownFileTypes = true
+});
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()

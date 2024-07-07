@@ -4,7 +4,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyVersion>1.0.7</AssemblyVersion>
+        <AssemblyVersion>1.0.8.1</AssemblyVersion>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 
@@ -12,7 +12,7 @@
       <PackageReference Include="AntDesign" Version="0.19.3" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
       <PackageReference Include="LibAES-CTR" Version="1.0.1" />
-      <PackageReference Include="Meshtastic" Version="1.0.42" />
+      <PackageReference Include="Meshtastic" Version="1.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.6" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
         <PrivateAssets>all</PrivateAssets>

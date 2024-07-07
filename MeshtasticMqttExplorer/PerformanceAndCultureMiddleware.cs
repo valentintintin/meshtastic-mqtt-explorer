@@ -26,7 +26,7 @@ public class PerformanceAndCultureMiddleware(
         nextTask.ContinueWith(t =>
         {
             var time = watch.ElapsedMilliseconds;
-            var requestString = $"[{httpContext.Request.Method}]{httpContext.Request.Path}?{httpContext.Request.QueryString}";
+            var requestString = $"[{httpContext.Request.Method}]{httpContext.Request.Path}{httpContext.Request.QueryString}";
             if (t.Status == TaskStatus.RanToCompletion)
             {
                 logger.LogInformation("{time}ms {requestString}", time, requestString);

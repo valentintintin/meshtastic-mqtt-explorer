@@ -1,0 +1,87 @@
+﻿@page "/send"
+@using MeshtasticMqttExplorer.Models
+@using MeshtasticMqttExplorer.Services
+
+@inject IConfiguration Configuration
+@inject IMessageService Message
+@inject MqttService MqttService
+
+<PageTitle>Envoi d'une trame</PageTitle>
+
+<PageHeader Title="Envoi d'une trame"></PageHeader>
+
+<Form Model="@Model"
+      OnFinish="OnFinish"
+      OnFinishFailed="OnFinishFailed"
+      LabelColSpan="8"
+      WrapperColSpan="16">
+    <FormItem Label="Mon ID">
+        <Input @bind-Value="@context.NodeFromId" />
+    </FormItem>
+    <FormItem Label="ID destinataire (vide si tout le monde)">
+        <Input @bind-Value="@context.NodeToId" />
+    </FormItem>
+    <FormItem Label="Clé de chiffrement (vide pour ne pas chiffrer)">
+        <Input @bind-Value="@context.Key" />
+    </FormItem>
+    <FormItem Label="Nombre de sauts">
+        <AntDesign.InputNumber Min="0" Max="7" @bind-Value="@context.HopLimit" TValue="uint" />
+    </FormItem>
+    <FormItem Label="Serveur MQTT">
+        <Select DataSource="@MqttConfigurations"
+                @bind-Value="@context.MqttServer"
+                ValueProperty="c=>c.Name"
+                LabelProperty="c=>c.Name"
+                Style="width:120px">
+        </Select>
+    </FormItem>
+    <FormItem Label="Topic racine MQTT">
+        <Input @bind-Value="@context.RootTopic" />
+    </FormItem>
+    <FormItem Label="Canal">
+        <Input @bind-Value="@context.Channel" />
+    </FormItem>
+    <FormItem Label="Message">
+        <Input @bind-Value="@context.Message" />
+    </FormItem>
+    <FormItem WrapperColOffset="8" WrapperColSpan="16">
+        <Button Type="@ButtonType.Primary" HtmlType="submit">
+            Envoyer
+        </Button>
+    </FormItem>
+</Form>
+
+@code
+{
+    private PublishMessageDto Model = new();
+    private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
+        
+    protected override void OnInitialized()
+    {
+        MqttConfigurations = (Configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
+            .Where(c => c.Enabled)
+            .ToList();
+
+        Model.MqttServer = MqttConfigurations.First().Name;
+
+        base.OnInitialized();
+    }
+    
+    private async Task OnFinish(EditContext editContext)
+    {
+        try
+        {
+            await MqttService.PublishMessage(Model);
+            await Message.Success("Trame bien envoyée !");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            await Message.Error($"Il y a eu une erreur pendant l'envoi : {e}");
+        }
+    }
+
+    private void OnFinishFailed(EditContext editContext)
+    {
+    }
+}
