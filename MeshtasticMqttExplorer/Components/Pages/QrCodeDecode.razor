@@ -1,0 +1,68 @@
+﻿@page "/qr-code-decoder"
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using MeshtasticMqttExplorer.Services
+
+@inject MeshtasticService MeshtasticService
+@inject IMessageService MessageService
+
+<PageTitle>Décodage d'un QR Code (ou URL)</PageTitle>
+
+<PageHeader Title="Décodage d'un QR Code (ou URL)"></PageHeader>
+
+<Form Model="@_model"
+      OnFinish="OnFinish"
+      LabelColSpan="8"
+      WrapperColSpan="16">
+    <FormItem Label="URL du QR Code">
+        <Input @bind-Value="@context.Url" Placeholder="https://meshtastic.org/e/#XXXXXXXXXXXXXXXXXXXXXXXXX" />
+    </FormItem>
+    <FormItem WrapperColOffset="8" WrapperColSpan="16">
+        <Button Type="@ButtonType.Primary" HtmlType="submit">
+            Décoder
+        </Button>
+    </FormItem>
+</Form>
+
+<Card Title="Résultat">
+    <ChildContent>
+        <pre>
+            @_result
+        </pre> 
+    </ChildContent>
+</Card>
+
+@code
+{
+    private Model _model = new();
+    private string? _result;
+    
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        WriteIndented = true
+    };
+    
+    private void OnFinish(EditContext editContext)
+    {
+        if (string.IsNullOrWhiteSpace(_model.Url))
+        {
+            return;
+        }
+        
+        try
+        {
+            _result = JsonSerializer.Serialize(MeshtasticService.DecodeQrCodeUrl(_model.Url), JsonSerializerOptions);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            MessageService.Error($"Erreur : {e}");
+        }
+    }
+
+    private class Model
+    {
+        [Required]
+        public string? Url { get; set; }
+    }
+}

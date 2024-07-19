@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Meshtastic.Protobufs;
+using MeshtasticMqttExplorer.Extensions;
 
 namespace MeshtasticMqttExplorer.Context.Entities;
 
@@ -43,7 +44,7 @@ public class Node : IEntity
     public virtual ICollection<TextMessage> TextMessagesFrom { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesTo { get; set; } = [];
 
-    public string NodeIdAsString() => $"!{NodeId.ToString("X").ToLower()}";
+    public string NodeIdAsString() => NodeId.ToHexString();
     public string Name() => LongName != null && ShortName != null ? $"{LongName} | {ShortName}" : NodeIdAsString();
     public string FullName() => LongName != null && ShortName != null ? $"{Name()} - {NodeIdAsString()}" : NodeIdAsString();
     public string OneName(bool onlyShort = false) => (onlyShort ? null : LongName) ?? ShortName ?? NodeIdAsString();
@@ -51,5 +52,10 @@ public class Node : IEntity
     public override string ToString()
     {
         return $"#{Id} -> {FullName()}";
+    }
+
+    public bool IsOffline()
+    {
+        return (DateTime.UtcNow - LastSeen!).Value.TotalHours > 24;
     }
 }

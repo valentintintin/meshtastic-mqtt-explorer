@@ -1,16 +1,19 @@
 ﻿@page "/send"
+@using System.Net
+@using MeshtasticMqttExplorer.Extensions
 @using MeshtasticMqttExplorer.Models
 @using MeshtasticMqttExplorer.Services
 
 @inject IConfiguration Configuration
 @inject IMessageService Message
 @inject MqttService MqttService
+@inject IHttpContextAccessor HttpContextAccessor
 
 <PageTitle>Envoi d'une trame</PageTitle>
 
 <PageHeader Title="Envoi d'une trame"></PageHeader>
 
-<Form Model="@Model"
+<Form Model="@_model"
       OnFinish="OnFinish"
       OnFinishFailed="OnFinishFailed"
       LabelColSpan="8"
@@ -30,8 +33,8 @@
     <FormItem Label="Serveur MQTT">
         <Select DataSource="@MqttConfigurations"
                 @bind-Value="@context.MqttServer"
-                ValueProperty="c=>c.Name"
-                LabelProperty="c=>c.Name"
+                ItemValue="c=>c.Name"
+                ItemLabel="c=>c.Name"
                 Style="width:120px">
         </Select>
     </FormItem>
@@ -53,7 +56,7 @@
 
 @code
 {
-    private PublishMessageDto Model = new();
+    private readonly PublishMessageDto _model = new();
     private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
         
     protected override void OnInitialized()
@@ -62,7 +65,8 @@
             .Where(c => c.Enabled)
             .ToList();
 
-        Model.MqttServer = MqttConfigurations.First().Name;
+        _model.MqttServer = MqttConfigurations.First().Name;
+        _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
 
         base.OnInitialized();
     }
@@ -71,7 +75,7 @@
     {
         try
         {
-            await MqttService.PublishMessage(Model);
+            await MqttService.PublishMessage(_model);
             await Message.Success("Trame bien envoyée !");
         }
         catch (Exception e)
@@ -83,5 +87,22 @@
 
     private void OnFinishFailed(EditContext editContext)
     {
+    }
+    
+    private IPAddress? GetIpAddress()
+    {
+        var ipAddress = HttpContextAccessor.HttpContext?.Request.Headers["HTTP_X_FORWARDED_FOR"];
+
+        if (!string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return IPAddress.Parse(ipAddress!);
+        }
+
+        return HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress;
+    }
+    
+    private uint IpAddressToInt(IPAddress? addr)
+    {
+        return addr != null ? (uint) IPAddress.NetworkToHostOrder((int) addr.Address) : 0;
     }
 }

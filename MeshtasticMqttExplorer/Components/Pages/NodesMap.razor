@@ -1,32 +1,35 @@
 @page "/map"
 @implements IAsyncDisposable
-
 @using System.Globalization
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Components.Shared
 @using MeshtasticMqttExplorer.Context
-@using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Extensions
-@using Color = System.Drawing.Color
+@using Microsoft.EntityFrameworkCore
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory;
+@inject IConfiguration Configuration
 
 <PageTitle>Carte des nœuds</PageTitle>
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position depuis 3 jours
+        @Total nœuds avec position depuis 3 jours dont @TotalAlive en vie
+        @if (Total > 0)
+        {
+            @Math.Round((double) TotalAlive / (double) Total * 100)<text>%</text>
+        }
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
     <PageHeaderContent>
-        <div style="display: flex; align-items: center; justify-content: space-between">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap">
             <div>
                 <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)" />
                 <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)" />
-                <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequency" TValue="string" OnChange="value => SetFrequency(value)" />
+                <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)" />
             </div>
 
             <div>
@@ -74,7 +77,7 @@
                    @if (ShowPaths)
                    {
                        <div class="legend">
-                           <span style="background-color: @Utils.Green" class="legend-bar"></span>
+                           <span style="background-color: @Utils.Gold" class="legend-bar"></span>
                            Paquets relayés par cette passerelle MQTT
                        </div>
                    }
@@ -99,12 +102,13 @@
     private bool ShowPaths { get; set; } = true;
     private bool ShowPois { get; set; } = true;
     private int Total { get; set; }
+    private int TotalAlive { get; set; }
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
     private Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; } = Config.Types.LoRaConfig.Types.RegionCode.Eu868;
     private Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; } = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate;
-    private string? CurrentFrequency { get; set; }
+    private string[]? CurrentFrequencies { get; set; }
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> RegionsCodes { get; } = Utils.RegionCodeFilters.Take(2)
         .Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(a.Value, a.Text))
         .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(null, "Tous")])
@@ -113,10 +117,10 @@
         .Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text))
         .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(null, "Tous")])
         .ToList();
-    private List<SegmentedOption<string>> Frequencies { get; } = [ 
-        new SegmentedOption<string>("", "Tous"),
-        new SegmentedOption<string>("869.4", "869.400 Mhz"),
-        new SegmentedOption<string>("869.4625", "869.4625 Mhz"),
+    private List<SegmentedOption<string[]>> Frequencies { get; } = [ 
+        new SegmentedOption<string[]>([""], "Tous"),
+        new SegmentedOption<string[]>(["869.4", ".400"], "869.400 Mhz"),
+        new SegmentedOption<string[]>([".4625"], "869.4625 Mhz"),
     ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -141,7 +145,7 @@
                                     [node.Latitude!.Value, node.Longitude!.Value],
                                     [p.Gateway.Latitude!.Value, p.Gateway.Longitude!.Value]
                                 ],
-                                Color = Utils.Green,
+                                Color = Utils.Gold,
                                 Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p>"
                             })
                     );
@@ -241,19 +245,22 @@
 
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
 
+        var maxDistanceLink = Configuration.GetValue("MaxDistanceLink", 300);
+
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < 1000).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors.Where(a => a.UpdatedAt >= threeDays && a.Distance < 1000 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.PacketsFrom.Where(a => a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < maxDistanceLink && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
+            .Include(n => n.MyNeighbors.Where(a => /*a.UpdatedAt >= threeDays &&*/ a.Distance < maxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => n.LastSeen >= threeDays)
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
             .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset)
-            .Where(n => CurrentFrequency == null || n.LongName != null && n.LongName.Contains(CurrentFrequency))
+            .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
             .AsSplitQuery()
             .ToListAsync();
 
         Total = Nodes.Count;
+        TotalAlive = Nodes.Count(n => !n.IsOffline());
         
         Loading = false;
         HasRenderMapData = false;
@@ -261,8 +268,7 @@
 
     private Osm.Marker GetMarker(Node node)
     {
-        var offline = (DateTime.UtcNow - node.LastSeen!).Value.TotalHours > 24;
-        var color = offline ? Utils.Red : node.IsMqttGateway == true ? Utils.Green : Utils.Blue;
+        var color = node.IsOffline() ? Utils.Red : node.IsMqttGateway == true ? Utils.Green : Utils.Blue;
         
         return new Osm.Marker
         {
@@ -297,9 +303,9 @@
         await FetchData();
     }
 
-    private async Task SetFrequency(string? frequency)
+    private async Task SetFrequency(string[]? frequency)
     {
-        CurrentFrequency = frequency;
+        CurrentFrequencies = frequency;
         
         await FetchData();
     }

@@ -4,7 +4,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyVersion>1.0.8.1</AssemblyVersion>
+        <AssemblyVersion>1.0.10</AssemblyVersion>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 
@@ -19,6 +19,9 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="MQTTnet" Version="4.3.6.1152" />
+      <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.28.1" />
+      <PackageReference Include="NLog.Targets.Seq" Version="4.0.1" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.11" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
@@ -43,6 +46,9 @@
       <None Remove="Components\Pages\NodesMap.razor.css" />
       <Content Include="Components\Pages\NodesMap.razor.css">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </Content>
+      <Content Update="nlog.Production.config">
+        <DependentUpon>nlog.config</DependentUpon>
       </Content>
     </ItemGroup>
 

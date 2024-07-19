@@ -1,10 +1,10 @@
 namespace MeshtasticMqttExplorer.Services;
 
-public class MqttConnectJob(MqttService mqttService, IHostEnvironment environment) : BackgroundService
+public class MqttConnectJob(MqttService mqttService, IConfiguration configuration) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        if (environment.IsProduction())
+        if (configuration.GetValue("ConnectToMqtt", false))
         {
             await mqttService.ConnectMqtt();
         }

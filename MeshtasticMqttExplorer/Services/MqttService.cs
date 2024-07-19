@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Reactive.Concurrency;
 using System.Reactive.Subjects;
 using System.Text;
 using System.Text.Json;
@@ -29,7 +30,7 @@ namespace MeshtasticMqttExplorer.Services;
 public class MqttService : AService, IAsyncDisposable
 {
     public static readonly uint NodeBroadcast = 0xFFFFFFFF;
-    public static readonly uint[] NodesAvoided = [NodeBroadcast, 0x1, 0x10];
+    public static readonly List<uint> NodesIgnored = [NodeBroadcast, 0x1, 0x10];
     public static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
         Converters =
@@ -37,95 +38,157 @@ public class MqttService : AService, IAsyncDisposable
             new JsonStringEnumConverter()
         },
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
     };
     
-    public readonly Subject<Packet> NewPacket = new();
-    public readonly Subject<Channel> NewChannel = new();
-    public readonly Subject<Node> NewNode = new();
-    public readonly Subject<Telemetry> NewTelemetry = new();
-    public readonly Subject<Position> NewPosition = new();
-    public readonly Subject<MeshtasticMqttExplorer.Context.Entities.NeighborInfo> NewNeighborInfoMessage = new();
-    public readonly Subject<TextMessage> NewTextMessage = new();
-    public readonly Subject<Waypoint> NewWaypoint = new();
-
     private readonly List<MqttClientAndConfiguration> _mqttClientAndConfigurations;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _environment;
+    private readonly Subject<(MqttApplicationMessage message, MqttConfiguration mqttConfiguration)> _mqttReceived = new();
 
-    public MqttService(ILogger<MqttService> logger, IConfiguration configuration, IDbContextFactory<DataContext> contextFactory, IHostEnvironment environment) : base(logger, contextFactory)
+    public MqttService(ILogger<MqttService> logger, IConfiguration configuration, IDbContextFactory<DataContext> contextFactory, IHostEnvironment environment, IServiceProvider serviceProvider) : base(logger, contextFactory)
     {
         _configuration = configuration;
         _environment = environment;
+        var scheduler = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>();
+
+        var shouldPurge = true;
         
+        NodesIgnored.AddRange(_configuration.GetValue<List<uint>>("NodesIgnored", [])!);
+
         _mqttClientAndConfigurations = (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
             .Where(c => c.Enabled)
-            .Select(async c => new MqttClientAndConfiguration
+            .Select(a => new MqttClientAndConfiguration
             {
-                Client = new MqttFactory().CreateMqttClient(),
-                Configuration = c,
-                Context = await contextFactory.CreateDbContextAsync()
+                Configuration = a,
+                Client = new MqttFactory().CreateMqttClient()
             })
-            .Select(a => a.Result)
             .ToList();
-
-        foreach (var mqttClientAndConfiguration in _mqttClientAndConfigurations)
+        
+        foreach (var mqttConfiguration in _mqttClientAndConfigurations)
         {
-            mqttClientAndConfiguration.Client.ConnectedAsync += async _ =>
+            mqttConfiguration.Client.ConnectedAsync += async _ =>
             {
-                Logger.LogInformation("Connection successful to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
+                Logger.LogInformation("Connection successful to MQTT {name}", mqttConfiguration.Configuration.Name);
 
-                foreach (var topic in mqttClientAndConfiguration.Configuration.Topics.Distinct())
+                foreach (var topic in mqttConfiguration.Configuration.Topics.Distinct())
                 {
-                    await mqttClientAndConfiguration.Client.SubscribeAsync(
+                    await mqttConfiguration.Client.SubscribeAsync(
                         new MqttTopicFilterBuilder()
                             .WithTopic(topic)
                             .Build());
                     
-                    Logger.LogDebug("Susbcription MQTT {name} to {topic}", mqttClientAndConfiguration.Configuration.Name, topic);
+                    Logger.LogDebug("Susbcription MQTT {name} to {topic}", mqttConfiguration.Configuration.Name, topic);
                 }
             };
 
-            mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
+            mqttConfiguration.Client.ApplicationMessageReceivedAsync += e =>
             {
-                logger.LogDebug("Received from {name} on {topic}", mqttClientAndConfiguration.Configuration.Name, e.ApplicationMessage.Topic);
-                
-                var data = e.ApplicationMessage.PayloadSegment.ToArray().ToArray();
+                var topic = e.ApplicationMessage.Topic;
+                logger.LogTrace("Received from {name} on {topic}", mqttConfiguration.Configuration.Name, topic);
 
-                var topicSegments = e.ApplicationMessage.Topic.Split("/");
-                if (topicSegments.Contains("stat"))
+                if (topic.Contains("json"))
                 {
-                    await DoReceiveStatus(topicSegments.Last(), Encoding.UTF8.GetString(data), mqttClientAndConfiguration);
-                    return;
-                }
-                
-                var rootPacket = new ServiceEnvelope();
-                rootPacket.MergeFrom(data);
+                    logger.LogTrace("Received from {name} on {topic} which is JSON so ignored", mqttConfiguration.Configuration.Name, topic);
 
-                if (rootPacket.Packet.ViaMqtt)
-                {
-                    logger.LogTrace("Packet #{packetId} gated via MQTT so ignored", rootPacket.Packet.Id);
-                    return;
+                    return Task.CompletedTask;
                 }
 
-                await DoReceive(rootPacket, mqttClientAndConfiguration, topicSegments);
+                if (topic.Contains("paho"))
+                {
+                    logger.LogTrace("Received from {name} on {topic} so ignored", mqttConfiguration.Configuration.Name, topic);
+
+                    return Task.CompletedTask;
+                }
+                
+                _mqttReceived.OnNext((e.ApplicationMessage, mqttConfiguration.Configuration));
+                return Task.CompletedTask;
             };
 
-            mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
+            mqttConfiguration.Client.DisconnectedAsync += async args =>
             {
-                logger.LogWarning(args.Exception, "MQTT {name} disconnected", mqttClientAndConfiguration.Configuration.Name);
+                logger.LogWarning(args.Exception, "MQTT {name} disconnected, reason : {reason}", mqttConfiguration.Configuration.Name, args.ReasonString);
 
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await ConnectMqtt();
             };
         }
+
+        _mqttReceived.SubscribeAsync(async data =>
+        {
+            if (shouldPurge)
+            {
+                Logger.LogInformation("Purge is needed");
+                await PurgeData();
+                await PurgeEncryptedPackets();
+                await PurgePackets();
+                shouldPurge = false;
+            }
+            
+            var rootPacket = new ServiceEnvelope();
+                
+            try
+            {
+                var topicSegments = data.message.Topic.Split("/");
+                var dataSegments = data.message.PayloadSegment;
+
+                if (dataSegments.Count == 0)
+                {
+                    logger.LogWarning("Received from {name} on {topic} without data so ignored", data.mqttConfiguration.Name, data.message.Topic);
+                        
+                    return;
+                }
+                    
+                var firstDataArray = dataSegments.ToArray();
+                    
+                if (topicSegments.Contains("stat"))
+                {
+                    await DoReceiveStatus(topicSegments.Last(), Encoding.UTF8.GetString(firstDataArray));
+                    return;
+                }
+                    
+                rootPacket.MergeFrom(firstDataArray.ToArray());
+
+                if (rootPacket.Packet == null)
+                {
+                    logger.LogWarning("Received from {name} on {topic} but packet null", data.mqttConfiguration.Name, data.message.Topic);
+
+                    return;
+                }
+                    
+                await DoReceive(rootPacket, data.mqttConfiguration, topicSegments);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw}", data.mqttConfiguration.Name, data.message.Topic, JsonSerializer.Serialize(rootPacket), JsonSerializer.Serialize(data.message.PayloadSegment));
+            }
+        });
+
+        scheduler.SchedulePeriodic(TimeSpan.FromHours(1), () =>
+        {
+            shouldPurge = true;
+        });
     }
 
-    private async Task DoReceiveStatus(string nodeIdString, string status, MqttClientAndConfiguration mqtt)
+    private async Task DoReceiveStatus(string nodeIdString, string status)
     {
+        if (!nodeIdString.StartsWith('!'))
+        {
+            Logger.LogWarning("Node (status) incorrect : {nodeId}", nodeIdString);
+            return;
+        }
+        
         var nodeId = uint.Parse(nodeIdString[1..], NumberStyles.HexNumber);
+
+        if (NodesIgnored.Contains(nodeId))
+        {
+            Logger.LogInformation("Node (status) ignored : {node}", nodeIdString);
+            return;
+        }
+        
         var isMqttGateway = status == "online";
-        var node = await mqtt.Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
+        var node = await Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
         {
             NodeId = nodeId,
             IsMqttGateway = isMqttGateway
@@ -135,7 +198,7 @@ public class MqttService : AService, IAsyncDisposable
             if (node.IsMqttGateway == true)
             {
                 Logger.LogInformation("New node (status) created {node}", node);
-                mqtt.Context.Add(node);
+                Context.Add(node);
             }
         }
         else if (node.NodeId != NodeBroadcast)
@@ -148,16 +211,29 @@ public class MqttService : AService, IAsyncDisposable
                     node.LastSeen = DateTime.UtcNow;
                 }
 
-                mqtt.Context.Update(node);
+                Context.Update(node);
             }
         }
-        await mqtt.Context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
     }
 
-    private async Task DoReceive(ServiceEnvelope rootPacket, MqttClientAndConfiguration mqtt, string[] topics)
+    private async Task DoReceive(ServiceEnvelope rootPacket, MqttConfiguration mqtt, string[] topics)
     {
+        if (!rootPacket.GatewayId.StartsWith('!'))
+        {
+            Logger.LogWarning("Node (gateway) incorrect : {nodeId}", rootPacket.GatewayId);
+            return;
+        }
+
         var nodeGatewayId = uint.Parse(rootPacket.GatewayId[1..], NumberStyles.HexNumber);
-        var nodeGateway = await mqtt.Context.Nodes
+
+        if (NodesIgnored.Contains(nodeGatewayId))
+        {
+            Logger.LogInformation("Node (gateway) ignored : {node}", rootPacket.GatewayId);
+            return;
+        }
+        
+        var nodeGateway = await Context.Nodes
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .FindByNodeIdAsync(nodeGatewayId) ?? new Node
         {
@@ -168,18 +244,23 @@ public class MqttService : AService, IAsyncDisposable
         if (nodeGateway.Id == 0)
         {
             Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
-            mqtt.Context.Add(nodeGateway);
+            Context.Add(nodeGateway);
         }
         else if (nodeGateway.NodeId != NodeBroadcast)
         {
             nodeGateway.LastSeen = DateTime.UtcNow;
             nodeGateway.IsMqttGateway = true;
-            mqtt.Context.Update(nodeGateway);
+            Context.Update(nodeGateway);
         }
-        await mqtt.Context.SaveChangesAsync();
-        NewNode.OnNext(nodeGateway);
+        await Context.SaveChangesAsync();
+
+        if (NodesIgnored.Contains(rootPacket.Packet.From))
+        {
+            Logger.LogInformation("Node (from) ignored : {node}", rootPacket.Packet.From.ToHexString());
+            return;
+        }
         
-        var nodeFrom = await mqtt.Context.Nodes
+        var nodeFrom = await Context.Nodes
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .FindByNodeIdAsync(rootPacket.Packet.From) ?? new Node
         {
@@ -190,19 +271,18 @@ public class MqttService : AService, IAsyncDisposable
         };
         if (nodeFrom.Id == 0)
         {
-            mqtt.Context.Add(nodeFrom);
+            Context.Add(nodeFrom);
             Logger.LogInformation("New node (from) created {node}", nodeFrom);
         }
         else if (nodeFrom.NodeId != NodeBroadcast)
         {
             nodeFrom.LastSeen = DateTime.UtcNow;
-            mqtt.Context.Update(nodeFrom);
-            await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, $"Gateway-{nodeGateway}", mqtt.Context);
+            Context.Update(nodeFrom);
+            await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, $"Gateway-{nodeGateway}", Context);
         }
-        await mqtt.Context.SaveChangesAsync();
-        NewNode.OnNext(nodeFrom);
+        await Context.SaveChangesAsync();
 
-        var nodeTo = await mqtt.Context.Nodes.FindByNodeIdAsync(rootPacket.Packet.To) ?? new Node
+        var nodeTo = await Context.Nodes.FindByNodeIdAsync(rootPacket.Packet.To) ?? new Node
         {
             NodeId = rootPacket.Packet.To,
             ModemPreset = nodeGateway.ModemPreset,
@@ -210,31 +290,27 @@ public class MqttService : AService, IAsyncDisposable
         };
         if (nodeTo.Id == 0)
         {
-            mqtt.Context.Add(nodeTo);
+            Context.Add(nodeTo);
             Logger.LogInformation("New node (to) created {node}", nodeTo);
         }
         else if (nodeTo.NodeId != NodeBroadcast)
         {
-            // nodeTo.ModemPreset ??= nodeGateway.ModemPreset;
-            // nodeTo.RegionCode ??= nodeGateway.RegionCode;
-            mqtt.Context.Update(nodeTo);
+            Context.Update(nodeTo);
         }
-        await mqtt.Context.SaveChangesAsync();
-        NewNode.OnNext(nodeTo);
+        await Context.SaveChangesAsync();
         
-        var channel = await mqtt.Context.Channels.FirstOrDefaultAsync(c => c.Name == rootPacket.ChannelId) ?? new Channel
+        var channel = await Context.Channels.FirstOrDefaultAsync(c => c.Name == rootPacket.ChannelId) ?? new Channel
         {
             Name = rootPacket.ChannelId
         };
         if (channel.Id == 0)
         {
-            mqtt.Context.Add(channel);
-            await mqtt.Context.SaveChangesAsync();
-            NewChannel.OnNext(channel);
+            Context.Add(channel);
+            await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
         }
 
-        if (await mqtt.Context.Packets.AnyAsync(a => a.PacketId == rootPacket.Packet.Id && a.FromId == rootPacket.Packet.From && (DateTime.UtcNow - a.CreatedAt).TotalMinutes < 1))
+        if (await Context.Packets.AnyAsync(a => a.PacketId == rootPacket.Packet.Id && a.FromId == rootPacket.Packet.From && (DateTime.UtcNow - a.CreatedAt).TotalMinutes < 1))
         {
             Logger.LogWarning("Packet #{packetId} from {from} to {to} by {gateway} duplicated, ignored", rootPacket.Packet.Id, nodeFrom, nodeTo, nodeGateway);
             
@@ -247,7 +323,7 @@ public class MqttService : AService, IAsyncDisposable
         var payload = rootPacket.Packet.GetPayload();
         
         var nodeGatewayPosition = nodeGateway.Positions.FirstOrDefault();
-        var nodeFromPosition =nodeFrom.Positions.FirstOrDefault();
+        var nodeFromPosition = nodeFrom.Positions.FirstOrDefault();
         double? distance = null;
         
         if (nodeFromPosition != null && nodeGatewayPosition != null)
@@ -279,12 +355,12 @@ public class MqttService : AService, IAsyncDisposable
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
             To = nodeTo,
-            MqttServer = mqtt.Configuration.Name,
+            MqttServer = mqtt.Name,
             MqttTopic = topics.Take(topics.Length - 1).JoinString("/")
         };
 
-        mqtt.Context.Add(packet);
-        await mqtt.Context.SaveChangesAsync();
+        Context.Add(packet);
+        await Context.SaveChangesAsync();
         
         Logger.LogInformation("Add new packet #{id} of type {type} from {from} to {to} by {gateway}. Encrypted : {encrypted}", packet.Id, packet.PortNum, nodeFrom, nodeTo, nodeGateway, packet.Encrypted);
         Logger.LogDebug("New packet {packet} {payload}", rootPacket, rootPacket.Packet.GetPayload());
@@ -292,29 +368,27 @@ public class MqttService : AService, IAsyncDisposable
         switch (rootPacket.Packet.Decoded?.Portnum)
         {
             case PortNum.MapReportApp:
-                await DoMapReportingPacket(mqtt, nodeFrom, rootPacket.Packet.GetPayload<MapReport>()); 
+                await DoMapReportingPacket(nodeFrom, rootPacket.Packet.GetPayload<MapReport>()); 
                 break;
             case PortNum.NodeinfoApp:
-                await DoNodeInfoPacket(mqtt, nodeFrom, packet, rootPacket.Packet.GetPayload<User>());
+                await DoNodeInfoPacket(nodeFrom, rootPacket.Packet.GetPayload<User>());
                 break;
             case PortNum.PositionApp:
-                await DoPositionPacket(mqtt, nodeFrom, packet, rootPacket.Packet.GetPayload<Meshtastic.Protobufs.Position>());
+                await DoPositionPacket(nodeFrom, packet, rootPacket.Packet.GetPayload<Meshtastic.Protobufs.Position>());
                 break;
             case PortNum.TelemetryApp:
-                await DoTelemetryPacket(mqtt, nodeFrom, packet, rootPacket.Packet.GetPayload<Meshtastic.Protobufs.Telemetry>());
+                await DoTelemetryPacket(nodeFrom, packet, rootPacket.Packet.GetPayload<Meshtastic.Protobufs.Telemetry>());
                 break;
             case PortNum.NeighborinfoApp:
-                await DoNeighborInfoPacket(mqtt, nodeFrom, packet, rootPacket.Packet.GetPayload<NeighborInfo>());
+                await DoNeighborInfoPacket(nodeFrom, packet, rootPacket.Packet.GetPayload<NeighborInfo>());
                 break;
             case PortNum.TextMessageApp:
-                await DoTextMessagePacket(mqtt, nodeFrom, nodeTo, packet, rootPacket.Packet.GetPayload<string>());
+                await DoTextMessagePacket(nodeFrom, nodeTo, packet, rootPacket.Packet.GetPayload<string>());
                 break;
             case PortNum.WaypointApp:
-                await DoWaypointPacket(mqtt, nodeFrom, nodeTo, packet, rootPacket.Packet.GetPayload<Waypoint>());
+                await DoWaypointPacket(nodeFrom, packet, rootPacket.Packet.GetPayload<Waypoint>());
                 break;
         }
-        
-        NewPacket.OnNext(packet);
     }
 
     public async Task ConnectMqtt()
@@ -385,7 +459,7 @@ public class MqttService : AService, IAsyncDisposable
         // await mqttConfiguration.Client.PublishBinaryAsync(topic, packet.ToByteArray());
     }
     
-    private async Task DoMapReportingPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, MapReport? mapReport)
+    private async Task DoMapReportingPacket(Node nodeFrom, MapReport? mapReport)
     {
         if (mapReport == null)
         {
@@ -394,7 +468,7 @@ public class MqttService : AService, IAsyncDisposable
         
         await KeepNbPacketsTypeForNode(nodeFrom, PortNum.MapReportApp, 10);
 
-        await UpdateRegionCodeAndModemPreset(nodeFrom, mapReport.Region, mapReport.ModemPreset, $"MapReport", mqtt.Context);
+        await UpdateRegionCodeAndModemPreset(nodeFrom, mapReport.Region, mapReport.ModemPreset, $"MapReport", Context);
         
         nodeFrom.ShortName = mapReport.ShortName;
         nodeFrom.LongName = mapReport.LongName;
@@ -403,24 +477,22 @@ public class MqttService : AService, IAsyncDisposable
         nodeFrom.NumOnlineLocalNodes = (int?)mapReport.NumOnlineLocalNodes;
         nodeFrom.FirmwareVersion = mapReport.FirmwareVersion;
         nodeFrom.HasDefaultChannel = mapReport.HasDefaultChannel;
-        await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, null, mqtt.Context);
+        await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, null, Context);
 
         Logger.LogInformation("Update {node} with MapReport", nodeFrom);
         
-        mqtt.Context.Update(nodeFrom);
-        await mqtt.Context.SaveChangesAsync();
-        NewNode.OnNext(nodeFrom);
+        Context.Update(nodeFrom);
+        await Context.SaveChangesAsync();
     }
 
-    private async Task DoPositionPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
-        Meshtastic.Protobufs.Position? positionPayload)
+    private async Task DoPositionPacket(Node nodeFrom, Packet packet, Meshtastic.Protobufs.Position? positionPayload)
     {
         if (positionPayload == null)
         {
             return;
         }
 
-        var position = await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet, mqtt.Context);
+        var position = await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet, Context);
 
         if (packet.GatewayPosition != null && position != null)
         {
@@ -428,13 +500,12 @@ public class MqttService : AService, IAsyncDisposable
             packet.GatewayDistanceKm = Utils.CalculateDistance(position.Latitude, position.Longitude,
                 packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude);
 
-            mqtt.Context.Update(packet);
-            await mqtt.Context.SaveChangesAsync();
+            Context.Update(packet);
+            await Context.SaveChangesAsync();
         }
     }
 
-    private async Task DoNodeInfoPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
-        User? userPayload)
+    private async Task DoNodeInfoPacket(Node nodeFrom, User? userPayload)
     {
         if (userPayload == null)
         {
@@ -448,12 +519,11 @@ public class MqttService : AService, IAsyncDisposable
         
         Logger.LogInformation("Update {node} with new NodeInfo", nodeFrom);
         
-        mqtt.Context.Update(nodeFrom);
-        await mqtt.Context.SaveChangesAsync();
-        NewNode.OnNext(nodeFrom);
+        Context.Update(nodeFrom);
+        await Context.SaveChangesAsync();
     }
 
-    private async Task DoTelemetryPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet,
+    private async Task DoTelemetryPacket(Node nodeFrom, Packet packet,
         Meshtastic.Protobufs.Telemetry? telemetryPayload)
     {
         if (telemetryPayload == null)
@@ -478,12 +548,11 @@ public class MqttService : AService, IAsyncDisposable
         
         Logger.LogInformation("Update {node} with new Telemetry {type}", nodeFrom, telemetry.Type);
         
-        mqtt.Context.Add(telemetry);
-        await mqtt.Context.SaveChangesAsync();
-        NewTelemetry.OnNext(telemetry);
+        Context.Add(telemetry);
+        await Context.SaveChangesAsync();
     }
     
-    private async Task DoNeighborInfoPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Packet packet, NeighborInfo? neighborInfoPayload)
+    private async Task DoNeighborInfoPacket(Node nodeFrom, Packet packet, NeighborInfo? neighborInfoPayload)
     {
         if (neighborInfoPayload == null)
         {
@@ -492,7 +561,7 @@ public class MqttService : AService, IAsyncDisposable
 
         foreach (var neighbor in neighborInfoPayload.Neighbors)
         {
-            var neighborNode = await mqtt.Context.Nodes
+            var neighborNode = await Context.Nodes
                 .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
                 .FindByNodeIdAsync(neighbor.NodeId) ?? new Node
             {
@@ -503,15 +572,14 @@ public class MqttService : AService, IAsyncDisposable
             if (neighborNode.Id == 0)
             {
                 Logger.LogInformation("Add node (neighbor) {node}", neighborNode);
-                mqtt.Context.Add(neighborNode);
+                Context.Add(neighborNode);
             }
             else
             {
                 await UpdateRegionCodeAndModemPreset(neighborNode, nodeFrom.RegionCode, nodeFrom.ModemPreset,
-                    $"Neighbor-{nodeFrom}", mqtt.Context);
+                    $"Neighbor-{nodeFrom}", Context);
             }
-            NewNode.OnNext(neighborNode);
-            await mqtt.Context.SaveChangesAsync();
+            await Context.SaveChangesAsync();
 
             var nodePosition = nodeFrom.Positions.FirstOrDefault();
             var neighborPosition = neighborNode.Positions.FirstOrDefault();
@@ -523,7 +591,7 @@ public class MqttService : AService, IAsyncDisposable
                     neighborPosition.Latitude, neighborPosition.Longitude);
             }
             
-            var neighborInfo = await mqtt.Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
+            var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
             {
                 Node = nodeFrom,
                 NodePosition = nodePosition,
@@ -536,7 +604,7 @@ public class MqttService : AService, IAsyncDisposable
             if (neighborInfo.Id == 0)
             {
                 Logger.LogInformation("Add neighbor {neighbor} to {node}", neighborNode, nodeFrom);
-                mqtt.Context.Add(neighborInfo);
+                Context.Add(neighborInfo);
             }
             else
             {
@@ -547,16 +615,14 @@ public class MqttService : AService, IAsyncDisposable
                 neighborInfo.NodePosition = nodePosition;
                 neighborInfo.NeighborPosition = neighborPosition;
                 neighborInfo.Distance = distance;
-                mqtt.Context.Update(neighborInfo);
+                Context.Update(neighborInfo);
             }
-
-            NewNeighborInfoMessage.OnNext(neighborInfo);
         }
 
-        await mqtt.Context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
     }
 
-    private async Task DoTextMessagePacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Node nodeTo, Packet packet,
+    private async Task DoTextMessagePacket(Node nodeFrom, Node nodeTo, Packet packet,
         string? textMessagePayload)
     {
         if (textMessagePayload == null)
@@ -574,19 +640,18 @@ public class MqttService : AService, IAsyncDisposable
             Channel = packet.Channel,
             Message = textMessagePayload
         };
-        mqtt.Context.Add(textMessage);
-        await mqtt.Context.SaveChangesAsync();
-        NewTextMessage.OnNext(textMessage);
+        Context.Add(textMessage);
+        await Context.SaveChangesAsync();
     }
 
-    private async Task DoWaypointPacket(MqttClientAndConfiguration mqtt, Node nodeFrom, Node nodeTo, Packet packet, Waypoint? payload)
+    private async Task DoWaypointPacket(Node nodeFrom, Packet packet, Waypoint? payload)
     {
         if (payload == null)
         {
             return;
         }
 
-        var waypoint = await mqtt.Context.Waypoints.FirstOrDefaultAsync(a => a.WaypointId == payload.Id) ??
+        var waypoint = await Context.Waypoints.FirstOrDefaultAsync(a => a.WaypointId == payload.Id) ??
                        new Context.Entities.Waypoint
                        {
                            Node = nodeFrom,
@@ -602,7 +667,7 @@ public class MqttService : AService, IAsyncDisposable
 
         if (waypoint.Id == 0)
         {
-            mqtt.Context.Add(waypoint);
+            Context.Add(waypoint);
         }
         else
         {
@@ -614,10 +679,10 @@ public class MqttService : AService, IAsyncDisposable
             waypoint.Icon = payload.Icon;
             waypoint.Packet = packet;
             
-            mqtt.Context.Update(waypoint);
+            Context.Update(waypoint);
         }
         
-        await mqtt.Context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
     }
 
     public new async ValueTask DisposeAsync()
@@ -626,7 +691,6 @@ public class MqttService : AService, IAsyncDisposable
         {
             Logger.LogWarning("Disconnect from MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
             await mqttClientAndConfiguration.Client.DisconnectAsync();
-            await mqttClientAndConfiguration.Context.DisposeAsync();
         }
         
         await base.DisposeAsync();
@@ -636,7 +700,7 @@ public class MqttService : AService, IAsyncDisposable
     {
         if (latitude == 0 && longitude == 0)
         {
-            Logger.LogWarning("Position given for {node} is incorrect", node);
+            Logger.LogWarning("Position given for {node} is incorrect : 0", node);
             
             return null;
         }
@@ -655,13 +719,13 @@ public class MqttService : AService, IAsyncDisposable
             || position.Altitude != node.Altitude)
         {
             position = new Position
-                    {
-                        Latitude = node.Latitude.Value,
-                        Longitude = node.Longitude.Value,
-                        Altitude = node.Altitude,
-                        Node = node,
-                        Packet = packet
-                    };
+            {
+                Latitude = node.Latitude.Value,
+                Longitude = node.Longitude.Value,
+                Altitude = node.Altitude,
+                Node = node,
+                Packet = packet
+            };
             
             context.Add(position);
         
@@ -682,9 +746,6 @@ public class MqttService : AService, IAsyncDisposable
         context.Update(node);
         await context.SaveChangesAsync();
         
-        NewNode.OnNext(node);
-        NewPosition.OnNext(position);
-
         return position;
     }
 
@@ -729,19 +790,19 @@ public class MqttService : AService, IAsyncDisposable
             var packet = new Data();
             packet.MergeFrom(decryptedContent);
 
-            Logger.LogInformation("Decrypt packet {packetId} from {nodeId} with key {key} OK", packetId, nodeFromId, key);
+            Logger.LogInformation("Decrypt packet {packetId} from {nodeId} with key {key} OK", packetId, nodeFromId.ToHexString(), key);
 
             return packet;
         }
         catch
         {
-            Logger.LogWarning("Decrypt packet {packetId} from {nodeId} with key {key} KO", packetId, nodeFromId, key);
+            Logger.LogTrace("Decrypt packet {packetId} from {nodeId} with key {key} KO", packetId, nodeFromId.ToHexString(), key);
 
             return null;
         }
     }
     
-    private byte[] Encrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
+    private byte[]? Encrypt(byte[] input, string key, ulong packetId, uint nodeFromId)
     {
         if (key.ToLower() == "aq==")
         {
@@ -802,7 +863,6 @@ public class MqttService : AService, IAsyncDisposable
     {
         public required IMqttClient Client { get; set; }
         public required MqttConfiguration Configuration { get; set; }
-        public required DataContext Context { get; set; }
     }
 
     public async Task PurgePackets()
@@ -826,9 +886,8 @@ public class MqttService : AService, IAsyncDisposable
     public async Task PurgeEncryptedPackets()
     {
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
-        var context = await DbContextFactory.CreateDbContextAsync();
         
-        var packets = context.Packets.Where(a => a.CreatedAt < threeDays && a.Encrypted && string.IsNullOrWhiteSpace(a.PayloadJson)).ToList();
+        var packets = Context.Packets.Where(a => a.CreatedAt < threeDays && a.Encrypted && string.IsNullOrWhiteSpace(a.PayloadJson)).ToList();
 
         if (packets.Count == 0)
         {
@@ -837,53 +896,50 @@ public class MqttService : AService, IAsyncDisposable
 
         Logger.LogInformation("Delete {nbPackets} packets because they are too old < {date} and encrypted", packets.Count, threeDays);
         
-        context.RemoveRange(packets);
-        await context.SaveChangesAsync();
+        Context.RemoveRange(packets);
+        await Context.SaveChangesAsync();
     }
 
     public async Task PurgeData()
     {
         var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
-        var context = await DbContextFactory.CreateDbContextAsync();
         
-        var telemetries = context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
+        var telemetries = Context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
 
         if (telemetries.Count > 0)
         {
             Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", telemetries.Count,
                 minDate);
 
-            context.RemoveRange(telemetries);
+            Context.RemoveRange(telemetries);
         }
 
-        var positions = context.Positions.Where(a => a.CreatedAt < minDate).ToList();
+        var positions = Context.Positions.Where(a => a.CreatedAt < minDate).ToList();
 
         if (positions.Count > 0)
         {
             Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", positions.Count,
                 minDate);
 
-            context.RemoveRange(positions);
+            Context.RemoveRange(positions);
         }
 
-        var neighbors = context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
+        var neighbors = Context.Telemetries.Where(a => a.CreatedAt < minDate).ToList();
 
         if (neighbors.Count > 0)
         {
             Logger.LogInformation("Delete {nbData} telemetries because they are too old < {date}", neighbors.Count,
                 minDate);
 
-            context.RemoveRange(neighbors);
+            Context.RemoveRange(neighbors);
         }
 
-        await context.SaveChangesAsync();
+        await Context.SaveChangesAsync();
     }
 
     private async Task KeepNbPacketsTypeForNode(Node node, PortNum portNum, int nbToKeep)
     {
-        var context = await DbContextFactory.CreateDbContextAsync();
-        
-        var packets = context.Packets
+        var packets = Context.Packets
             .Where(a => a.From == node && a.PortNum == portNum)
             .OrderByDescending(a => a.CreatedAt)
             .Skip(nbToKeep)
@@ -894,10 +950,15 @@ public class MqttService : AService, IAsyncDisposable
             return;
         }
 
-        Logger.LogInformation("Delete {nbPackets} of {type} packets for node #{node} because there are already {nbKeep} of them", packets.Count, portNum, node.Id, nbToKeep);
-        
-        context.RemoveRange(packets);
-        await context.SaveChangesAsync();
+        if (packets.Count > 1)
+        {
+            Logger.LogInformation(
+                "Delete {nbPackets} of {type} packets for node #{node} because there are already {nbKeep} of them",
+                packets.Count, portNum, node.Id, nbToKeep);
+        }
+
+        Context.RemoveRange(packets);
+        await Context.SaveChangesAsync();
     }
 
     private async Task KeepDatedPacketsTypeForNode(Node node, PortNum portNum, int nbDays)

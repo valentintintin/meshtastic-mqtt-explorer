@@ -87,37 +87,10 @@
     private List<Channel> Channels { get; set; } = [];
     private Channel? Channel { get; set; }
     private DataContext Context { get; set; } = null!;
-    private List<IDisposable> Disposables { get; } = [];
     
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
-
-        Disposables.Add(MqttService.NewTextMessage.SubscribeAsync(async message =>
-        {
-            var channel = Channels.Find(c => c.Id == message.ChannelId);
-
-            if (channel == null)
-            {
-                Channels.Add(message.Channel);
-            }
-            else
-            {
-                channel.TextMessages.Add(message);
-            }
-
-            Total++;
-            
-            await InvokeAsync(StateHasChanged); 
-        }));
-
-        Disposables.Add(MqttService.NewChannel.Where(c => Channels.Find(cc => cc.Id == c.Id) == null).SubscribeAsync(async channel =>
-        {
-            Channels.Add(channel);
-
-            await InvokeAsync(StateHasChanged);
-        }));
-
         await base.OnInitializedAsync();
     }
 
@@ -164,10 +137,5 @@
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync();
-
-        foreach (var disposable in Disposables)
-        {
-            disposable.Dispose();
-        }
     }
 }

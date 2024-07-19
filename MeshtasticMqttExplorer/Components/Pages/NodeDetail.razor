@@ -1,4 +1,6 @@
+@page "/node/by-nodeid/{nodeid}"
 @page "/node/{id:long}"
+
 @implements IAsyncDisposable
 
 @using Meshtastic.Protobufs
@@ -64,7 +66,10 @@
 @code
 {
     [Parameter]
-    public long Id { get; set; }
+    public long? Id { get; set; }
+    
+    [Parameter]
+    public string? NodeId { get; set; }
 
     private bool Loading { get; set; } = true;
     private bool Alive { get; set; }
@@ -91,17 +96,26 @@
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
-        Node = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
-            .Include(n => n.PacketsFrom.Where(a => a.CreatedAt >= threeDays && a.GatewayId != a.FromId).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors.Where(a => a.UpdatedAt >= threeDays).OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Neighbor)
-            .Include(n => n.NeighborsFor.Where(a => a.UpdatedAt >= threeDays).OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Node)
+        var query = Context.Nodes
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
+            .Include(n => n.MyNeighbors/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.NeighborsFor/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Node)
             .Include(n => n.Positions.Where(a => a.UpdatedAt >= aDay).OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays).OrderBy(a => a.CreatedAt))
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(a => a.Id == Id);
+            .AsSplitQuery();
+
+        if (Id.HasValue)
+        {
+            Node = await query.FirstOrDefaultAsync(a => a.Id == Id);
+        }
+        else if (!string.IsNullOrWhiteSpace(NodeId))
+        {
+            NodeId = $"!{NodeId.TrimStart('!')}";
+            Node = await query.FirstOrDefaultAsync(a => a.NodeIdString == NodeId);
+        }
 
         if (Node == null)
         {

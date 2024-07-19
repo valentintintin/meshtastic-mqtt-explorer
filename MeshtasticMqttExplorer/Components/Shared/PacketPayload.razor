@@ -170,17 +170,26 @@
                 break;
             case PortNum.TracerouteApp:
                 <Descriptions Column="1">
-                    <DescriptionsItem Title="@("Route " + (TraceRoute?.Route?.Count > 0 ? "en " + TraceRoute?.Route?.Count + " sauts" : ""))">
+                    <DescriptionsItem Title="Route">
                         @if (TraceRoute?.Route?.Any() == true)
                         {
                             <Timeline>
-                                <TimelineItem Color="blue">@Packet.From.NodeIdString</TimelineItem>
+                                <TimelineItem Color="blue">
+                                    <a href="/node/by-nodeid/@Packet.From.Id" target="_blank">@Packet.From.NodeIdString</a>
+                                </TimelineItem>
                                 
-                                @{ var i = 1; }
+                                @* @{ var i = 1; } *@
                                 @foreach (var nodeId in TraceRoute?.Route ?? [])
                                 {
-                                    <TimelineItem Color="@(i++ == TraceRoute?.Route?.Count ? "red" : "green")">!@nodeId.ToString("X").ToLower()</TimelineItem>
+                                    @* @(i++ == TraceRoute?.Route?.Count ? "red" : "green") *@
+                                    <TimelineItem Color="green">
+                                        <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank">@nodeId.ToHexString()</a>
+                                    </TimelineItem>
                                 }
+
+                                <TimelineItem Color="red">
+                                    <a href="/node/by-nodeid/@Packet.To.Id" target="_blank">@Packet.To.NodeIdString</a>
+                                </TimelineItem>
                             </Timeline>
                         }
                         else
