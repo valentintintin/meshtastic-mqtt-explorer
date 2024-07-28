@@ -6,6 +6,7 @@
 @using MeshtasticMqttExplorer.Context.Entities
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Extensions.Entities
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 
@@ -68,7 +69,7 @@
         Telemetries = await Context.Telemetries
             .Include(n => n.Node)
             .Where(n => n.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics)
-            .Where(n => n.CreatedAt >= twelveHours)
+            .CreatedAfter(twelveHours)
             .Where(n => n.Node.Latitude.HasValue && n.Node.Longitude.HasValue)
             .GroupBy(n => n.NodeId)
             .Select(a => a.OrderByDescending(b => b.CreatedAt).First())

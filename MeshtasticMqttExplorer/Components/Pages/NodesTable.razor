@@ -1,20 +1,13 @@
 @page "/nodes"
 @implements IAsyncDisposable
 
-@using System.Text
-@using System.Text.Json
-@using System.Text.Json.Serialization
-@using AntDesign.TableModels
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using MeshtasticMqttExplorer.Services
-@using Microsoft.AspNetCore.WebUtilities
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory
-@inject IMessageService Message
-@inject NavigationManager Navigation
 
 <PageTitle>Tableau des nœuds</PageTitle>
 
@@ -26,7 +19,7 @@
         <Button OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
     <PageHeaderContent>
-        <Search Placeholder="Accéder à un nœud" EnterButton="true" OnSearch="OnSearch" @bind-Value="@SearchValue" />
+        <NodeSearch></NodeSearch>
     </PageHeaderContent>
 </PageHeader>
 
@@ -73,18 +66,16 @@
     private int Total { get; set; }
     private IQueryable<Node> NodesQueryable { get; set; } = null!;
     private DataContext Context { get; set; } = null!;
-
-    private string SearchValue { get; set; } = "";
     
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
         
-        NodesQueryable = Context.Nodes.Where(a => a.LastSeen.HasValue && MqttService.NodesIgnored.All(b => b != a.NodeId));
+        NodesQueryable = Context.Nodes.Where(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
         
         var localContext = await ContextFactory.CreateDbContextAsync();
         
-        Total = localContext.Nodes.Count(a => a.LastSeen.HasValue && MqttService.NodesIgnored.All(b => b != a.NodeId));
+        Total = localContext.Nodes.Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
         
         await localContext.DisposeAsync();
 
@@ -93,28 +84,7 @@
 
     private void FetchData()
     {
-        Total = Context.Nodes.Count(a => a.LastSeen.HasValue && MqttService.NodesIgnored.All(b => b != a.NodeId));
-    }
-
-    private async Task OnSearch()
-    {
-        if (SearchValue.Trim('!').Length < 4)
-        {
-            await Message.Warning("Il faut minimum 4 caractères");
-            return;
-        }
-
-        await Task.Delay(250);
-
-        var node = await Context.Nodes.SingleOrDefaultAsync(a => a.NodeIdString.ToLower().Trim('!') == SearchValue.ToLower().Trim('!') || a.ShortName == SearchValue.ToLower() || a.LongName == SearchValue.ToLower());
-        
-        if (node != null) {
-            Navigation.NavigateTo($"/node/{node.Id}");
-        }
-        else
-        {
-            await Message.Error($"{SearchValue} introuvable");
-        }
+        Total = Context.Nodes.Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
     }
 
     public async ValueTask DisposeAsync()

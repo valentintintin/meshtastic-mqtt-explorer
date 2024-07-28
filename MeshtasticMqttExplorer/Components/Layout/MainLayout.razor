@@ -9,13 +9,25 @@
         
         <Menu Theme="MenuTheme.Dark" Mode="MenuMode.Horizontal">
             <MenuItem RouterLink="/map" RouterMatch="NavLinkMatch.All">Carte</MenuItem>
-            <MenuItem RouterLink="/nodes" RouterMatch="NavLinkMatch.All">Nœuds</MenuItem>
-            <MenuItem RouterLink="/messages" RouterMatch="NavLinkMatch.All">Messages</MenuItem>
-            <MenuItem RouterLink="/weather" RouterMatch="NavLinkMatch.All">Météo</MenuItem>
-            <MenuItem RouterLink="/waypoints" RouterMatch="NavLinkMatch.All">Points d'intérêts</MenuItem>
-            <MenuItem RouterLink="/packets" RouterMatch="NavLinkMatch.All">Trames</MenuItem>
-            <MenuItem RouterLink="/qr-code-decoder" RouterMatch="NavLinkMatch.All">Décodeur de QR Code</MenuItem>
+            <SubMenu Title="Exploration">
+                <MenuItem RouterLink="/messages" RouterMatch="NavLinkMatch.All">Messages</MenuItem>
+                <MenuItem RouterLink="/weather" RouterMatch="NavLinkMatch.All">Météo</MenuItem>
+                <MenuItem RouterLink="/waypoints" RouterMatch="NavLinkMatch.All">Points d'intérêts</MenuItem>
+            </SubMenu>
             <MenuItem RouterLink="/stats" RouterMatch="NavLinkMatch.All">Statistiques</MenuItem>
+            <SubMenu Title="Avancés">
+                <MenuItem RouterLink="/nodes" RouterMatch="NavLinkMatch.All">Nœuds</MenuItem>
+                <MenuItem RouterLink="/packets" RouterMatch="NavLinkMatch.All">Trames</MenuItem>
+                
+                <MenuDivider></MenuDivider>
+                
+                <MenuItem RouterLink="/qr-code-decoder" RouterMatch="NavLinkMatch.All">Décodeur de QR Code</MenuItem>
+                <MenuItem RouterLink="/proto-decoder" RouterMatch="NavLinkMatch.All">Décodeur ProtoBuf</MenuItem>
+                
+                <MenuDivider></MenuDivider>
+                
+                <MenuItem RouterLink="/send" RouterMatch="NavLinkMatch.All">Envoyer une trame (dev)</MenuItem>
+            </SubMenu>
         </Menu>
     </Header>
 
@@ -24,7 +36,7 @@
     </Content>
 
     <Footer Style="text-align: center; ">
-        <a href="https://f4hvv.valentin-saugnier.fr" target="_blank">Valentin Saugnier - F4HVV</a> - <a href="mailto:valentin.s.10@gmail.com">valentin.s.10@gmail.com</a> - <a href="https://github.com/valentintintin/meshtastic-mqtt-explorer" target="_blank">Github du projet</a> 
+        <a href="/a-propos">À propos</a> - <a href="https://f4hvv.valentin-saugnier.fr" target="_blank">Valentin Saugnier - F4HVV</a> - <a href="mailto:valentin.s.10@gmail.com">valentin.s.10@gmail.com</a> - <a href="https://github.com/valentintintin/meshtastic-mqtt-explorer" target="_blank">Github du projet</a>
     </Footer>
 </Layout>
 

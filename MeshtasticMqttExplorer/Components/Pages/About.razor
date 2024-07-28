@@ -1,35 +1,41 @@
-﻿@page "/"
+﻿@page "/a-propos"
+@using System.Diagnostics
+@using System.Text.Json
 @using MeshtasticMqttExplorer.Models
+@using MeshtasticMqttExplorer.Services
 
 @inject IConfiguration Configuration
 
 <PageTitle>Meshtastic Mqtt Explorer</PageTitle>
 
 <GridRow Gutter="(16, 16)" Justify="center">
-    <GridCol Xs="24" Md="12">
+    <GridCol Xs="24" Md="8">
         <Card Title="Le projet">
             <ChildContent>
                 <p>
-                    Ce site est un outil pour le projet <a href="https://meshtastic.org/" target="_blank">Meshtastic</a>. Petit tour des fonctionnalités
+                    Ce site est un outil pour le projet <a href="https://meshtastic.org/" target="_blank">Meshtastic</a>.
                 </p>
-
-                <ul>
-                    <li>Visualiser les <a href="/packets">paquets échangés</a> sur le réseau</li>
-                    <li>Visualiser les nœuds connectés sur <a href="/map">une carte</a> ou <a href="/map">un tableau</a></li>
-                    <li>Visualiser sur <a href="/messages">les messages envoyés</a></li>
-                    <li>Visualiser sur une carte <a href="/weather">les données météos remontées</a></li>
-                    <li>Visualiser sur une carte <a href="/waypoints">les points d'intérêts</a></li>
-                    <li>Visualiser quelques <a href="/stats">statistiques</a></li>
-                </ul> 
                 
                 <p>
-                    Les paquets sont sauvegardés pendants <b>@NbDaysPurge jours</b>.
+                    Les trames sont sauvegardés pendants <b>@NbDaysPurge jours</b>.
+                </p>
+
+                <p>
+                    Messages MQTT reçus : <b>@MqttService.NbMessages</b>
+                </p>
+
+                <p>
+                    Messages MQTT à traiter : <b>@MqttService.NbMessagesToDo</b>
+                </p>
+                
+                <p>
+                    RAM : @(Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024) Mb
                 </p>
             </ChildContent>
         </Card>
     </GridCol>
     
-    <GridCol Xs="24" Md="4">
+    <GridCol Xs="24" Md="8">
         <Card Title="Inspiration & liens">
             <ChildContent>
                 <ul>

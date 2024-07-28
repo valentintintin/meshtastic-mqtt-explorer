@@ -7,6 +7,7 @@
 @using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Extensions.Entities
 
 @inject IDbContextFactory<DataContext> ContextFactory
 
@@ -109,12 +110,11 @@
 
         if (Id.HasValue)
         {
-            Node = await query.FirstOrDefaultAsync(a => a.Id == Id);
+            Node = await query.FindByIdAsync(Id);
         }
         else if (!string.IsNullOrWhiteSpace(NodeId))
         {
-            NodeId = $"!{NodeId.TrimStart('!')}";
-            Node = await query.FirstOrDefaultAsync(a => a.NodeIdString == NodeId);
+            Node = await query.FindByNodeIdStringAsync(NodeId);
         }
 
         if (Node == null)

@@ -13,13 +13,15 @@
 
 <PageHeader Title="Envoi d'une trame"></PageHeader>
 
+<Result Status="warning" Title="Page en développement et pas encore fonctionnelle"></Result>
+
 <Form Model="@_model"
       OnFinish="OnFinish"
       OnFinishFailed="OnFinishFailed"
       LabelColSpan="8"
       WrapperColSpan="16">
     <FormItem Label="Mon ID">
-        <Input @bind-Value="@context.NodeFromId" />
+        <Input @bind-Value="@context.NodeFromId" readonly />
     </FormItem>
     <FormItem Label="ID destinataire (vide si tout le monde)">
         <Input @bind-Value="@context.NodeToId" />

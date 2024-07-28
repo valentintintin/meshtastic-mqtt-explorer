@@ -50,9 +50,9 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
-    builder.Services.AddSingleton<MqttService>();
-    builder.Services.AddSingleton<MeshtasticService>();
-    builder.Services.AddHostedService<MqttConnectJob>();
+    builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<MqttService>();
+    builder.Services.AddHostedService<MqttService>();
 
     if (!builder.Environment.IsDevelopment())
     {
@@ -94,6 +94,8 @@ try
     var context = app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContext();
     context.Database.Migrate();
 
+    MeshtasticService.NodesIgnored.AddRange(app.Configuration.GetValue<List<uint>>("NodesIgnored", [])!);
+    
     if (false)
     {
         var mqttService = app.Services.GetRequiredService<MqttService>();
@@ -122,9 +124,6 @@ try
                     {
                         node.ModemPreset = data.ModemPreset;
                         node.RegionCode = data.Region;
-
-                        await mqttService.UpdatePosition(node, data.LatitudeI, data.LongitudeI, data.Altitude, null,
-                            context);
                     }
 
                     break;
@@ -135,8 +134,6 @@ try
 
                     if (data != null)
                     {
-                        await mqttService.UpdatePosition(node, data.LatitudeI, data.LongitudeI, data.Altitude, null,
-                            context);
                     }
 
                     break;
@@ -171,7 +168,6 @@ finally
     // Ensure to flush and stop internal timers/threads before application-exit (Avoid segmentation fault on Linux)
     LogManager.Shutdown();
 }
-
 
 Console.WriteLine("Stopped");
 

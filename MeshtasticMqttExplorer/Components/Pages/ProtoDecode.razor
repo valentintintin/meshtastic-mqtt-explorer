@@ -1,0 +1,133 @@
+﻿@page "/proto-decoder"
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Json
+@using Google.Protobuf
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Extensions
+@using Position = Meshtastic.Protobufs.Position
+@using Telemetry = Meshtastic.Protobufs.Telemetry
+
+@inject IMessageService MessageService
+
+<PageTitle>Décodage ProtoBuf</PageTitle>
+
+<PageHeader Title="Décodage ProtoBuf">
+    <SubtitleTemplate>
+        Test avec : @_messagesToTest.Select(m => m.GetType().Name).Order().JoinString()
+    </SubtitleTemplate>
+</PageHeader>
+
+<Form Model="@_model"
+      OnFinish="OnFinish"
+      LabelColSpan="8"
+      WrapperColSpan="16">
+    <FormItem Label="Base64 du ProtoBuf">
+        <Input @bind-Value="@context.Data" />
+    </FormItem>
+    <FormItem WrapperColOffset="8" WrapperColSpan="16">
+        <Button Type="@ButtonType.Primary" HtmlType="submit">
+            Décoder
+        </Button>
+    </FormItem>
+</Form>
+
+@if (_data != null)
+{
+    <Card Title="Résultat">
+        <ChildContent>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                @foreach (var message in _messages)
+                {
+                    <div>
+                        <b>@message.GetType().Name</b>
+                        <pre>
+                            @(JsonSerializer.Serialize<object>(message, JsonSerializerOptions))
+                        </pre>
+                    </div>
+                }
+
+                <div>
+                    <b>TextMessage</b>
+                    <pre>@Encoding.UTF8.GetString(_data)</pre>
+                </div>
+            </div>
+        </ChildContent>
+    </Card>
+}
+
+@code
+{
+    private readonly List<IMessage> _messagesToTest = [
+        new MeshPacket(),
+        new ServiceEnvelope(),
+        new FromRadio(),
+        new ToRadio(),
+        new Data(),
+        new NodeInfo(),
+        new User(),
+        new Position(),
+        new Telemetry(),
+        new Neighbor(),
+        new Waypoint(),
+        new RouteDiscovery(),
+        new Routing(),
+        new MapReport(),
+        new ChannelSet(),
+        new AdminMessage(),
+        new DeviceProfile(),
+        new Config(),
+    ];
+    private readonly List<IMessage> _messages = [];
+    private readonly Model _model = new();
+    private byte[]? _data;
+    
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        WriteIndented = true
+    };
+    
+    private async Task OnFinish(EditContext editContext)
+    {
+        if (string.IsNullOrWhiteSpace(_model.Data))
+        {
+            return;
+        }
+
+        try
+        {
+            _data = Convert.FromBase64String(_model.Data);
+        }
+        catch (Exception)
+        {
+            await MessageService.Error("Erreur durant la conversion de la base64");
+            return;
+        }
+
+        _messages.Clear();
+
+        foreach (var messageToTest in _messagesToTest.OrderBy(m => m.GetType().Name))
+        {
+            try
+            {
+                messageToTest.MergeFrom(_data);
+                _messages.Add(messageToTest);
+            }
+            catch
+            {
+                // Ignored
+            }
+        }
+
+        if (_messages.Count == 0)
+        {
+            await MessageService.Error("Le message n'a pas pu être décodé");
+        }
+    }
+
+    private class Model
+    {
+        [Required]
+        public string? Data { get; set; }
+    }
+}

@@ -1,4 +1,6 @@
+@page "/"
 @page "/map"
+
 @implements IAsyncDisposable
 @using System.Globalization
 @using Meshtastic.Protobufs
@@ -9,13 +11,12 @@
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory;
-@inject IConfiguration Configuration
 
 <PageTitle>Carte des nœuds</PageTitle>
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position depuis 3 jours dont @TotalAlive en vie
+        @Total nœuds avec position dont @TotalAlive en vie
         @if (Total > 0)
         {
             @Math.Round((double) TotalAlive / (double) Total * 100)<text>%</text>
@@ -25,18 +26,32 @@
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
     <PageHeaderContent>
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap">
-            <div>
-                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)" />
-                <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)" />
-                <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)" />
-            </div>
+        <div>
+            <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)" />
+            <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)" />
+            <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)" />
+        </div>
 
-            <div>
-                <Switch @bind-Checked="ShowNeighbors" Disabled="@Loading" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData"/>
-                <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/>
-                <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes" UnCheckedChildren="Cacher les routes" OnChange="FetchData" />
-            </div>
+        <div>
+            <Switch @bind-Checked="ShowNeighbors" Disabled="@Loading" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData"/>
+            <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/>
+            <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes" UnCheckedChildren="Cacher les routes" OnChange="FetchData" />
+        </div>
+
+        <div>
+            <span>
+                Depuis :
+                <DatePicker TValue="DateOnly?" Picker="@DatePickerType.Date" @bind-Value="FromDate" DisabledDate="date => date > DateTime.Today || date < DateTime.Today.AddDays(-16)" OnChange="FetchData"/>
+            </span>
+
+            <span>
+                Distance max des liens :
+                <AntDesign.InputNumber Formatter="FormatKm" Parser="ParseKm" Min="10" Max="1000" Step="10" @bind-value="MaxDistanceLink" TValue="int" OnChange="FetchData" />
+            </span>
+        </div>
+        
+        <div>
+            <NodeSearch></NodeSearch>
         </div>
     </PageHeaderContent>
 </PageHeader>
@@ -96,6 +111,8 @@
 
 @code
 {
+    const int DifferenceBetweenDistanceAllowed = 50; 
+    
     private bool Loading { get; set; }
     private bool HasRenderMapData { get; set; }
     private bool ShowNeighbors { get; set; } = true;
@@ -103,6 +120,8 @@
     private bool ShowPois { get; set; } = true;
     private int Total { get; set; }
     private int TotalAlive { get; set; }
+    private int MaxDistanceLink { get; set; } = 350;
+    private DateOnly? FromDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
@@ -138,6 +157,7 @@
                 {
                     lines.AddRange(
                         node.PacketsFrom
+                            .Where(g => Math.Abs(g.GatewayDistanceKm!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, g.Gateway.Latitude!.Value, g.Gateway.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
                             .Select(p => new Osm.Line
                             {
                                 Id = $"node(gateway)-{p.Gateway.Id}->node-{node.Id}",
@@ -146,7 +166,7 @@
                                     [p.Gateway.Latitude!.Value, p.Gateway.Longitude!.Value]
                                 ],
                                 Color = Utils.Gold,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {p.RxSnr}</p>"
                             })
                     );
                 }
@@ -156,6 +176,7 @@
                     lines.AddRange(
                         node.MyNeighbors
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
@@ -164,13 +185,14 @@
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
                                 Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
                     
                     lines.AddRange(
                         node.NeighborsFor
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
@@ -179,7 +201,7 @@
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
                                 Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
                 }
@@ -227,6 +249,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (CultureInfo.CurrentCulture.Name != "fr-FR")
+        {
+            CurrentRegionCode = null;
+            CurrentModemPreset = null;
+        }
+        
         Context = await ContextFactory.CreateDbContextAsync();
 
         await FetchData();
@@ -242,17 +270,14 @@
         }
         
         Loading = true;
-
-        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
-
-        var maxDistanceLink = Configuration.GetValue("MaxDistanceLink", 300);
-
+        
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < maxDistanceLink && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors.Where(a => /*a.UpdatedAt >= threeDays &&*/ a.Distance < maxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
+            .Include(n => n.MyNeighbors.Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => n.LastSeen >= threeDays)
+            .Where(n => n.LastSeen.HasValue)
+            .Where(n => !FromDate.HasValue || n.LastSeen >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
             .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset)
             .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
@@ -308,6 +333,16 @@
         CurrentFrequencies = frequency;
         
         await FetchData();
+    }
+    
+    private string FormatKm(int value)
+    {
+        return value + "Km";
+    }
+
+    private string ParseKm(string value)
+    {
+        return value.Replace("Km", "");
     }
 
     public async ValueTask DisposeAsync()

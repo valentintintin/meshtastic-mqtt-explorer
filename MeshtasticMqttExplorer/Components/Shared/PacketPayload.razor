@@ -321,29 +321,40 @@
 
     protected override void OnParametersSet()
     {
+        var packetData = new MeshPacket();
+        
         var rootPacket = new ServiceEnvelope();
         rootPacket.MergeFrom(Packet.Payload);
 
-        RawJson = JsonSerializer.Serialize(rootPacket, MqttService.JsonSerializerOptions);
-        PayloadJson = JsonSerializer.Serialize(rootPacket.Packet.GetPayload(), MqttService.JsonSerializerOptions);
+        if (rootPacket.Packet != null)
+        {
+            packetData = rootPacket.Packet;
+        }
+        else
+        {
+            packetData.MergeFrom(Packet.Payload);
+        }
+        
+        RawJson = JsonSerializer.Serialize(packetData, MeshtasticService.JsonSerializerOptions);
+        PayloadJson = JsonSerializer.Serialize(packetData.GetPayload(), MeshtasticService.JsonSerializerOptions);
         
         try
         {
-            switch (rootPacket.Packet.Decoded?.Portnum)
+            switch (packetData.Decoded?.Portnum)
             {
                 case PortNum.TextMessageApp:
                 case PortNum.SerialApp:
                 case PortNum.RangeTestApp:
-                    TextMessage = rootPacket.Packet.GetPayload<string>();
+                    TextMessage = packetData.GetPayload<string>();
                     break;
                 case PortNum.TelemetryApp:
-                    Telemetry = rootPacket.Packet.GetPayload<Telemetry>();
+                    Telemetry = packetData.GetPayload<Telemetry>();
                     break;
                 case PortNum.NodeinfoApp:
-                    User = rootPacket.Packet.GetPayload<User>();
+                    User = packetData.GetPayload<User>();
                     break;
                 case PortNum.PositionApp:
-                    Position = rootPacket.Packet.GetPayload<Position>();
+                    Position = packetData.GetPayload<Position>();
                     
                     if (Position != null)
                     {
@@ -357,10 +368,10 @@
 
                     break;
                 case PortNum.NeighborinfoApp:
-                    NeighborInfo = rootPacket.Packet.GetPayload<NeighborInfo>();
+                    NeighborInfo = packetData.GetPayload<NeighborInfo>();
                     break;
                 case PortNum.MapReportApp:
-                    MapReport = rootPacket.Packet.GetPayload<MapReport>();
+                    MapReport = packetData.GetPayload<MapReport>();
                     
                     if (MapReport != null)
                     {
@@ -375,16 +386,16 @@
 
                     break;
                 case PortNum.TracerouteApp:
-                    TraceRoute = rootPacket.Packet.GetPayload<RouteDiscovery>();
+                    TraceRoute = packetData.GetPayload<RouteDiscovery>();
                     break;
                 case PortNum.RoutingApp:
-                    Routing = rootPacket.Packet.GetPayload<Routing>();
+                    Routing = packetData.GetPayload<Routing>();
                     break;
                 case PortNum.StoreForwardApp:
-                    StoreAndForward = rootPacket.Packet.GetPayload<StoreAndForward>();
+                    StoreAndForward = packetData.GetPayload<StoreAndForward>();
                     break;
                 case PortNum.WaypointApp:
-                    Waypoint = rootPacket.Packet.GetPayload<Waypoint>();
+                    Waypoint = packetData.GetPayload<Waypoint>();
                     
                     if (Waypoint != null)
                     {

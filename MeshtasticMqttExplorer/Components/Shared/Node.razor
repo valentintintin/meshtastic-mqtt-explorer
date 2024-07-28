@@ -423,7 +423,7 @@
                                     [pp.GatewayPosition!.Latitude, pp.GatewayPosition.Longitude]
                                 ],
                                 Color = Utils.Green,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(pp.GatewayDistanceKm.HasValue ? Math.Round(pp.GatewayDistanceKm.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(pp.GatewayDistanceKm.HasValue ? Math.Round(pp.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {pp.RxSnr}</p>"
                             }).ToList()
                         })
                 );
@@ -444,7 +444,7 @@
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
                                 Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
                 }
@@ -481,7 +481,7 @@
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
                                 Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p>"
+                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
                 }

@@ -152,7 +152,7 @@ window.addPolylinesToMap = (lines) => {
 window.createPolyline = (line) => {
     let polyline = L.polyline(line.points, {
         color: line.color,
-        weight: 2
+        weight: 5
     });
 
     if (line.popup) {

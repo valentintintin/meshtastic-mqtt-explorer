@@ -38,8 +38,8 @@ public class Packet : IEntity
     public float? RxRssi { get; set; }
     public DateTimeOffset? RxTime { get; set; }
     
-    public uint? HopStart { get; set; }
-    public uint? HopLimit { get; set; }
+    public int? HopStart { get; set; }
+    public int? HopLimit { get; set; }
     public bool? WantAck { get; set; }
     public MeshPacket.Types.Priority? Priority { get; set; }
     

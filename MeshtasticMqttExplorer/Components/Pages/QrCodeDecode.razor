@@ -24,17 +24,20 @@
     </FormItem>
 </Form>
 
-<Card Title="Résultat">
-    <ChildContent>
-        <pre>
+@if (_result != null)
+{
+    <Card Title="Résultat">
+        <ChildContent>
+            <pre>
             @_result
-        </pre> 
-    </ChildContent>
-</Card>
+        </pre>
+        </ChildContent>
+    </Card>
+}
 
 @code
 {
-    private Model _model = new();
+    private readonly Model _model = new();
     private string? _result;
     
     private static readonly JsonSerializerOptions JsonSerializerOptions = new()

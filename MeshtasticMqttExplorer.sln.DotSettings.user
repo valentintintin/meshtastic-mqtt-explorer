@@ -5,4 +5,5 @@
   &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign.charts/0.5.1/lib/net8.0/AntDesign.Charts.dll" /&gt;
   &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign/0.19.1/lib/net8.0/AntDesign.dll" /&gt;
 &lt;/AssemblyExplorer&gt;</s:String>
-	<s:String x:Key="/Default/Monitoring/StartMode/@EntryValue">OnDebug</s:String></wpf:ResourceDictionary>
+	<s:String x:Key="/Default/Monitoring/PerformanceProfilingMode/@EntryValue">Sampling</s:String>
+	</wpf:ResourceDictionary>

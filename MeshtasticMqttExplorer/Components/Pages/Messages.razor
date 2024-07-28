@@ -10,7 +10,6 @@
 @using MeshtasticMqttExplorer.Services
 @using Channel = MeshtasticMqttExplorer.Context.Entities.Channel
 
-@inject MqttService MqttService
 @inject IDbContextFactory<DataContext> ContextFactory;
 
 <PageTitle>
@@ -32,7 +31,7 @@
         }
         else
         {
-            <text>@Total messages dans @Channel.Name</text>
+            <text>@Total messages dans @Channel.Name (limité aux 100 derniers)</text>
         }
     </SubtitleTemplate>
     <PageHeaderExtra>
@@ -111,7 +110,7 @@
         Loading = true;
         
         Channels = await Context.Channels
-            .Include(c => c.TextMessages.OrderByDescending(a => a.CreatedAt))
+            .Include(c => c.TextMessages.OrderByDescending(a => a.CreatedAt).Take(100))
             .ThenInclude(c => c.From)
             .Include(c => c.TextMessages)
             .ThenInclude(c => c.To)

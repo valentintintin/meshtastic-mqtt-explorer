@@ -1,0 +1,48 @@
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@implements IAsyncDisposable
+
+@inject IDbContextFactory<DataContext> ContextFactory
+@inject IMessageService Message
+@inject NavigationManager Navigation
+
+<Search Placeholder="Accéder à un nœud" EnterButton="true" OnSearch="OnSearch" @bind-Value="@SearchValue" />
+
+@code {
+    private string SearchValue { get; set; } = "";
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+        
+        await base.OnInitializedAsync();
+    }
+
+    
+    private async Task OnSearch()
+    {
+        if (SearchValue.TrimStart('!').Length < 4)
+        {
+            await Message.Warning("Il faut minimum 4 caractères");
+            return;
+        }
+
+        await Task.Delay(250);
+
+        var node = await Context.Nodes.SingleOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().TrimStart('!') == SearchValue.ToLower().TrimStart('!') || a.ShortName == SearchValue.ToLower() || a.LongName == SearchValue.ToLower());
+        
+        if (node != null) {
+            Navigation.NavigateTo($"/node/{node.Id}");
+        }
+        else
+        {
+            await Message.Error($"{SearchValue} introuvable");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}
