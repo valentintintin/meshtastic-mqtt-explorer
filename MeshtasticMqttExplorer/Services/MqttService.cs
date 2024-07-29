@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Net.Mqtt;
+using System.Net.Mqtt.Sdk.Bindings;
 using System.Reactive.Concurrency;
 using System.Text;
 using System.Text.Json;
@@ -9,11 +11,8 @@ using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Context.Entities;
 using MeshtasticMqttExplorer.Extensions;
 using MeshtasticMqttExplorer.Extensions.Entities;
-using MeshtasticMqttExplorer.Models;
 using Microsoft.EntityFrameworkCore;
-using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Protocol;
+using MqttConfiguration = MeshtasticMqttExplorer.Models.MqttConfiguration;
 
 namespace MeshtasticMqttExplorer.Services;
 
@@ -40,34 +39,24 @@ public class MqttService : BackgroundService
         serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>().SchedulePeriodic(TimeSpan.FromMinutes(15), GC.Collect);
 
         _mqttClientAndConfigurations = (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
-            .Where(c => c.Enabled)
-            .Select(a => new MqttClientAndConfiguration
+            .Where(a => a.Enabled)
+            .Select(async a => new MqttClientAndConfiguration
             {
                 Configuration = a,
-                Client = new MqttFactory().CreateMqttClient()
+                Client = await MqttClient.CreateAsync(a.Host, new System.Net.Mqtt.MqttConfiguration
+                {
+                    Port = a.Port,
+                    AllowWildcardsInTopicFilters = true
+                })
             })
+            .Select(a => a.Result)
             .ToList();
         
         foreach (var mqttConfiguration in _mqttClientAndConfigurations)
         {
-            mqttConfiguration.Client.ConnectedAsync += async _ =>
+            mqttConfiguration.Client.MessageStream.SubscribeAsync(async e =>
             {
-                _logger.LogInformation("Connection successful to MQTT {name}", mqttConfiguration.Configuration.Name);
-
-                foreach (var topic in mqttConfiguration.Configuration.Topics.Distinct())
-                {
-                    await mqttConfiguration.Client.SubscribeAsync(
-                        new MqttTopicFilterBuilder()
-                            .WithTopic(topic)
-                            .Build());
-                    
-                    _logger.LogDebug("Subscription MQTT {name} to {topic}", mqttConfiguration.Configuration.Name, topic);
-                }
-            };
-
-            mqttConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
-            {
-                var topic = e.ApplicationMessage.Topic;
+                var topic = e.Topic;
                 logger.LogTrace("Received from {name} on {topic}", mqttConfiguration.Configuration.Name, topic);
 
                 if (topic.Contains("json"))
@@ -84,19 +73,19 @@ public class MqttService : BackgroundService
                 {
                     return;
                 }
-                
+
                 NbMessages++;
                 NbMessagesToDo++;
 
-                await DoReceive(e.ApplicationMessage.Topic, e.ApplicationMessage.PayloadSegment.ToArray(), mqttConfiguration.Configuration);
-                
+                await DoReceive(topic, e.Payload, mqttConfiguration.Configuration);
+
                 NbMessagesToDo--;
-            };
+            });
 
-            mqttConfiguration.Client.DisconnectedAsync += async args =>
+            mqttConfiguration.Client.Disconnected += async (sender, args) =>
             {
-                logger.LogWarning(args.Exception, "MQTT {name} disconnected, reason : {reason}", mqttConfiguration.Configuration.Name, args.ReasonString);
-
+                logger.LogWarning("MQTT {name} disconnected, reason : {reason} {message}", mqttConfiguration.Configuration.Name, args.Reason, args.Message);
+                
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await ConnectMqtt();
             };
@@ -282,18 +271,16 @@ public class MqttService : BackgroundService
         {
             _logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
 
-            var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
-                    .WithTcpServer(mqttClientAndConfiguration.Configuration.Host, mqttClientAndConfiguration.Configuration.Port)
-                    .WithClientId($"MeshtasticMqttExplorer_ValentinF4HVV_{_environment.EnvironmentName}")
-                ;
+            await mqttClientAndConfiguration.Client.ConnectAsync (new MqttClientCredentials(
+                clientId: "MeshtasticExplorerF4HVV",
+                userName: mqttClientAndConfiguration.Configuration.Username,
+                password: mqttClientAndConfiguration.Configuration.Password
+            ), cleanSession: true);
             
-            if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.Configuration.Username))
+            foreach (var topic in mqttClientAndConfiguration.Configuration.Topics)
             {
-                mqttClientOptionsBuilder = mqttClientOptionsBuilder
-                    .WithCredentials(mqttClientAndConfiguration.Configuration.Username, mqttClientAndConfiguration.Configuration.Password);
+                await mqttClientAndConfiguration.Client.SubscribeAsync(topic, MqttQualityOfService.AtLeastOnce);
             }
-
-            await mqttClientAndConfiguration.Client.ConnectAsync(mqttClientOptionsBuilder.Build());   
         }
     }
 

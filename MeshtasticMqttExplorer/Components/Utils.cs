@@ -77,6 +77,7 @@ public static class Utils
     [
         new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
         new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
+        new TableFilter<string?> { Text = "ServeurPerso", Value = "ServeurPerso" },
     ];
 
     public static readonly TableLocale TableLocale = new()
