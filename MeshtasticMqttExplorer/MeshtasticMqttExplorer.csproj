@@ -24,6 +24,7 @@
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.11" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
+      <PackageReference Include="System.Net.Mqtt" Version="0.6.16-beta" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>
 

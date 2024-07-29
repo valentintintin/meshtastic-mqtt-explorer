@@ -13,6 +13,7 @@ using MeshtasticMqttExplorer.Models;
 using Microsoft.EntityFrameworkCore;
 using MQTTnet;
 using MQTTnet.Client;
+using MQTTnet.Protocol;
 
 namespace MeshtasticMqttExplorer.Services;
 
@@ -71,20 +72,23 @@ public class MqttService : BackgroundService
 
                 if (topic.Contains("json"))
                 {
-                    logger.LogTrace("Received from {name} on {topic} which is JSON so ignored", mqttConfiguration.Configuration.Name, topic);
                     return;
                 }
 
                 if (topic.Contains("paho"))
                 {
-                    logger.LogTrace("Received from {name} on {topic} so ignored", mqttConfiguration.Configuration.Name, topic);
+                    return;
+                }
+
+                if (topic.Contains("stat"))
+                {
                     return;
                 }
                 
                 NbMessages++;
                 NbMessagesToDo++;
 
-                await DoReceive(e.ApplicationMessage, mqttConfiguration.Configuration);
+                await DoReceive(e.ApplicationMessage.Topic, e.ApplicationMessage.PayloadSegment.ToArray(), mqttConfiguration.Configuration);
                 
                 NbMessagesToDo--;
             };
@@ -99,112 +103,45 @@ public class MqttService : BackgroundService
         }
     }
 
-    private async Task DoReceive(MqttApplicationMessage message, MqttConfiguration mqttConfiguration)
+    private async Task DoReceive(string topic, byte[]? data, MqttConfiguration mqttConfiguration)
     {
-        var topicSegments = message.Topic.Split("/");
-        var data = message.PayloadSegment.Array;
+        var topicSegments = topic.Split("/");
 
         if (data == null || data.Length == 0)
         {
             _logger.LogWarning("Received from {name} on {topic} without data so ignored",
-                mqttConfiguration.Name, message.Topic);
+                mqttConfiguration.Name, topic);
 
             return;
         }
 
-        if (topicSegments.Contains("stat"))
+        var rootPacket = new ServiceEnvelope();
+
+        try
         {
-            try
+            rootPacket.MergeFrom(data);
+
+            if (rootPacket.Packet == null)
             {
-                await DoReceiveStatus(topicSegments.Last(), Encoding.UTF8.GetString(data));
+                _logger.LogWarning("Received from {name} on {topic} but packet null", mqttConfiguration.Name, topic);
+                return;
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Error for a received MQTT message from {name} on {topic}. Packet Raw : {packetRaw} | {rawString}",
-                    mqttConfiguration.Name, message.Topic, Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
-            }
+
+            await DoReceivePacket(rootPacket, mqttConfiguration, topicSegments);
         }
-        else
+        catch (InvalidProtocolBufferException ex)
         {
-            var rootPacket = new ServiceEnvelope();
-
-            try
-            {
-                rootPacket.MergeFrom(data);
-
-                if (rootPacket.Packet == null)
-                {
-                    _logger.LogWarning("Received from {name} on {topic} but packet null", mqttConfiguration.Name,
-                        message.Topic);
-                    return;
-                }
-
-                await DoReceivePacket(rootPacket, mqttConfiguration, topicSegments);
-            }
-            catch (InvalidProtocolBufferException ex)
-            {
-                _logger.LogWarning(ex,
-                    "Received from {name} on {topic} but packet incorrect. Packet Raw : {packetRaw} | {rawString}",
-                    mqttConfiguration.Name, message.Topic, Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw} | {rawString}",
-                    mqttConfiguration.Name, message.Topic, JsonSerializer.Serialize(rootPacket),
-                    Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
-            }
+            _logger.LogWarning(ex,
+                "Received from {name} on {topic} but packet incorrect. Packet Raw : {packetRaw} | {rawString}",
+                mqttConfiguration.Name, topic, Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
         }
-    }
-
-    private async Task DoReceiveStatus(string nodeIdString, string status)
-    {
-        if (!nodeIdString.StartsWith('!'))
+        catch (Exception ex)
         {
-            _logger.LogWarning("Node (status) incorrect : {nodeId}", nodeIdString);
-            return;
+            _logger.LogError(ex,
+                "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw} | {rawString}",
+                mqttConfiguration.Name, topic, JsonSerializer.Serialize(rootPacket),
+                Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
         }
-
-        var nodeId = nodeIdString.ToInteger();
-
-        if (MeshtasticService.NodesIgnored.Contains(nodeId))
-        {
-            _logger.LogInformation("Node (status) ignored : {node}", nodeIdString);
-            return;
-        }
-
-        var context = await _contextFactory.CreateDbContextAsync();
-        
-        var isMqttGateway = status == "online";
-        var node = await context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
-        {
-            NodeId = nodeId,
-            IsMqttGateway = isMqttGateway
-        };
-        if (node.Id == 0)
-        {
-            _logger.LogInformation("New node (status) created {node} with status {status}", node, isMqttGateway);
-            context.Add(node);
-        }
-        else
-        {
-            var nodeLastSeenDelta = DateTime.UtcNow - node.LastSeen;
-            if (node.IsMqttGateway != isMqttGateway || nodeLastSeenDelta >= TimeSpan.FromMinutes(15))
-            {
-                _logger.LogInformation("Update node (status) {node} with status {status}. Last seen difference : {deltaLastSeen}", node, isMqttGateway, nodeLastSeenDelta);
-
-                if (isMqttGateway)
-                {
-                    node.LastSeen = DateTime.UtcNow;
-                }
-
-                node.IsMqttGateway = isMqttGateway;
-                context.Update(node);
-            }
-        }
-
-        await context.SaveChangesAsync();
     }
 
     private async Task DoReceivePacket(ServiceEnvelope rootPacket, MqttConfiguration mqtt, string[] topics)
