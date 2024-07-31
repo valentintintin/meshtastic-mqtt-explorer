@@ -5,6 +5,7 @@
 @using System.Globalization
 @using System.Reactive.Linq
 @using MeshtasticMqttExplorer.Context
+@using MeshtasticMqttExplorer.Context.Entities
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Extensions
 @using MeshtasticMqttExplorer.Services
@@ -31,7 +32,7 @@
         }
         else
         {
-            <text>@Total messages dans @Channel.Name (limité aux 100 derniers)</text>
+            <text>@Total messages dans @Channel.Name</text>
         }
     </SubtitleTemplate>
     <PageHeaderExtra>
@@ -48,21 +49,24 @@
                   Style="height: 100%;">
                 @foreach (var channel in Channels)
                 {
-                    <MenuItem RouterLink="@("/channel/" + channel.Id + "/messages")" RouterMatch="NavLinkMatch.All">@channel.Name (@channel.TextMessages.Count messages)</MenuItem>
+                    <MenuItem RouterLink="@("/channel/" + channel.Id + "/messages")" RouterMatch="NavLinkMatch.All">@channel.Name (@Totals[channel.Id] messages)</MenuItem>
                 }
             </Menu>
         </Sider>
         <Content Style="padding:0 24px; min-height: 280px;">
             @if (Channel != null)
             {
-                @foreach (var message in Channel.TextMessages)
+                @foreach (var message in TextMessages)
                 {
-                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName())"
+                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName() + " via " + message.Packet?.Gateway?.OneName() + " #" + message.Packet?.PacketId)"
                              Avatar="@message.From.HardwareModel.GetImageUrl()"
                              Content="@message.Message"
-                             Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)">
+                             Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"
+                             Placement="@(message.To?.NodeId == MeshtasticService.NodeBroadcast ? "left" : "right")">
                     </Comment>
                 }
+                
+                <Pagination Total="Total" OnChange="ChangePagination"></Pagination>
             }
             else if (Channels.Count > 0)
             {
@@ -82,8 +86,12 @@
     public long? ChannelId { get; set; }
     
     private bool Loading { get; set; } = true;
+    private int PageIndex { get; set; }
+    private int PageSize { get; set; } = 10;
     private int Total { get; set; }
+    private Dictionary<long, int> Totals { get; set; } = new();
     private List<Channel> Channels { get; set; } = [];
+    private List<TextMessage> TextMessages { get; set; } = [];
     private Channel? Channel { get; set; }
     private DataContext Context { get; set; } = null!;
     
@@ -108,29 +116,48 @@
     private async Task FetchData()
     {
         Loading = true;
-        
+
         Channels = await Context.Channels
-            .Include(c => c.TextMessages.OrderByDescending(a => a.CreatedAt).Take(100))
-            .ThenInclude(c => c.From)
-            .Include(c => c.TextMessages)
-            .ThenInclude(c => c.To)
             .Where(a => a.TextMessages.Count > 0)
             .OrderBy(a => a.Name)
             .ToListAsync();
 
-        Total = Channels.Sum(a => a.TextMessages.Count);
-
+        Totals = await Context.TextMessages
+            .GroupBy(t => t.ChannelId)
+            .ToDictionaryAsync(a => a.Key, messages => messages.Count());
+        
         if (ChannelId.HasValue)
         {
             Channel = Channels.Find(c => c.Id == ChannelId);
 
             if (Channel != null)
             {
-                Total = Channel.TextMessages.Count;
+                TextMessages = await Context.TextMessages
+                    .Include(a => a.From)
+                    .Include(a => a.To)
+                    .Include(a => a.Packet)
+                    .ThenInclude(a => a.Gateway)
+                    .Where(a => a.Channel == Channel)
+                    .OrderByDescending(a => a.CreatedAt)
+                    .Skip(PageIndex * PageSize).Take(PageSize)
+                    .ToListAsync();
+                Total = Totals[Channel.Id];
             }
+        }
+        else
+        {
+            Total = Totals.Sum(a => a.Value);
         }
 
         Loading = false;
+    }
+
+    public async Task ChangePagination(PaginationEventArgs paginationArgs)
+    {
+        PageIndex = paginationArgs.Page - 1;
+        PageSize = paginationArgs.PageSize;
+
+        await FetchData();
     }
 
     public async ValueTask DisposeAsync()
