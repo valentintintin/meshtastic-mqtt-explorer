@@ -337,12 +337,12 @@
     
     private string FormatKm(int value)
     {
-        return value + "Km";
+        return value + " Km";
     }
 
     private string ParseKm(string value)
     {
-        return value.Replace("Km", "");
+        return value.Replace(" Km", "");
     }
 
     public async ValueTask DisposeAsync()

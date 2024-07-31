@@ -4,13 +4,14 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyVersion>1.0.18</AssemblyVersion>
+        <AssemblyVersion>1.0.19</AssemblyVersion>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="AntDesign" Version="0.19.3" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
+      <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
       <PackageReference Include="LibAES-CTR" Version="1.0.1" />
       <PackageReference Include="Meshtastic" Version="1.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.6" />
@@ -23,7 +24,7 @@
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.11" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
-      <PackageReference Include="System.Net.Mqtt" Version="0.6.16-beta" />
+      <PackageReference Include="System.Net.Mqtt" Version="0.6.66-beta" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>
 

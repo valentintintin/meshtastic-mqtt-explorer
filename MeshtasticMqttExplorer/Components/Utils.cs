@@ -73,12 +73,7 @@ public static class Utils
         .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
         .OrderBy(p => p.Text)
         .ToArray();
-    public static readonly TableFilter<string?>[] MqttServerFilters =
-    [
-        new TableFilter<string?> { Text = "Meshtastic", Value = "Meshtastic" },
-        new TableFilter<string?> { Text = "Gaulix", Value = "Gaulix" },
-        new TableFilter<string?> { Text = "ServeurPerso", Value = "ServeurPerso" },
-    ];
+    public static List<TableFilter<string?>> MqttServerFilters = [];
 
     public static readonly TableLocale TableLocale = new()
     {

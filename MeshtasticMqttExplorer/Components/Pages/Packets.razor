@@ -67,7 +67,7 @@ else
         <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="Sauts">
             <div style="width: 30px">
                 <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
-                    @(context.HopStart - context.HopLimit)
+                    @Math.Abs(context.HopStart - context.HopLimit ?? 0)
                     @if (context.GatewayDistanceKm.HasValue)
                     {
                         @(" | " + Math.Round(context.GatewayDistanceKm.Value, 2) + " Km")

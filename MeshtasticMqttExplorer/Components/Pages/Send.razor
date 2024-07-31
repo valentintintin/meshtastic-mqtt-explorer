@@ -4,93 +4,168 @@
 @using MeshtasticMqttExplorer.Models
 @using MeshtasticMqttExplorer.Services
 
-@inject IConfiguration Configuration
-@inject IMessageService Message
-@inject MqttService MqttService
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IConfiguration Configuration
+@inject MqttService MqttService
+@inject IMessageService Message
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
 <PageTitle>Envoi d'une trame</PageTitle>
 
 <PageHeader Title="Envoi d'une trame"></PageHeader>
 
-<Result Status="warning" Title="Page en développement et pas encore fonctionnelle"></Result>
+@if (!_allowed)
+{
+    <Result Title="Fonctionnalité désactivée" Status="403"></Result>
+}
+else
+{
+    <Form Model="@_model"
+          OnFinish="OnFinish"
+          LabelColSpan="8"
+          WrapperColSpan="16">
 
-<Form Model="@_model"
-      OnFinish="OnFinish"
-      OnFinishFailed="OnFinishFailed"
-      LabelColSpan="8"
-      WrapperColSpan="16">
-    <FormItem Label="Mon ID">
-        <Input @bind-Value="@context.NodeFromId" readonly />
-    </FormItem>
-    <FormItem Label="ID destinataire (vide si tout le monde)">
-        <Input @bind-Value="@context.NodeToId" />
-    </FormItem>
-    <FormItem Label="Clé de chiffrement (vide pour ne pas chiffrer)">
-        <Input @bind-Value="@context.Key" />
-    </FormItem>
-    <FormItem Label="Nombre de sauts">
-        <AntDesign.InputNumber Min="0" Max="7" @bind-Value="@context.HopLimit" TValue="uint" />
-    </FormItem>
-    <FormItem Label="Serveur MQTT">
-        <Select DataSource="@MqttConfigurations"
-                @bind-Value="@context.MqttServer"
-                ItemValue="c=>c.Name"
-                ItemLabel="c=>c.Name"
-                Style="width:120px">
-        </Select>
-    </FormItem>
-    <FormItem Label="Topic racine MQTT">
-        <Input @bind-Value="@context.RootTopic" />
-    </FormItem>
-    <FormItem Label="Canal">
-        <Input @bind-Value="@context.Channel" />
-    </FormItem>
-    <FormItem Label="Message">
-        <Input @bind-Value="@context.Message" />
-    </FormItem>
-    <FormItem WrapperColOffset="8" WrapperColSpan="16">
-        <Button Type="@ButtonType.Primary" HtmlType="submit">
-            Envoyer
-        </Button>
-    </FormItem>
-</Form>
+        <Collapse DefaultActiveKey="@(new[] { "1" })" Accordion>
+            <Panel Header="Informations de base" Key="1">
+                <FormItem Label="Mon Id">
+                    <Input @bind-Value="@context.NodeFromId" ReadOnly="@(!_allowedAnyId)" MaxLength="9" />
+                </FormItem>
+                <FormItem Label="Id destinataire (vide si tout le monde)">
+                    <Input @bind-Value="@context.NodeToId" MaxLength="9" />
+                </FormItem>
+            </Panel>
+            <Panel Header="Données" Key="2">
+                <Tabs Type="@TabType.Card" @bind-ActiveKey="@context.Type">
+                    <TabPane Tab="Message" Key="@PublishMessageDto.MessageType.Message.ToString()">
+                        <FormItem Label="Canal">
+                            <Input @bind-Value="@context.Channel"/>
+                        </FormItem>
+                        <FormItem Label="Message">
+                            <TextArea ShowCount MaxLength="200" @bind-Value="@context.Message"></TextArea>
+                        </FormItem>
+                    </TabPane>
+                    <TabPane Tab="NodeInfo" Key="@PublishMessageDto.MessageType.NodeInfo.ToString()">
+                        <FormItem Label="Nom long (max 37)">
+                            <Input @bind-Value="@context.Name" MaxLength="37" />
+                        </FormItem>
+                        <FormItem Label="Nom court (max 4)">
+                            <Input @bind-Value="@context.ShortName" MaxLength="4" />
+                        </FormItem>
+                    </TabPane>
+                    <TabPane Tab="Position" Key="@PublishMessageDto.MessageType.Position.ToString()">
+                        <FormItem Label="Latitude">
+                            <AntDesign.InputNumber Width="150" TValue="double" Step="0.0001" @bind-Value="@context.Latitude"/>
+                        </FormItem>
+                        <FormItem Label="Longitude">
+                            <AntDesign.InputNumber Width="150" TValue="double" Step="0.0001" @bind-Value="@context.Longitude"/>
+                        </FormItem>
+                        <FormItem Label="Altitude">
+                            <AntDesign.InputNumber Width="150" TValue="int" Max="5000" @bind-Value="@context.Altitude" Formatter="FormatM" Parser="ParseM" />
+                        </FormItem>
+                    </TabPane>
+                    <TabPane Tab="Point d'intérêt" Key="@PublishMessageDto.MessageType.Waypoint.ToString()">
+                        <FormItem Label="Nom (max 30)">
+                            <Input @bind-Value="@context.Name" MaxLength="30" />
+                        </FormItem>
+                        <FormItem Label="Description">
+                            <TextArea ShowCount MaxLength="100" @bind-Value="@context.Description"></TextArea>
+                        </FormItem>
+                        <FormItem Label="Date d'expiration (UTC)">
+                            <DatePicker TValue="DateTime" AllowClear="false" ShowTime="true" @bind-Value="@context.Expires" DisabledDate="date => date < DateTime.UtcNow"/>
+                        </FormItem>
+                        <FormItem Label="Latitude">
+                            <AntDesign.InputNumber Width="150" TValue="double" Step="0.0001" @bind-Value="@context.Latitude"/>
+                        </FormItem>
+                        <FormItem Label="Longitude">
+                            <AntDesign.InputNumber Width="150" TValue="double" Step="0.0001" @bind-Value="@context.Longitude"/>
+                        </FormItem>
+                        <FormItem Label="Id (optionnel)">
+                            <AntDesign.InputNumber Width="150" TValue="uint?" Min="0" Max="MeshtasticService.NodeBroadcast" @bind-Value="@context.Id"/>
+                        </FormItem>
+                    </TabPane>
+                </Tabs>
+            </Panel>
+            <Panel Header="Avancé" Key="10">
+                <FormItem Label="Clé de chiffrement (base64, vide pour ne pas chiffrer)">
+                    <Input @bind-Value="@context.Key" />
+                </FormItem>
+                <FormItem Label="Nombre de sauts">
+                    <AntDesign.InputNumber Min="0" Max="7" @bind-Value="@context.HopLimit" TValue="uint"/>
+                </FormItem>
+                <FormItem Label="Serveur MQTT">
+                    <Select DataSource="@MqttConfigurations"
+                            @bind-Value="@context.MqttServer"
+                            ItemValue="c => c.Name"
+                            ItemLabel="c => c.Name"
+                            Style="width:120px">
+                    </Select>
+                </FormItem>
+                <FormItem Label="Topic racine MQTT">
+                    <Input @bind-Value="@context.RootTopic"/>
+                </FormItem>
+            </Panel>
+        </Collapse>
+
+        <FormItem WrapperColOffset="8" WrapperColSpan="16">
+            <Button Type="@ButtonType.Primary" HtmlType="submit">
+                Envoyer
+            </Button>
+        </FormItem>
+    </Form>
+}
 
 @code
 {
-    private readonly PublishMessageDto _model = new();
+    private bool _allowed;
+    private bool _allowedAnyId;
+    private PublishMessageDto _model;
     private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
-        
+
     protected override void OnInitialized()
     {
+        _allowed = Configuration.GetValue("AllowSend", true);
+        _allowedAnyId = Configuration.GetValue("AllowSendFromAnyId", false);
+        
         MqttConfigurations = (Configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
             .Where(c => c.Enabled)
             .ToList();
-
-        _model.MqttServer = MqttConfigurations.First().Name;
-        _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
-
+        
         base.OnInitialized();
     }
-    
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _model = await LocalStorage.GetItemAsync<PublishMessageDto>("lastSentDto") ?? new PublishMessageDto();
+            _model.MqttServer = MqttConfigurations.First().Name;
+
+            if (!_allowedAnyId)
+            {
+                _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
     private async Task OnFinish(EditContext editContext)
     {
         try
         {
             await MqttService.PublishMessage(_model);
             await Message.Success("Trame bien envoyée !");
+            await LocalStorage.SetItemAsync("lastSentDto", _model);
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
-            await Message.Error($"Il y a eu une erreur pendant l'envoi : {e}");
+            await Message.Error($"Il y a eu une erreur pendant l'envoi : {e.Message}");
         }
     }
 
-    private void OnFinishFailed(EditContext editContext)
-    {
-    }
-    
     private IPAddress? GetIpAddress()
     {
         var ipAddress = HttpContextAccessor.HttpContext?.Request.Headers["HTTP_X_FORWARDED_FOR"];
@@ -102,9 +177,19 @@
 
         return HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress;
     }
-    
+
     private uint IpAddressToInt(IPAddress? addr)
     {
         return addr != null ? (uint) IPAddress.NetworkToHostOrder((int) addr.Address) : 0;
+    }
+    
+    private string FormatM(int value)
+    {
+        return value + " m";
+    }
+
+    private string ParseM(string value)
+    {
+        return value.Replace(" m", "");
     }
 }

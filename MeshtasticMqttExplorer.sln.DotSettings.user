@@ -4,6 +4,8 @@
   &lt;Assembly Path="/home/valentin/.nuget/packages/openlayers.blazor/1.5.9/lib/net8.0/OpenLayers.Blazor.dll" /&gt;
   &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign.charts/0.5.1/lib/net8.0/AntDesign.Charts.dll" /&gt;
   &lt;Assembly Path="/home/valentin/.nuget/packages/antdesign/0.19.1/lib/net8.0/AntDesign.dll" /&gt;
+  &lt;Assembly Path="/home/valentin/.nuget/packages/system.net.mqtt/0.6.16-beta/lib/netstandard2.0/System.Net.Mqtt.dll" /&gt;
+  &lt;Assembly Path="/usr/lib/dotnet/shared/Microsoft.NETCore.App/8.0.0/System.Private.CoreLib.dll" /&gt;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:String x:Key="/Default/Monitoring/PerformanceProfilingMode/@EntryValue">Sampling</s:String>
 	</wpf:ResourceDictionary>

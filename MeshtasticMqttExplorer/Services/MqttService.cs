@@ -4,15 +4,17 @@ using System.Net.Mqtt.Sdk.Bindings;
 using System.Reactive.Concurrency;
 using System.Text;
 using System.Text.Json;
+using AntDesign;
 using Google.Protobuf;
 using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
+using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Context.Entities;
 using MeshtasticMqttExplorer.Extensions;
-using MeshtasticMqttExplorer.Extensions.Entities;
 using Microsoft.EntityFrameworkCore;
 using MqttConfiguration = MeshtasticMqttExplorer.Models.MqttConfiguration;
+using Waypoint = Meshtastic.Protobufs.Waypoint;
 
 namespace MeshtasticMqttExplorer.Services;
 
@@ -36,8 +38,6 @@ public class MqttService : BackgroundService
         _environment = environment;
         _serviceProvider = serviceProvider;
         
-        serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>().SchedulePeriodic(TimeSpan.FromMinutes(15), GC.Collect);
-
         _mqttClientAndConfigurations = (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
             .Where(a => a.Enabled)
             .Select(async a => new MqttClientAndConfiguration
@@ -54,34 +54,8 @@ public class MqttService : BackgroundService
         
         foreach (var mqttConfiguration in _mqttClientAndConfigurations)
         {
-            mqttConfiguration.Client.MessageStream.SubscribeAsync(async e =>
-            {
-                var topic = e.Topic;
-                logger.LogTrace("Received from {name} on {topic}", mqttConfiguration.Configuration.Name, topic);
-
-                if (topic.Contains("json"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("paho"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("stat"))
-                {
-                    return;
-                }
-
-                NbMessages++;
-                NbMessagesToDo++;
-
-                await DoReceive(topic, e.Payload, mqttConfiguration.Configuration);
-
-                NbMessagesToDo--;
-            });
-
+            Utils.MqttServerFilters.Add(new TableFilter<string?> { Text = mqttConfiguration.Configuration.Name, Value = mqttConfiguration.Configuration.Name });
+            
             mqttConfiguration.Client.Disconnected += async (sender, args) =>
             {
                 logger.LogWarning("MQTT {name} disconnected, reason : {reason} {message}", mqttConfiguration.Configuration.Name, args.Reason, args.Message);
@@ -164,13 +138,67 @@ public class MqttService : BackgroundService
 
         var nodeFromId = dto.NodeFromId.ToInteger();
         var nodeToId = string.IsNullOrWhiteSpace(dto.NodeToId) ? MeshtasticService.NodeBroadcast : dto.NodeToId.ToInteger();
-        var topic = dto.RootTopic.Clone();
+        var topic = (string) dto.RootTopic.Clone();
 
-        var data = new Data
+        var data = new Data();
+        
+        switch (Enum.Parse<PublishMessageDto.MessageType>(dto.Type))
         {
-            Portnum = PortNum.TextMessageApp,
-            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(dto.Message))
-        };
+            case PublishMessageDto.MessageType.Message:
+                if (string.IsNullOrWhiteSpace(dto.Message))
+                {
+                    throw new ValidationException("Le message est vide");
+                }
+                
+                data.Portnum = PortNum.TextMessageApp;
+                data.Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(dto.Message!));
+                break;
+            case PublishMessageDto.MessageType.NodeInfo:
+                if (string.IsNullOrWhiteSpace(dto.ShortName))
+                {
+                    throw new ValidationException("Le nom court est vide");
+                }
+                
+                if (string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    throw new ValidationException("Le nom long est vide");
+                }
+                
+                data.Portnum = PortNum.NodeinfoApp;
+                data.Payload = ByteString.CopyFrom(new User
+                {
+                    Id = dto.NodeFromId,
+                    ShortName = dto.ShortName,
+                    LongName = dto.Name
+                }.ToByteArray());
+                break;
+            case PublishMessageDto.MessageType.Position:
+                data.Portnum = PortNum.PositionApp;
+                data.Payload = ByteString.CopyFrom(new Meshtastic.Protobufs.Position
+                {
+                    LongitudeI = (int) (dto.Longitude / 0.0000001),
+                    LatitudeI = (int) (dto.Latitude / 0.0000001),
+                    Altitude = dto.Altitude
+                }.ToByteArray());
+                break;
+            case PublishMessageDto.MessageType.Waypoint:
+                if (string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    throw new ValidationException("Le nom est vide");
+                }
+                
+                data.Portnum = PortNum.WaypointApp;
+                data.Payload = ByteString.CopyFrom(new Waypoint
+                {
+                    Id = dto.Id ?? (uint) Random.Shared.NextInt64(),
+                    Name = dto.Name,
+                    Description = dto.Description,
+                    Expire = (uint)new DateTimeOffset(dto.Expires).ToUnixTimeSeconds(),
+                    LongitudeI = (int) (dto.Longitude / 0.0000001),
+                    LatitudeI = (int) (dto.Latitude / 0.0000001)
+                }.ToByteArray());
+                break;
+        }
         
         var packet = new ServiceEnvelope
         {
@@ -189,15 +217,13 @@ public class MqttService : BackgroundService
         }
 
         topic += $"/{dto.Channel}/{dto.NodeFromId}";
-        _logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()));
+        
+        var packetBytes = packet.ToByteArray();
+        
+        _logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data} | {base64}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()), Convert.ToBase64String(packetBytes));
 
-        // await mqttConfiguration.Client.PublishBinaryAsync(topic, packet.ToByteArray());
-    }
-    
-    private class MqttClientAndConfiguration
-    {
-        public required IMqttClient Client { get; set; }
-        public required MqttConfiguration Configuration { get; set; }
+        await mqttConfiguration.Client.PublishAsync(new MqttApplicationMessage(topic, packetBytes), MqttQualityOfService.AtLeastOnce);
+        await DoReceive(topic, packetBytes, mqttConfiguration.Configuration);
     }
 
     public async Task PurgePacketsForNode(Node node)
@@ -272,10 +298,42 @@ public class MqttService : BackgroundService
             _logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
 
             await mqttClientAndConfiguration.Client.ConnectAsync (new MqttClientCredentials(
-                clientId: "MeshtasticExplorerF4HVV",
+                clientId: $"MeshtasticExplorerF4HVV{_environment.EnvironmentName}",
                 userName: mqttClientAndConfiguration.Configuration.Username,
                 password: mqttClientAndConfiguration.Configuration.Password
             ), cleanSession: true);
+
+            _logger.LogInformation("Connection to MQTT {name} OK", mqttClientAndConfiguration.Configuration.Name);
+            
+            mqttClientAndConfiguration.Client.MessageStream.SubscribeAsync(async e =>
+            {
+                var topic = e.Topic;
+                _logger.LogTrace("Received from {name} on {topic}", mqttClientAndConfiguration.Configuration.Name, topic);
+
+                if (topic.Contains("json"))
+                {
+                    return;
+                }
+
+                if (topic.Contains("paho"))
+                {
+                    return;
+                }
+
+                if (topic.Contains("stat"))
+                {
+                    return;
+                }
+
+                NbMessages++;
+                NbMessagesToDo++;
+
+                await DoReceive(topic, e.Payload, mqttClientAndConfiguration.Configuration);
+
+                NbMessagesToDo--;
+
+                e = null;
+            });
             
             foreach (var topic in mqttClientAndConfiguration.Configuration.Topics)
             {
@@ -303,26 +361,66 @@ public class MqttService : BackgroundService
             await mqttClientAndConfiguration.Client.DisconnectAsync();
         }
     }
+    
+    private class MqttClientAndConfiguration
+    {
+        public required IMqttClient Client { get; init; }
+        public required MqttConfiguration Configuration { get; init; }
+    }
 }
 
 public class PublishMessageDto
 {
-    public string? MqttServer { get; set; }
+    public string MqttServer { get; set; } = null!;
 
     [Required]
+    [Length(2, 9)]
     public string NodeFromId { get; set; } = "!1000001";
     
     [Required]
+    [MinLength(1)]
     public string Channel { get; set; } = "LongFast";
     
-    [Required]
-    public string Message { get; set; } = "Test";
-    
+    [Length(2, 9)]
     public string? NodeToId { get; set; }
+    
+    [Range(0, 7)]
     public uint HopLimit { get; set; } = 3;
     
     [Required]
+    [MinLength(4)]
     public string RootTopic { get; set; } = "msh/EU_868/2/";
 
+    [MinLength(4)]
     public string? Key { get; set; }// = "AQ==";
+    
+    public string Type { get; set; } = MessageType.Message.ToString();
+    
+    [Length(1, 200)]
+    public string? Message { get; set; }
+    
+    public double Latitude { get; set; }
+    public double Longitude { get; set; }
+    public int Altitude { get; set; }
+    
+    [Length(4, 4)]
+    public string? ShortName { get; set; }
+    
+    [Length(1, 37)]
+    public string? Name { get; set; }
+    
+    [MaxLength(100)]
+    public string? Description { get; set; }
+    
+    public uint? Id { get; set; }
+    
+    public DateTime Expires { get; set; } = DateTime.UtcNow.AddDays(1);
+    
+    public enum MessageType
+    {
+        Message,
+        NodeInfo,
+        Position,
+        Waypoint
+    }
 }

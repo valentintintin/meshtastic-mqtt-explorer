@@ -1,5 +1,6 @@
 using System.Globalization;
 using AntDesign;
+using Blazored.LocalStorage;
 using Google.Protobuf;
 using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
@@ -32,6 +33,7 @@ try
     builder.Services.AddResponseCompression();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
+    builder.Services.AddBlazoredLocalStorage();
 
     builder.Services.Configure<HostOptions>(hostOptions =>
     {
@@ -51,8 +53,8 @@ try
     });
 
     builder.Services.AddScoped<MeshtasticService>();
-    builder.Services.AddScoped<MqttService>();
-    builder.Services.AddHostedService<MqttService>();
+    builder.Services.AddSingleton<MqttService>();
+    builder.Services.AddHostedService(p => p.GetRequiredService<MqttService>());
 
     if (!builder.Environment.IsDevelopment())
     {
@@ -91,8 +93,8 @@ try
     Thread.CurrentThread.CurrentCulture = culture;
     Thread.CurrentThread.CurrentUICulture = culture;
 
-    var context = app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContext();
-    context.Database.Migrate();
+    var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
+    await context.Database.MigrateAsync();
 
     MeshtasticService.NodesIgnored.AddRange(app.Configuration.GetValue<List<uint>>("NodesIgnored", [])!);
     
