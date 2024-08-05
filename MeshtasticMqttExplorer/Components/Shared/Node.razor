@@ -332,6 +332,36 @@
             </ChildContent>
         </Card>
     </GridCol>
+
+    <GridCol Xs="24" Md="12">
+        <Card Title="Courbe de tension">
+            <ChildContent>
+                @if (DataPowerMetricsVoltage?.Any() == true)
+                {
+                    <AntDesign.Charts.Line Data="DataPowerMetricsVoltage" Config="_configVoltage"/>
+                }
+                else
+                {
+                    <Empty></Empty>
+                }
+            </ChildContent>
+        </Card>
+    </GridCol>
+
+    <GridCol Xs="24" Md="12">
+        <Card Title="Courbe d'intensité">
+            <ChildContent>
+                @if (DataPowerMetricsCurrent?.Any() == true)
+                {
+                    <AntDesign.Charts.Line Data="DataPowerMetricsCurrent" Config="_configCurrent"/>
+                }
+                else
+                {
+                    <Empty></Empty>
+                }
+            </ChildContent>
+        </Card>
+    </GridCol>
     </GridRow>
 }
 
@@ -350,6 +380,8 @@
     private List<DateChartData<float>>? DataVoltageBattery { get; set; }
     private List<DateChartData<float>>? DataWeather { get; set; }
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsVoltage { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsCurrent { get; set; }
     private List<Packet> PacketsGateway { get; set; } = [];
     private bool HasRenderMapData { get; set; }
     private Osm? Map { get; set; }
@@ -358,6 +390,8 @@
     private readonly LineConfig _configVoltageBattery = Utils.GetLineConfig("Tension (V)", 0, 5);
     private readonly LineConfig _configTemperature = Utils.GetLineConfig("Température (°C) / Humidité (%)", -10, 100);
     private readonly LineConfig _configPressure = Utils.GetLineConfig("Pression atmosphérique (hPa)", 950, 1050);
+    private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)", 0);
+    private readonly LineConfig _configCurrent = Utils.GetLineConfig("Intensité (mA)", 0);
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -604,6 +638,52 @@
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Pression",
                 value = a.BarometricPressure ?? 0
+            }).ToList();
+        
+        DataPowerMetricsVoltage = NodeInfo?.Telemetries
+            .Where(a => a.Channel1Voltage > 0 || a.Channel2Voltage > 0 || a.Channel3Voltage > 0)
+            .SelectMany(a => new List<DateChartData<float>> {
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Voltage canal 1",
+                    value = a.Channel1Voltage ?? 0
+                },
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Voltage canal 2",
+                    value = a.Channel2Voltage ?? 0
+                },
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Voltage canal 3",
+                    value = a.Channel3Voltage ?? 0
+                }
+            }).ToList();
+        
+        DataPowerMetricsCurrent = NodeInfo?.Telemetries
+            .Where(a => a.Channel1Current > 0 || a.Channel2Current > 0 || a.Channel3Current > 0)
+            .SelectMany(a => new List<DateChartData<float>> {
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Intensité canal 1",
+                    value = a.Channel1Current ?? 0
+                },
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Intensité canal 2",
+                    value = a.Channel2Current ?? 0
+                },
+                new()
+                {
+                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                    type = "Intensité canal 3",
+                    value = a.Channel3Current ?? 0
+                }
             }).ToList();
 
         PacketsGateway = NodeInfo?.PacketsFrom?

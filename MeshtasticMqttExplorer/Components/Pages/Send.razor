@@ -28,7 +28,11 @@ else
         <Collapse DefaultActiveKey="@(new[] { "1" })" Accordion>
             <Panel Header="Informations de base" Key="1">
                 <FormItem Label="Mon Id">
-                    <Input @bind-Value="@context.NodeFromId" ReadOnly="@(!_allowedAnyId)" MaxLength="9" />
+                    @if (!_allowedAnyId)
+                    {
+                        <b>Non modifiable car vous êtes sur un serveur public. L'ID est votre IPv4</b>
+                    }
+                    <Input @bind-Value="@context.NodeFromId" ReadOnly="@(!_allowedAnyId)" MaxLength="9"/>
                 </FormItem>
                 <FormItem Label="Id destinataire (vide si tout le monde)">
                     <Input @bind-Value="@context.NodeToId" MaxLength="9" />
