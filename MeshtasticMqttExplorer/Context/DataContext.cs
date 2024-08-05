@@ -21,6 +21,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
+    public required DbSet<Traceroute> Traceroutes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

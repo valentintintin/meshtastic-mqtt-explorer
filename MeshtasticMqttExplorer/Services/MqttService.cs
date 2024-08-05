@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net.Mqtt;
-using System.Net.Mqtt.Sdk.Bindings;
 using System.Reactive.Concurrency;
 using System.Text;
 using System.Text.Json;
@@ -20,15 +19,12 @@ namespace MeshtasticMqttExplorer.Services;
 
 public class MqttService : BackgroundService
 {
-    private readonly List<MqttClientAndConfiguration> _mqttClientAndConfigurations;
+    public static readonly List<MqttClientAndConfiguration> MqttClientAndConfigurations  = [];
     private readonly ILogger<MqttService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IDbContextFactory<DataContext> _contextFactory;
     private readonly IHostEnvironment _environment;
     private readonly IServiceProvider _serviceProvider;
-
-    public static int NbMessages { get; set; }
-    public static int NbMessagesToDo { get; set; }
 
     public MqttService(ILogger<MqttService> logger, IConfiguration configuration, IDbContextFactory<DataContext> contextFactory, IHostEnvironment environment, IServiceProvider serviceProvider)
     {
@@ -37,8 +33,20 @@ public class MqttService : BackgroundService
         _contextFactory = contextFactory;
         _environment = environment;
         _serviceProvider = serviceProvider;
+
+        logger.LogInformation("Purge des données");
+        PurgeOldData().ConfigureAwait(true).GetAwaiter().GetResult();
+        PurgeOldPackets().ConfigureAwait(true).GetAwaiter().GetResult();;
+        logger.LogInformation("Purge des données OK");
+
+        _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>().SchedulePeriodic(TimeSpan.FromHours(1), async () =>
+        {
+            await PurgeOldData();
+            await PurgeOldPackets();
+        });
         
-        _mqttClientAndConfigurations = (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
+        MqttClientAndConfigurations.AddRange(
+            (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
             .Where(a => a.Enabled)
             .Select(async a => new MqttClientAndConfiguration
             {
@@ -50,9 +58,10 @@ public class MqttService : BackgroundService
                 })
             })
             .Select(a => a.Result)
-            .ToList();
+            .ToList()
+        );
         
-        foreach (var mqttConfiguration in _mqttClientAndConfigurations)
+        foreach (var mqttConfiguration in MqttClientAndConfigurations)
         {
             Utils.MqttServerFilters.Add(new TableFilter<string?> { Text = mqttConfiguration.Configuration.Name, Value = mqttConfiguration.Configuration.Name });
             
@@ -122,17 +131,14 @@ public class MqttService : BackgroundService
 
         if (packet != null)
         {
-            var node = packet.Value.packet.From;
-            await PurgeDataForNode(node);
-            await PurgeEncryptedPacketsForNode(node);
-            await PurgePacketsForNode(node);
+            await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
         }
     }
 
     public async Task PublishMessage(PublishMessageDto dto)
     {
-        var mqttConfiguration = string.IsNullOrWhiteSpace(dto.MqttServer) ? _mqttClientAndConfigurations.First() : 
-            _mqttClientAndConfigurations.First(a => a.Configuration.Name == dto.MqttServer);
+        var mqttConfiguration = string.IsNullOrWhiteSpace(dto.MqttServer) ? MqttClientAndConfigurations.First() : 
+            MqttClientAndConfigurations.First(a => a.Configuration.Name == dto.MqttServer);
         
         var meshtasticService = _serviceProvider.CreateAsyncScope().ServiceProvider.GetRequiredService<MeshtasticService>();
 
@@ -250,6 +256,18 @@ public class MqttService : BackgroundService
         await context.SaveChangesAsync();
     }
 
+    public async Task PurgeOldPackets()
+    {
+        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
+        var context = await _contextFactory.CreateDbContextAsync();
+        
+        _logger.LogTrace("Delete packets if they are too old < {date}", minDate);
+        
+        context.RemoveRange(context.Packets.Where(a => a.CreatedAt < minDate));
+        
+        await context.SaveChangesAsync();
+    }
+
     public async Task PurgeDataForNode(Node node)
     {
         var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
@@ -260,6 +278,20 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
+
+        await context.SaveChangesAsync();
+    }
+
+    public async Task PurgeOldData()
+    {
+        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
+        var context = await _contextFactory.CreateDbContextAsync();
+        
+        _logger.LogTrace("Delete old data if they are too old < {date}", minDate);
+        
+        context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
+        context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
+        context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
 
         await context.SaveChangesAsync();
     }
@@ -293,7 +325,7 @@ public class MqttService : BackgroundService
 
     private async Task ConnectMqtt()
     {
-        foreach (var mqttClientAndConfiguration in _mqttClientAndConfigurations.Where(m => !m.Client.IsConnected))
+        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(m => !m.Client.IsConnected))
         {
             _logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
 
@@ -325,14 +357,9 @@ public class MqttService : BackgroundService
                     return;
                 }
 
-                NbMessages++;
-                NbMessagesToDo++;
+                mqttClientAndConfiguration.NbPacket++;
 
                 await DoReceive(topic, e.Payload, mqttClientAndConfiguration.Configuration);
-
-                NbMessagesToDo--;
-
-                e = null;
             });
             
             foreach (var topic in mqttClientAndConfiguration.Configuration.Topics)
@@ -355,17 +382,18 @@ public class MqttService : BackgroundService
 
         stoppingToken.WaitHandle.WaitOne();
         
-        foreach (var mqttClientAndConfiguration in _mqttClientAndConfigurations.Where(m => m.Client.IsConnected))
+        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(m => m.Client.IsConnected))
         {
             _logger.LogWarning("Disconnect from MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
             await mqttClientAndConfiguration.Client.DisconnectAsync();
         }
     }
     
-    private class MqttClientAndConfiguration
+    public class MqttClientAndConfiguration
     {
         public required IMqttClient Client { get; init; }
         public required MqttConfiguration Configuration { get; init; }
+        public uint NbPacket { get; set; }
     }
 }
 

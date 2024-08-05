@@ -35,7 +35,7 @@
         <div>
             <Switch @bind-Checked="ShowNeighbors" Disabled="@Loading" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData"/>
             <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/>
-            <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes" UnCheckedChildren="Cacher les routes" OnChange="FetchData" />
+            <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes directes" UnCheckedChildren="Cacher les routes directes" OnChange="FetchData" />
         </div>
 
         <div>
@@ -62,48 +62,48 @@
     <Card Title="Légende" Size="small" Bordered="true">
         <ChildContent>
             <GridRow Gutter="(16, 16)" Justify="center">
-               <GridCol Xs="24" Md="12">
-                   <div class="legend">
-                       <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
-                       En ligne | Passerelle MQTT
-                   </div>
-                   <div class="legend">
-                       <span style="@GetIconStyleCss(Utils.Blue)" class="legend-circle"></span>
-                       En ligne
-                   </div>
-                   <div class="legend">
-                       <span style="@GetIconStyleCss(Utils.Red)" class="legend-circle"></span>
-                       Hors ligne depuis plus de 24h
-                   </div>
-                   <div class="legend">
-                       <span style="@GetIconStyleCss(Utils.Gray)" class="legend-circle"></span>
-                       Bande et profil de modulation inconnu
-                   </div>
-               </GridCol>
+                <GridCol Xs="24" Md="12">
+                    <div class="legend">
+                        <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
+                        En ligne | Passerelle MQTT
+                    </div>
+                    <div class="legend">
+                        <span style="@GetIconStyleCss(Utils.Blue)" class="legend-circle"></span>
+                        En ligne
+                    </div>
+                    <div class="legend">
+                        <span style="@GetIconStyleCss(Utils.Red)" class="legend-circle"></span>
+                        Hors ligne depuis plus de 24h
+                    </div>
+                    <div class="legend">
+                        <span style="@GetIconStyleCss(Utils.Gray)" class="legend-circle"></span>
+                        Bande et profil de modulation inconnu
+                    </div>
+                </GridCol>
     
-               <GridCol Xs="24" Md="12">
-                   @if (ShowNeighbors)
-                   {
-                       <div class="legend">
-                           <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                           Voisin du nœud
-                       </div>
-                   }
-                   @if (ShowPaths)
-                   {
-                       <div class="legend">
-                           <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                           Paquets relayés par cette passerelle MQTT
-                       </div>
-                   }
-                   @if (ShowPois)
-                   {
-                       <div class="legend">
-                           <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
-                           Point d'intétêt
-                       </div>
-                   }
-               </GridCol>
+                <GridCol Xs="24" Md="12">
+                    @if (ShowNeighbors)
+                    {
+                        <div class="legend">
+                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
+                            Voisin du nœud
+                        </div>
+                    }
+                    @if (ShowPaths)
+                    {
+                        <div class="legend">
+                            <span style="background-color: @Utils.Gold" class="legend-bar"></span>
+                            Route directe
+                        </div>
+                    }
+                    @if (ShowPois)
+                    {
+                        <div class="legend">
+                            <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
+                            Point d'intétêt
+                        </div>
+                    }
+                </GridCol>
             </GridRow>
         </ChildContent>
     </Card>
@@ -158,15 +158,21 @@
                     lines.AddRange(
                         node.PacketsFrom
                             .Where(g => Math.Abs(g.GatewayDistanceKm!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, g.Gateway.Latitude!.Value, g.Gateway.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
-                            .Select(p => new Osm.Line
+                            .Select(p =>
                             {
-                                Id = $"node(gateway)-{p.Gateway.Id}->node-{node.Id}",
-                                Points = [
-                                    [node.Latitude!.Value, node.Longitude!.Value],
-                                    [p.Gateway.Latitude!.Value, p.Gateway.Longitude!.Value]
-                                ],
-                                Color = Utils.Gold,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {p.RxSnr}</p>"
+                                markers.Add(GetMarker(p.Gateway));
+                                
+                                return new Osm.Line
+                                {
+                                    Id = $"node(gateway)-{p.Gateway.Id}->node-{node.Id}",
+                                    Points =
+                                    [
+                                        [node.Latitude!.Value, node.Longitude!.Value],
+                                        [p.Gateway.Latitude!.Value, p.Gateway.Longitude!.Value]
+                                    ],
+                                    Color = Utils.Gold,
+                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {p.RxSnr}</p>"
+                                };
                             })
                     );
                 }
@@ -177,15 +183,21 @@
                         node.MyNeighbors
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
-                            .Select(n => new Osm.Line
+                            .Select(n =>
                             {
-                                Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
-                                Points = [
-                                    [node.Latitude!.Value, node.Longitude!.Value],
-                                    [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
-                                ],
-                                Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                markers.Add(GetMarker(n.Neighbor));
+                                
+                                return new Osm.Line
+                                {
+                                    Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
+                                    Points =
+                                    [
+                                        [node.Latitude!.Value, node.Longitude!.Value],
+                                        [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
+                                    ],
+                                    Color = Utils.Red,
+                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                };
                             })
                     );
                     
@@ -193,15 +205,21 @@
                         node.NeighborsFor
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
-                            .Select(n => new Osm.Line
+                            .Select(n =>
                             {
-                                Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
-                                Points = [
-                                    [node.Latitude!.Value, node.Longitude!.Value],
-                                    [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
-                                ],
-                                Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                markers.Add(GetMarker(n.Node));
+                                
+                                return new Osm.Line
+                                {
+                                    Id = $"node(neighbor)-{n.Node.Id}->node-{node.Id}",
+                                    Points =
+                                    [
+                                        [node.Latitude!.Value, node.Longitude!.Value],
+                                        [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
+                                    ],
+                                    Color = Utils.Red,
+                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                };
                             })
                     );
                 }
@@ -239,7 +257,7 @@
             }
 
             await Map.AddPolylines(lines);
-            await Map.AddMarkers(markers);
+            await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
 
             HasRenderMapData = true;
         }
@@ -272,7 +290,7 @@
         Loading = true;
         
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.HopStart - a.HopLimit == 0).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
+            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors.Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
@@ -301,7 +319,7 @@
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
             Label = node.AllNames,
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen!.Value.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             IconType = Osm.IconType.Circle,
             Color = color,
             FillColor = node.RegionCode.HasValue ? color : Utils.Gray,

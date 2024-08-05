@@ -175,7 +175,7 @@
                         {
                             <Timeline>
                                 <TimelineItem Color="blue">
-                                    <a href="/node/by-nodeid/@Packet.From.Id" target="_blank">@Packet.From.NodeIdString</a>
+                                    <a href="/node/@Packet.From.Id" target="_blank">@Packet.From.NodeIdString</a>
                                 </TimelineItem>
                                 
                                 @* @{ var i = 1; } *@
@@ -188,7 +188,7 @@
                                 }
 
                                 <TimelineItem Color="red">
-                                    <a href="/node/by-nodeid/@Packet.To.Id" target="_blank">@Packet.To.NodeIdString</a>
+                                    <a href="/node/@Packet.To.Id" target="_blank">@Packet.To.NodeIdString</a>
                                 </TimelineItem>
                             </Timeline>
                         }

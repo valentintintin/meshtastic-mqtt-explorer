@@ -192,6 +192,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             case PortNum.WaypointApp:
                 await DoWaypointPacket(nodeFrom, packet, meshPacket.GetPayload<Waypoint>());
                 break;
+            case PortNum.TracerouteApp:
+                await DoTraceroutePacket(nodeFrom, nodeTo, packet, meshPacket.GetPayload<RouteDiscovery>());
+                break;
         }
 
         return (packet, meshPacket);
@@ -279,6 +282,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Temperature = telemetryPayload.EnvironmentMetrics?.Temperature,
             RelativeHumidity = telemetryPayload.EnvironmentMetrics?.RelativeHumidity,
             BarometricPressure = telemetryPayload.EnvironmentMetrics?.BarometricPressure,
+            Channel1Voltage = telemetryPayload.PowerMetrics?.Ch1Voltage,
+            Channel2Voltage = telemetryPayload.PowerMetrics?.Ch2Voltage,
+            Channel3Voltage = telemetryPayload.PowerMetrics?.Ch3Voltage,
+            Channel1Current = telemetryPayload.PowerMetrics?.Ch1Current,
+            Channel2Current = telemetryPayload.PowerMetrics?.Ch2Current,
+            Channel3Current = telemetryPayload.PowerMetrics?.Ch3Current,
         };
         
         Logger.LogInformation("Update {node} with new Telemetry {type}", nodeFrom, telemetry.Type);
@@ -417,6 +426,47 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         
         await Context.SaveChangesAsync();
+    }
+
+    public async Task DoTraceroutePacket(Node nodeFrom, Node nodeTo, Packet packet, RouteDiscovery? payload)
+    {
+        if (payload == null)
+        {
+            return;
+        }
+
+        if (payload.Route.Count == 0)
+        {
+            return;
+        }
+
+        var hop = 0;
+        foreach (var nodeId in payload.Route)
+        {
+            var node = await Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
+            {
+                NodeId = nodeId
+            };
+            if (node.Id == 0)
+            {
+                Context.Add(node);
+                Logger.LogInformation("New node (traceroute) created {node}", node);
+                await Context.SaveChangesAsync();
+            }
+            
+            var traceroute = new Traceroute
+            {
+                From = nodeFrom,
+                To = nodeTo,
+                Packet = packet,
+                Node = node,
+                Hop = hop++,
+            };
+
+            Context.Add(traceroute);
+        }
+        
+        await Context.SaveChangesAsync();   
     }
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)

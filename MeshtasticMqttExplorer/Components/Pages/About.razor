@@ -1,5 +1,6 @@
 ﻿@page "/a-propos"
 @using System.Diagnostics
+@using MeshtasticMqttExplorer.Extensions
 @using MeshtasticMqttExplorer.Models
 @using MeshtasticMqttExplorer.Services
 
@@ -8,58 +9,51 @@
 <PageTitle>Meshtastic Mqtt Explorer</PageTitle>
 
 <GridRow Gutter="(16, 16)" Justify="center">
-    <GridCol Xs="24" Md="8">
+    <GridCol Xs="24" Md="12">
         <Card Title="Le projet">
             <ChildContent>
                 <p>
                     Ce site est un outil pour le projet <a href="https://meshtastic.org/" target="_blank">Meshtastic</a>.
                 </p>
-                
+
                 <p>
                     Les trames sont sauvegardés pendants <b>@NbDaysPurge jours</b>.
                 </p>
 
                 <p>
-                    Messages MQTT reçus : <b>@MqttService.NbMessages</b>
-                </p>
-
-                <p>
-                    Messages MQTT à traiter : <b>@MqttService.NbMessagesToDo</b>
-                </p>
-                
-                <p>
-                    RAM : @(Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024) Mb
+                    RAM : <b>@(Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024) Mb</b> depuis @(Process.GetCurrentProcess().StartTime.ToUniversalTime().ToFrench())
                 </p>
             </ChildContent>
         </Card>
-    </GridCol>
     
-    <GridCol Xs="24" Md="8">
         <Card Title="Inspiration & liens">
             <ChildContent>
                 <ul>
                     <li><a href="https://meshmap.net/" rel="nofollow" target="_blank">MeshMap</a></li>
                     <li><a href="https://meshtastic.liamcottle.net/" rel="nofollow" target="_blank">Liam Cottle</a></li>
                     <li><a href="https://wiki.fr-emcom.com/gaulix_reseau_meshtastic_-_france:1:start" target="_blank">Le Wiki du réseau Gaulix</a></li>
+                    <li><a href="https://meshtastic.discourse.group/t/france-public-channel/10230" target="_blank">Le Forum Meshtastic France</a></li>
                 </ul>
             </ChildContent>
         </Card>
     </GridCol>
     
-    <GridCol Xs="24" Lg="8">
+    <GridCol Xs="24" Lg="12">
         <Card Title="Serveurs MQTT utilisés">
             <ChildContent>
-                @foreach (var mqtt in MqttConfigurations)
+                @foreach (var mqtt in MqttService.MqttClientAndConfigurations)
                 {
                     <Descriptions Bordered Column="1">
-                        <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Name</DescriptionsItem>
-                        <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Host</DescriptionsItem>
-                        @* <DescriptionsItem Title="Topics"> *@
-                        @*     @foreach (var topic in mqtt.Topics) *@
-                        @*     { *@
-                        @*     <Tag>@topic</Tag> *@
-                        @*     } *@
-                        @* </DescriptionsItem> *@
+                        <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Configuration.Name</DescriptionsItem>
+                        <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Configuration.Host</DescriptionsItem>
+                        <DescriptionsItem Title="Connecté" ContentStyle="font-weight: bold">@mqtt.Client.IsConnected</DescriptionsItem>
+                        <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @(Math.Round(mqtt.NbPacket / (DateTime.UtcNow - Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds, 0))/s</DescriptionsItem>
+                        <DescriptionsItem Title="Topics">
+                            @foreach (var topic in mqtt.Configuration.Topics)
+                            {
+                                <Tag>@topic</Tag>
+                            }
+                        </DescriptionsItem>
                     </Descriptions>
                     <Divider></Divider>
                 }
@@ -70,15 +64,10 @@
 
 @code
 {
-    private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
     private int NbDaysPurge { get; set; }
         
     protected override void OnInitialized()
     {
-        MqttConfigurations = (Configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
-            .Where(c => c.Enabled)
-            .ToList();
-
         NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
 
         base.OnInitialized();

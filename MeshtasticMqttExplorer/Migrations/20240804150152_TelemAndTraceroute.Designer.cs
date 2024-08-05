@@ -3,6 +3,7 @@ using System;
 using MeshtasticMqttExplorer.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MeshtasticMqttExplorer.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20240804150152_TelemAndTraceroute")]
+    partial class TelemAndTraceroute
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -505,13 +508,7 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.Property<int>("Hop")
                         .HasColumnType("integer");
 
-                    b.Property<long>("NodeFromId")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("NodeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("NodeToId")
                         .HasColumnType("bigint");
 
                     b.Property<long?>("PacketId")
@@ -522,17 +519,9 @@ namespace MeshtasticMqttExplorer.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("NodeFromId");
-
                     b.HasIndex("NodeId");
 
-                    b.HasIndex("NodeToId");
-
                     b.HasIndex("PacketId");
-
-                    b.HasIndex("UpdatedAt");
 
                     b.ToTable("Traceroutes");
                 });
@@ -759,36 +748,19 @@ namespace MeshtasticMqttExplorer.Migrations
 
             modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.Traceroute", b =>
                 {
-                    b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "From")
-                        .WithMany("TraceroutesFrom")
-                        .HasForeignKey("NodeFromId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "Node")
-                        .WithMany("TraceroutesPart")
+                        .WithMany()
                         .HasForeignKey("NodeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MeshtasticMqttExplorer.Context.Entities.Node", "To")
-                        .WithMany("TraceroutesTo")
-                        .HasForeignKey("NodeToId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("MeshtasticMqttExplorer.Context.Entities.Packet", "Packet")
                         .WithMany()
-                        .HasForeignKey("PacketId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("From");
+                        .HasForeignKey("PacketId");
 
                     b.Navigation("Node");
 
                     b.Navigation("Packet");
-
-                    b.Navigation("To");
                 });
 
             modelBuilder.Entity("MeshtasticMqttExplorer.Context.Entities.Waypoint", b =>
@@ -831,12 +803,6 @@ namespace MeshtasticMqttExplorer.Migrations
                     b.Navigation("TextMessagesFrom");
 
                     b.Navigation("TextMessagesTo");
-
-                    b.Navigation("TraceroutesFrom");
-
-                    b.Navigation("TraceroutesPart");
-
-                    b.Navigation("TraceroutesTo");
 
                     b.Navigation("Waypoints");
                 });

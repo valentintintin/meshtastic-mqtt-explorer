@@ -4,6 +4,11 @@ public static class DateTimeExtensions
 {
     public static DateTime ToFrench(this DateTime dateTime)
     {
+        if (dateTime.Kind == DateTimeKind.Unspecified)
+        {
+            return dateTime;
+        }
+        
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
         return TimeZoneInfo.ConvertTimeFromUtc(dateTime, timeZone);
     }

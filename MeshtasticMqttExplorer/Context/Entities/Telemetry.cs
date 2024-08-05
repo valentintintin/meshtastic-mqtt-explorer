@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace MeshtasticMqttExplorer.Context.Entities;
 
 public class Telemetry : IEntity
@@ -23,6 +21,15 @@ public class Telemetry : IEntity
     public float? Temperature { get; set; }
     public float? RelativeHumidity { get; set; }
     public float? BarometricPressure { get; set; }
+    
+    public float? Channel1Voltage { get; set; }
+    public float? Channel1Current { get; set; }
+    
+    public float? Channel2Voltage { get; set; }
+    public float? Channel2Current { get; set; }
+    
+    public float? Channel3Voltage { get; set; }
+    public float? Channel3Current { get; set; }
 
     public required Meshtastic.Protobufs.Telemetry.VariantOneofCase Type;
 }
