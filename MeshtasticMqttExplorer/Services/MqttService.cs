@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Net.Mqtt;
 using System.Reactive.Concurrency;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +13,9 @@ using MeshtasticMqttExplorer.Extensions;
 using Microsoft.EntityFrameworkCore;
 using MqttConfiguration = MeshtasticMqttExplorer.Models.MqttConfiguration;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
+using MQTTnet;
+using MQTTnet.Client;
+using MQTTnet.Protocol;
 
 namespace MeshtasticMqttExplorer.Services;
 
@@ -48,26 +50,65 @@ public class MqttService : BackgroundService
         MqttClientAndConfigurations.AddRange(
             (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
             .Where(a => a.Enabled)
-            .Select(async a => new MqttClientAndConfiguration
+            .Select(a => new MqttClientAndConfiguration
             {
                 Configuration = a,
-                Client = await MqttClient.CreateAsync(a.Host, new System.Net.Mqtt.MqttConfiguration
-                {
-                    Port = a.Port
-                })
+                Client = new MqttFactory().CreateMqttClient()
             })
-            .Select(a => a.Result)
             .ToList()
         );
         
-        foreach (var mqttConfiguration in MqttClientAndConfigurations)
+        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations)
         {
-            Utils.MqttServerFilters.Add(new TableFilter<string?> { Text = mqttConfiguration.Configuration.Name, Value = mqttConfiguration.Configuration.Name });
+            Utils.MqttServerFilters.Add(new TableFilter<string?> { Text = mqttClientAndConfiguration.Configuration.Name, Value = mqttClientAndConfiguration.Configuration.Name });
             
-            mqttConfiguration.Client.Disconnected += async (sender, args) =>
+            mqttClientAndConfiguration.Client.ConnectedAsync += async _ =>
             {
-                logger.LogWarning("MQTT {name} disconnected, reason : {reason} {message}", mqttConfiguration.Configuration.Name, args.Reason, args.Message);
-                
+                _logger.LogInformation("Connection successful to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
+
+                foreach (var topic in mqttClientAndConfiguration.Configuration.Topics.Distinct())
+                {
+                    await mqttClientAndConfiguration.Client.SubscribeAsync(
+                        new MqttTopicFilterBuilder()
+                            .WithTopic(topic)
+                            .WithRetainAsPublished(false)
+                            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce)
+                            .Build());
+                    
+                    _logger.LogDebug("Subscription MQTT {name} to {topic}", mqttClientAndConfiguration.Configuration.Name, topic);
+                }
+            };
+            
+            mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
+            {
+                var topic = e.ApplicationMessage.Topic;
+                _logger.LogTrace("Received from {name} on {topic}", mqttClientAndConfiguration.Configuration.Name, topic);
+
+                if (topic.Contains("json"))
+                {
+                    return;
+                }
+
+                if (topic.Contains("paho"))
+                {
+                    return;
+                }
+
+                if (topic.Contains("stat"))
+                {
+                    return;
+                }
+
+                mqttClientAndConfiguration.NbPacket++;
+                mqttClientAndConfiguration.LastPacketDate = DateTime.UtcNow;
+
+                await DoReceive(topic, e.ApplicationMessage.PayloadSegment.ToArray(), mqttClientAndConfiguration.Configuration);
+            };
+
+            mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
+            {
+                logger.LogWarning(args.Exception, "MQTT {name} disconnected, reason : {reason}", mqttClientAndConfiguration.Configuration.Name, args.ReasonString);
+
                 await Task.Delay(TimeSpan.FromSeconds(5));
                 await ConnectMqtt();
             };
@@ -227,7 +268,7 @@ public class MqttService : BackgroundService
         
         _logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data} | {base64}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()), Convert.ToBase64String(packetBytes));
 
-        await mqttConfiguration.Client.PublishAsync(new MqttApplicationMessage(topic, packetBytes), MqttQualityOfService.AtLeastOnce);
+        await mqttConfiguration.Client.PublishBinaryAsync(topic, packetBytes);
         await DoReceive(topic, packetBytes, mqttConfiguration.Configuration);
     }
 
@@ -328,44 +369,18 @@ public class MqttService : BackgroundService
         {
             _logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
 
-            await mqttClientAndConfiguration.Client.ConnectAsync(new MqttClientCredentials(
-                clientId: $"MeshtasticExplorerF4HVV{_environment.EnvironmentName}",
-                userName: mqttClientAndConfiguration.Configuration.Username,
-                password: mqttClientAndConfiguration.Configuration.Password
-            ), cleanSession: true);
-
-            _logger.LogInformation("Connection to MQTT {name} OK", mqttClientAndConfiguration.Configuration.Name);
+            var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
+                    .WithTcpServer(mqttClientAndConfiguration.Configuration.Host, mqttClientAndConfiguration.Configuration.Port)
+                    .WithClientId($"MeshtasticMqttExplorer_ValentinF4HVV_{_environment.EnvironmentName}")
+                ;
             
-            mqttClientAndConfiguration.Client.MessageStream.SubscribeAsync(async e =>
+            if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.Configuration.Username))
             {
-                var topic = e.Topic;
-                _logger.LogTrace("Received from {name} on {topic}", mqttClientAndConfiguration.Configuration.Name, topic);
-
-                if (topic.Contains("json"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("paho"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("stat"))
-                {
-                    return;
-                }
-
-                mqttClientAndConfiguration.NbPacket++;
-                mqttClientAndConfiguration.LastPacketDate = DateTime.UtcNow;
-
-                await DoReceive(topic, e.Payload, mqttClientAndConfiguration.Configuration);
-            });
-            
-            foreach (var topic in mqttClientAndConfiguration.Configuration.Topics)
-            {
-                await mqttClientAndConfiguration.Client.SubscribeAsync(topic, MqttQualityOfService.AtMostOnce);
+                mqttClientOptionsBuilder = mqttClientOptionsBuilder
+                    .WithCredentials(mqttClientAndConfiguration.Configuration.Username, mqttClientAndConfiguration.Configuration.Password);
             }
+
+            await mqttClientAndConfiguration.Client.ConnectAsync(mqttClientOptionsBuilder.Build());   
         }
     }
 
