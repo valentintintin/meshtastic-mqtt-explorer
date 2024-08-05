@@ -49,7 +49,10 @@
                   Style="height: 100%;">
                 @foreach (var channel in Channels)
                 {
-                    <MenuItem RouterLink="@("/channel/" + channel.Id + "/messages")" RouterMatch="NavLinkMatch.All">@channel.Name (@Totals[channel.Id] messages)</MenuItem>
+                    @if (Totals.TryGetValue(channel.Id, out var total))
+                    {
+                        <MenuItem RouterLink="@("/channel/" + channel.Id + "/messages")" RouterMatch="NavLinkMatch.All">@channel.Name (@total messages)</MenuItem>
+                    }
                 }
             </Menu>
         </Sider>
@@ -58,7 +61,7 @@
             {
                 @foreach (var message in TextMessages)
                 {
-                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName() + " via " + message.Packet?.Gateway?.OneName() + " #" + message.Packet?.PacketId)"
+                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName() + " via " + message.Packet?.Gateway.OneName() + " #" + message.Packet?.PacketId)"
                              Avatar="@message.From.HardwareModel.GetImageUrl()"
                              Content="@message.Message"
                              Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"

@@ -53,8 +53,7 @@ public class MqttService : BackgroundService
                 Configuration = a,
                 Client = await MqttClient.CreateAsync(a.Host, new System.Net.Mqtt.MqttConfiguration
                 {
-                    Port = a.Port,
-                    AllowWildcardsInTopicFilters = true
+                    Port = a.Port
                 })
             })
             .Select(a => a.Result)
@@ -329,7 +328,7 @@ public class MqttService : BackgroundService
         {
             _logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.Configuration.Name);
 
-            await mqttClientAndConfiguration.Client.ConnectAsync (new MqttClientCredentials(
+            await mqttClientAndConfiguration.Client.ConnectAsync(new MqttClientCredentials(
                 clientId: $"MeshtasticExplorerF4HVV{_environment.EnvironmentName}",
                 userName: mqttClientAndConfiguration.Configuration.Username,
                 password: mqttClientAndConfiguration.Configuration.Password
@@ -358,13 +357,14 @@ public class MqttService : BackgroundService
                 }
 
                 mqttClientAndConfiguration.NbPacket++;
+                mqttClientAndConfiguration.LastPacketDate = DateTime.UtcNow;
 
                 await DoReceive(topic, e.Payload, mqttClientAndConfiguration.Configuration);
             });
             
             foreach (var topic in mqttClientAndConfiguration.Configuration.Topics)
             {
-                await mqttClientAndConfiguration.Client.SubscribeAsync(topic, MqttQualityOfService.AtLeastOnce);
+                await mqttClientAndConfiguration.Client.SubscribeAsync(topic, MqttQualityOfService.AtMostOnce);
             }
         }
     }
@@ -394,6 +394,7 @@ public class MqttService : BackgroundService
         public required IMqttClient Client { get; init; }
         public required MqttConfiguration Configuration { get; init; }
         public uint NbPacket { get; set; }
+        public DateTime? LastPacketDate { get; set; }
     }
 }
 

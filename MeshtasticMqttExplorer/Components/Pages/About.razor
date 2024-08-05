@@ -47,7 +47,7 @@
                         <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Configuration.Name</DescriptionsItem>
                         <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Configuration.Host</DescriptionsItem>
                         <DescriptionsItem Title="Connecté" ContentStyle="font-weight: bold">@mqtt.Client.IsConnected</DescriptionsItem>
-                        <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @(Math.Round(mqtt.NbPacket / (DateTime.UtcNow - Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds, 0))/s</DescriptionsItem>
+                        <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @(Math.Round(mqtt.NbPacket / (DateTime.UtcNow - Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalSeconds, 0))/s | @mqtt.LastPacketDate?.ToFrench()</DescriptionsItem>
                         <DescriptionsItem Title="Topics">
                             @foreach (var topic in mqtt.Configuration.Topics)
                             {

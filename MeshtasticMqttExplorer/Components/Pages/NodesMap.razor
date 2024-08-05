@@ -10,6 +10,7 @@
 @using Microsoft.EntityFrameworkCore
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
+@inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
 
 <PageTitle>Carte des nœuds</PageTitle>
@@ -41,7 +42,7 @@
         <div>
             <span>
                 Depuis :
-                <DatePicker TValue="DateOnly?" Picker="@DatePickerType.Date" @bind-Value="FromDate" DisabledDate="date => date > DateTime.Today || date < DateTime.Today.AddDays(-16)" OnChange="FetchData"/>
+                <DatePicker TValue="DateOnly?" Picker="@DatePickerType.Date" @bind-Value="FromDate" DisabledDate="date => date > DateTime.Today || date < DateTime.Today.AddDays(-NbDaysPurge - 1)" OnChange="FetchData"/>
             </span>
 
             <span>
@@ -120,6 +121,7 @@
     private bool ShowPois { get; set; } = true;
     private int Total { get; set; }
     private int TotalAlive { get; set; }
+    private int NbDaysPurge { get; set; }
     private int MaxDistanceLink { get; set; } = 350;
     private DateOnly? FromDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
     private List<Node> Nodes { get; set; } = [];
@@ -267,6 +269,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
+        
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {
             CurrentRegionCode = null;
