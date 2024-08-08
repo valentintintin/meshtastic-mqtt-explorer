@@ -294,7 +294,7 @@
         Loading = true;
         
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
+            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.RxSnr != 0 && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors.Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)

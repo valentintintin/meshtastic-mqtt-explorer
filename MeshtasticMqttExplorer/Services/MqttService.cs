@@ -171,6 +171,34 @@ public class MqttService : BackgroundService
 
         if (packet != null)
         {
+            Config.Types.LoRaConfig.Types.RegionCode? regionCode = null;
+            Config.Types.LoRaConfig.Types.ModemPreset? modemPreset = null;
+            
+            if (topics.Contains("EU_868"))
+            {
+                regionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868;
+            } 
+            else if (topics.Contains("EU_433"))
+            {
+                regionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu433;
+            }
+            
+            if (topics.Contains("LongFast"))
+            {
+                modemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongFast;
+            } 
+            else if (topics.Contains("LongMod"))
+            {
+                modemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate;
+            }
+            else if (topics.Contains("LongSlow"))
+            {
+                modemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongSlow;
+            }
+            
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, "MqttTopic");
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, "MqttTopic");
+            
             await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
         }
     }
@@ -318,6 +346,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
+        context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate && a.Node == node));
 
         await context.SaveChangesAsync();
     }
@@ -332,6 +361,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
+        context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate));
 
         await context.SaveChangesAsync();
     }

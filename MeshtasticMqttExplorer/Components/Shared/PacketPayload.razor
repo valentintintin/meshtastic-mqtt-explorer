@@ -178,10 +178,8 @@
                                     <a href="/node/@Packet.From.Id" target="_blank">@Packet.From.NodeIdString</a>
                                 </TimelineItem>
                                 
-                                @* @{ var i = 1; } *@
                                 @foreach (var nodeId in TraceRoute?.Route ?? [])
                                 {
-                                    @* @(i++ == TraceRoute?.Route?.Count ? "red" : "green") *@
                                     <TimelineItem Color="green">
                                         <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank">@nodeId.ToHexString()</a>
                                     </TimelineItem>

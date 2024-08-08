@@ -180,7 +180,7 @@
                                             <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
+                                            <text>Voisin de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -207,7 +207,7 @@
                                             <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <text>Voisin de : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
+                                            <text>Voisin pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -222,6 +222,46 @@
                                 </ListItem>
                             </ChildContent>
                         </AntList>
+                    }
+                }
+                else
+                {
+                    <Empty></Empty>
+                }
+            </ChildContent>
+        </Card>
+    </GridCol>
+        
+    <GridCol Xs="24" Md="8">
+        <Card Title="Traceroutes">
+            <ChildContent>
+                @if (NodeInfo.TraceroutesFrom.Any())
+                {
+                    @foreach (var traceroutes in NodeInfo.TraceroutesFrom.GroupBy(t => t.PacketId, (_, traceroutes) => new
+                              {
+                                  traceroutes = traceroutes.OrderBy(t => t.Hop).ToList(),
+                                  date = traceroutes.First().CreatedAt,
+                                  to = traceroutes.Last().To
+                              }).Take(10))
+                    {
+                        <p>@traceroutes.date.ToFrench()</p>
+                        
+                        <Timeline>
+                            <TimelineItem Color="blue">
+                                <a href="/node/@NodeInfo.Id" target="_blank">@NodeInfo.AllNames</a>
+                            </TimelineItem>
+                                
+                            @foreach (var traceroute in traceroutes.traceroutes)
+                            {
+                                <TimelineItem Color="green">
+                                    <a href="/node/@traceroute.NodeId" target="_blank">@traceroute.Node.AllNames</a>
+                                </TimelineItem>
+                            }
+
+                            <TimelineItem Color="red">
+                                <a href="/node/@traceroutes.to.Id" target="_blank">@traceroutes.to.AllNames</a>
+                            </TimelineItem>
+                        </Timeline>
                     }
                 }
                 else
@@ -439,26 +479,33 @@
                 
                 markers.AddRange(
                     gateways
-                        .Select(p => new Osm.Marker
+                        .Select(p =>
                         {
-                            Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}",
-                            Latitude = p.GatewayPosition.Latitude,
-                            Longitude = p.GatewayPosition.Longitude,
-                            Color = "green",
-                            Label = $"Passerelle MQTT : {p.Gateway.AllNames}",
-                            PopupOnHover = true,
-                            Popup = $"<p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{p.Gateway.AllNames}</b></p>",
-                            LinesOnHover = p.Packets.Select(pp => new Osm.Line
+                            var marker = new Osm.Marker
                             {
-                                Id = $"node(gateway)-{p.Gateway.Id}->node-{NodeInfo.Id}",
-                                Points =
-                                [
-                                    [pp.Position!.Latitude, pp.Position.Longitude],
-                                    [pp.GatewayPosition!.Latitude, pp.GatewayPosition.Longitude]
-                                ],
-                                Color = Utils.Green,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(pp.GatewayDistanceKm.HasValue ? Math.Round(pp.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {pp.RxSnr}</p>"
-                            }).ToList()
+                                Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}",
+                                Latitude = p.GatewayPosition.Latitude,
+                                Longitude = p.GatewayPosition.Longitude,
+                                Color = "green",
+                                Label = $"Passerelle MQTT : {p.Gateway.AllNames} - Position le {p.GatewayPosition.UpdatedAt.ToFrench()}",
+                                PopupOnHover = true,
+                                Popup = $"<p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{p.Gateway.AllNames}</b></a></p><p>Position le {p.GatewayPosition.UpdatedAt.ToFrench()}</p>",
+                                LinesOnHover = p.Packets.OrderBy(p => p.CreatedAt).Select(pp => new Osm.Line
+                                {
+                                    Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}->node-{NodeInfo.Id}",
+                                    Points =
+                                    [
+                                        [pp.Position!.Latitude, pp.Position.Longitude],
+                                        [pp.GatewayPosition!.Latitude, pp.GatewayPosition.Longitude]
+                                    ],
+                                    Color = Utils.Green,
+                                    Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(pp.GatewayDistanceKm.HasValue ? Math.Round(pp.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {pp.RxSnr}</p>"
+                                }).ToList()
+                            };
+                            
+                            lines.Add(marker.LinesOnHover.Last());
+                            
+                            return marker;
                         })
                 );
             }
@@ -471,7 +518,7 @@
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
                             .Select(n => new Osm.Line
                             {
-                                Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
+                                Id = $"node(neighbor)-{n.Neighbor.Id}->node-{NodeInfo.Id}",
                                 Points =
                                 [
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
@@ -482,7 +529,7 @@
                             })
                     );
                 }
-                    
+                
                 markers.AddRange(
                     NodeInfo.MyNeighbors
                         .Select(n => n.Neighbor)
@@ -495,7 +542,7 @@
                             Color = "red",
                             Label = $"Voisin : {n.AllNames}",
                             PopupOnHover = true,
-                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b>"
+                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></a></p>"
                         })
                 );
             }
@@ -530,9 +577,46 @@
                             Latitude = n.Latitude!.Value,
                             Longitude = n.Longitude!.Value,
                             Color = "red",
+                            Label = $"Voisin pour : {n.AllNames}",
+                            PopupOnHover = true,
+                            Popup = $"<p>Voisin pour : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></p></a>"
+                        })
+                );
+            }
+            
+            if (NodeInfo.TraceroutesFrom.Any()) {
+                if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                {
+                    lines.AddRange(
+                        NodeInfo.NeighborsFor
+                            .Where(n => n.Node is { Latitude: not null, Longitude: not null })
+                            .Select(n => new Osm.Line
+                            {
+                                Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
+                                Points =
+                                [
+                                    [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
+                                    [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
+                                ],
+                                Color = Utils.Red,
+                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                            })
+                    );
+                }
+                    
+                markers.AddRange(
+                    NodeInfo.NeighborsFor
+                        .Select(n => n.Node)
+                        .Where(n => n is { Latitude: not null, Longitude: not null })
+                        .Select(n => new Osm.Marker
+                        {
+                            Id = $"node(neightbor)-{n.Id}",
+                            Latitude = n.Latitude!.Value,
+                            Longitude = n.Longitude!.Value,
+                            Color = "red",
                             Label = $"Voisin : {n.AllNames}",
                             PopupOnHover = true,
-                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b>"
+                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></a></p>"
                         })
                 );
             }

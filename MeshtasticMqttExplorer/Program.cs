@@ -7,6 +7,7 @@ using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
+using MeshtasticMqttExplorer.Extensions;
 using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -97,56 +98,7 @@ try
     await context.Database.MigrateAsync();
 
     MeshtasticService.NodesIgnored.AddRange(app.Configuration.GetValue<List<uint>>("NodesIgnored", [])!);
-    
-    if (false)
-    {
-        var mqttService = app.Services.GetRequiredService<MqttService>();
-
-        var nodes = context.Nodes
-            .Include(a =>
-                a.PacketsFrom.Where(p => p.PortNum == PortNum.MapReportApp || p.PortNum == PortNum.PositionApp)
-                    .OrderByDescending(p => p.UpdatedAt).Take(1))
-            .Where(n => n.PacketsFrom.Any(p => p.PortNum == PortNum.MapReportApp || p.PortNum == PortNum.PositionApp))
-            .ToList();
-        var i = 0;
-        foreach (var node in nodes)
-        {
-            var packet = node.PacketsFrom.First();
-
-            var rootPacket = new ServiceEnvelope();
-            rootPacket.MergeFrom(packet.Payload);
-
-            switch (rootPacket.Packet.Decoded.Portnum)
-            {
-                case PortNum.MapReportApp:
-                {
-                    var data = rootPacket.Packet.GetPayload<MapReport>();
-
-                    if (data != null)
-                    {
-                        node.ModemPreset = data.ModemPreset;
-                        node.RegionCode = data.Region;
-                    }
-
-                    break;
-                }
-                case PortNum.PositionApp:
-                {
-                    var data = rootPacket.Packet.GetPayload<Position>();
-
-                    if (data != null)
-                    {
-                    }
-
-                    break;
-                }
-            }
-
-            await context.SaveChangesAsync();
-
-            Console.WriteLine($"#{node.Id} | {++i}/{nodes.Count}");
-        }
-    }
+    Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToString()).JoinString()}");
 
     Console.WriteLine("Started");
 

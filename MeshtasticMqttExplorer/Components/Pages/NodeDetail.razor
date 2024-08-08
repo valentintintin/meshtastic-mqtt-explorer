@@ -98,13 +98,15 @@
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         var query = Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
+            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Node)
             .Include(n => n.Positions.Where(a => a.UpdatedAt >= aDay).OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays).OrderBy(a => a.CreatedAt))
+            .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Node)
+            .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.To)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
             .AsSplitQuery();
 
