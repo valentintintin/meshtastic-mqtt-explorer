@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AntDesign;
 using Blazored.LocalStorage;
 using Google.Protobuf;
@@ -30,6 +32,10 @@ try
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
     builder.Services.AddAntDesign();
+    builder.Services.AddControllers().AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
     builder.Services.AddResponseCompression();
     builder.Services.AddHttpContextAccessor();
@@ -80,6 +86,8 @@ try
     });
     app.UseAntiforgery();
 
+    app.MapControllers();
+
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 
@@ -97,7 +105,7 @@ try
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
     await context.Database.MigrateAsync();
 
-    MeshtasticService.NodesIgnored.AddRange(app.Configuration.GetValue<List<uint>>("NodesIgnored", [])!);
+    MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>().GetSection("NodesIgnored").Get<List<uint>>() ?? []);
     Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToString()).JoinString()}");
 
     Console.WriteLine("Started");

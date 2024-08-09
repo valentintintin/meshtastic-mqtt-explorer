@@ -1,0 +1,383 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+ "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <title>
+   Meshtastic MQTT Explorer - Graph des noeuds
+  </title>
+
+  <style>
+   body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+   }
+   svg {
+    width: 100%;
+    height: 100%;
+   }
+   .node text {
+    font-family: sans-serif;
+    fill: #fff;
+    text-anchor: middle;
+    dominant-baseline: middle;
+   }
+   .link.bidirectional {
+    stroke: #555;
+   }
+   .link.bidirectional-highlight {
+    stroke: #fff;
+   }
+   .link.unidirectional-red {
+    stroke: #400;
+   }
+   .link.unidirectional-green {
+    stroke: #040;
+   }
+   .link.unidirectional-red-highlight {
+    stroke: #f00;
+   }
+   .link.unidirectional-green-highlight {
+    stroke: #0f0;
+   }
+   .tooltip {
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    width: auto;
+    height: auto;
+    font: 12px sans-serif;
+    color: white;
+    pointer-events: none;
+   }
+   .tooltip b {
+    color: #0f0;
+   }
+   .bottom {
+    position: absolute;
+    bottom: 5px;
+    left: 0px;
+    width: 100%;
+    text-align: center;
+    font: 12px sans-serif;
+    color: white;
+   }
+  </style>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, user-scalable=yes" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+ </head>
+ <body>
+  <svg></svg>
+  <script>
+   const tooltip = d3.select("body").append("div")
+   .attr("class", "tooltip");
+
+   fetch("/graph?_=" + new Date().getTime()).then(response => response.json()).then(data => {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const arrowSize = 6;
+    const nodeSize = 25;
+
+    const linkMap = new Map();
+    data.links.forEach(link => {
+     const key = `${link.source}-${link.target}`;
+     const reverseKey = `${link.target}-${link.source}`;
+
+     if(linkMap.has(reverseKey)) {
+      const reverseLink = linkMap.get(reverseKey);
+      reverseLink.bidirectional = true;
+      reverseLink.snr = (reverseLink.snr + link.snr) / 2;
+     } else if(!linkMap.has(key)) {
+      link.bidirectional = false;
+      linkMap.set(key, link);
+     } else {
+      const existingLink = linkMap.get(key);
+      existingLink.bidirectional = true;
+      existingLink.snr = (existingLink.snr + link.snr) / 2;
+     }
+    });
+
+    const filteredLinks = [...linkMap.values()];
+
+    const svg = d3.select("svg");
+    const g = svg.append("g");
+
+    svg.call(d3.zoom().on("zoom", (event) => {
+     g.attr("transform", event.transform);
+    }));
+
+    g.append("defs").append("marker")
+     .attr("id", "arrowhead-green")
+     .attr("viewBox", "0 -5 10 10")
+     .attr("refX", 5)
+     .attr("refY", 0)
+     .attr("orient", "auto")
+     .attr("markerWidth", arrowSize)
+     .attr("markerHeight", arrowSize)
+     .append("path")
+     .attr("d", "M 0,-5 L 10,0 L 0,5")
+     .attr("fill", "#0f0");
+
+    g.append("defs").append("marker")
+     .attr("id", "arrowhead-green-start")
+     .attr("viewBox", "0 -5 10 10")
+     .attr("refX", 5)
+     .attr("refY", 0)
+     .attr("orient", "auto-start-reverse")
+     .attr("markerWidth", arrowSize)
+     .attr("markerHeight", arrowSize)
+     .append("path")
+     .attr("d", "M 0,-5 L 10,0 L 0,5")
+     .attr("fill", "#0f0");
+
+    g.append("defs").append("marker")
+     .attr("id", "arrowhead-red")
+     .attr("viewBox", "0 -5 10 10")
+     .attr("refX", 5)
+     .attr("refY", 0)
+     .attr("orient", "auto")
+     .attr("markerWidth", arrowSize)
+     .attr("markerHeight", arrowSize)
+     .append("path")
+     .attr("d", "M 0,-5 L 10,0 L 0,5")
+     .attr("fill", "#f00");
+
+    g.append("defs").append("marker")
+     .attr("id", "arrowhead-red-start")
+     .attr("viewBox", "0 -5 10 10")
+     .attr("refX", 5)
+     .attr("refY", 0)
+     .attr("orient", "auto-start-reverse")
+     .attr("markerWidth", arrowSize)
+     .attr("markerHeight", arrowSize)
+     .append("path")
+     .attr("d", "M 0,-5 L 10,0 L 0,5")
+     .attr("fill", "#f00");
+
+    const linkLayer = g.append("g").attr("class", "links");
+    const nodeLayer = g.append("g").attr("class", "nodes");
+    const arrowLayer = g.append("g").attr("class", "arrows");
+
+    function getMiddle(source, target) {
+     return {
+      x: (source.x + target.x) / 2,
+      y: (source.y + target.y) / 2
+     };
+    }
+
+    linkLayer.selectAll(".link.unidirectional-red")
+     .data(filteredLinks.filter(d => !d.bidirectional))
+     .enter().append("line")
+     .attr("class", "link unidirectional-red");
+
+    linkLayer.selectAll(".link.unidirectional-green")
+     .data(filteredLinks.filter(d => !d.bidirectional))
+     .enter().append("line")
+     .attr("class", "link unidirectional-green");
+
+    linkLayer.selectAll("line.bidirectional")
+     .data(filteredLinks.filter(d => d.bidirectional))
+     .enter().append("line")
+     .attr("class", "link bidirectional");
+
+    const node = nodeLayer.selectAll("g")
+     .data(data.nodes)
+     .enter().append("g")
+     .attr("class", "node")
+     .style("cursor", "move")
+     .on("mouseover", function(event, d) {
+      let tooltipHtml = "<b>Name</b> <span style=\"background-color: #080;\">" + d.short_name + "</span> " + d.long_name +
+                        "<br><b>MAC</b> 0x" + d.id.toString(16) +
+                        "<br><b>Updated</b> " + new Date(d.updated_at * 1000).toLocaleString();
+
+      if(d.neighbours_updated_at === null)
+       tooltipHtml += "<br><b style=\"color:#f00;\">Neighbor Info is not enabled</b>";
+      else
+       tooltipHtml += "<br><b>Neighbors</b> " + new Date(d.neighbours_updated_at * 1000).toLocaleString();
+
+      if(d.role === "ROUTER_CLIENT")
+       tooltipHtml += "<br><b style=\"color:#f00;\">Role ROUTER_CLIENT is deprecated</b>";
+      else
+       tooltipHtml += "<br><b>Role</b> " + d.role;
+
+      tooltip.html(tooltipHtml);
+      
+      d3.select(this).select("circle").attr("opacity", 1);
+
+      linkLayer.selectAll("line.unidirectional-red")
+       .classed("unidirectional-red-highlight", l => l.source.id === d.id || l.target.id === d.id);
+
+      linkLayer.selectAll("line.unidirectional-green")
+       .classed("unidirectional-green-highlight", l => l.source.id === d.id || l.target.id === d.id);
+
+      linkLayer.selectAll("line").filter(l => l.source.id === d.id || l.target.id === d.id)
+       .classed("bidirectional-highlight", l => l.bidirectional)
+       .raise();
+
+      node.raise();
+      arrowLayer.raise();
+     })
+     .on("mouseout", function(event, d) {
+      d3.select(this).select("circle").attr("opacity", 0.5);
+      linkLayer.selectAll("line").classed("bidirectional-highlight", false)
+       .classed("unidirectional-red-highlight", false)
+       .classed("unidirectional-green-highlight", false);
+     })
+     .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+
+    node.append("circle")
+     .attr("r", nodeSize)
+     .attr("fill", d => {
+      switch (d.role) {
+       case "CLIENT":
+        return "#00f";
+       case "CLIENT_MUTE":
+        return "#444";
+       case "ROUTER":
+        return "#80f";
+       default:
+        return "#800";
+      }
+     })
+     .attr("opacity", 0.5);
+
+    node.append("text")
+     .attr("x", 0)
+     .attr("y", 0)
+     .text(d => d.long_name);
+
+    arrowLayer.selectAll("line")
+     .data(filteredLinks)
+     .enter().append("line")
+     .attr("class", "arrow")
+     .attr("marker-end", d => d.bidirectional || !d.unidirectional ? "url(#arrowhead-green)" : "url(#arrowhead-red)")
+     .attr("marker-start", d => d.bidirectional ? "url(#arrowhead-green-start)" : "url(#arrowhead-red-start)");
+
+    const simulation = d3.forceSimulation(data.nodes)
+     .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => 220 - d.snr * 15))
+     .force("charge", d3.forceManyBody().strength(-200))
+     .force("center", d3.forceCenter(width / 2, height / 2))
+     .force("collide", d3.forceCollide().radius(30))
+     .alphaDecay(0.005)
+     .alphaMin(0.001);
+
+    simulation.on("tick", () => {
+     linkLayer.selectAll("line.unidirectional-red")
+      .each(function(d) {
+       const middle = getMiddle(d.source, d.target);
+       d3.select(this)
+        .attr("x1", middle.x)
+        .attr("y1", middle.y)
+        .attr("x2", adjustPosition(d.target, d.source, nodeSize).targetX)
+        .attr("y2", adjustPosition(d.target, d.source, nodeSize).targetY);
+      });
+
+     linkLayer.selectAll("line.unidirectional-green")
+      .each(function(d) {
+       const middle = getMiddle(d.source, d.target);
+       d3.select(this)
+        .attr("x1", adjustPosition(d.source, d.target, nodeSize).sourceX)
+        .attr("y1", adjustPosition(d.source, d.target, nodeSize).sourceY)
+        .attr("x2", middle.x)
+        .attr("y2", middle.y);
+      });
+
+     linkLayer.selectAll("line.unidirectional-red-highlight")
+      .each(function(d) {
+       const middle = getMiddle(d.source, d.target);
+       d3.select(this)
+        .attr("x1", middle.x)
+        .attr("y1", middle.y)
+        .attr("x2", adjustPosition(d.target, d.source, nodeSize).targetX)
+        .attr("y2", adjustPosition(d.target, d.source, nodeSize).targetY);
+      });
+
+     linkLayer.selectAll("line.unidirectional-green-highlight")
+      .each(function(d) {
+       const middle = getMiddle(d.source, d.target);
+       d3.select(this)
+        .attr("x1", adjustPosition(d.source, d.target, nodeSize).sourceX)
+        .attr("y1", adjustPosition(d.source, d.target, nodeSize).sourceY)
+        .attr("x2", middle.x)
+        .attr("y2", middle.y);
+      });
+
+     linkLayer.selectAll("line.bidirectional")
+      .each(function(d) {
+       d3.select(this)
+        .attr("x1", adjustPosition(d.target, d.source, nodeSize).sourceX)
+        .attr("y1", adjustPosition(d.target, d.source, nodeSize).sourceY)
+        .attr("x2", adjustPosition(d.source, d.target, nodeSize).targetX)
+        .attr("y2", adjustPosition(d.source, d.target, nodeSize).targetY);
+      });
+
+     node.attr("transform", d => `translate(${d.x},${d.y})`);
+
+     arrowLayer.selectAll("line")
+      .each(function(d) {
+       d3.select(this)
+        .attr("x1", adjustPosition(d.target, d.source, nodeSize - arrowSize / 2).sourceX)
+        .attr("y1", adjustPosition(d.target, d.source, nodeSize - arrowSize / 2).sourceY)
+        .attr("x2", adjustPosition(d.source, d.target, nodeSize - arrowSize / 2).targetX)
+        .attr("y2", adjustPosition(d.source, d.target, nodeSize - arrowSize / 2).targetY);
+      });
+    });
+
+    function dragstarted(event, d) {
+     if(!event.active)
+      simulation.alphaTarget(0.3).restart();
+     d.fx = d.x;
+     d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+     d.fx = event.x;
+     d.fy = event.y;
+    }
+
+    function dragended(event, d) {
+     if(!event.active)
+      simulation.alphaTarget(0);
+     d.fx = null;
+     d.fy = null;
+    }
+
+    function adjustPosition(source, target, margin) {
+     const dx = target.x - source.x;
+     const dy = target.y - source.y;
+     const distance = Math.sqrt(dx * dx + dy * dy);
+     const ratio = (distance - margin) / distance;
+     const sourceRatio = margin / distance;
+
+     return {
+      sourceX: source.x + dx * sourceRatio,
+      sourceY: source.y + dy * sourceRatio,
+      targetX: target.x - dx * ratio,
+      targetY: target.y - dy * ratio
+     };
+    }
+
+    window.addEventListener("resize", () => {
+     svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+     simulation.force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+     simulation.alpha(1).restart();
+    });
+   });
+  </script>
+
+  <div class="bottom">
+   Meshtastic radio network - LoRa LONG_MODERATE 868 Mhz
+  </div>
+ </body>
+</html>

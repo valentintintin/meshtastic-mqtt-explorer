@@ -546,21 +546,23 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public async Task UpdateRegionCodeAndModemPreset(Node node, Config.Types.LoRaConfig.Types.RegionCode? regionCode, Config.Types.LoRaConfig.Types.ModemPreset? modemPreset, string source)
     {
-        if (!node.RegionCode.HasValue || !node.ModemPreset.HasValue)
+        if (regionCode.HasValue)
         {
-            Logger.LogDebug("Node {node} does not have RegionCode or ModemPreset so we set it from {source} to {regionCode} {modemPreset}", node, source, regionCode, modemPreset);
-        }
-        else if (node.RegionCode != regionCode || node.ModemPreset != modemPreset)
-        {
-            Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) or ModemPreset ({oldModemPreset}) so we set it from {source} to {regionCode} {modemPreset}", node, node.RegionCode, node.ModemPreset, source, regionCode, modemPreset);
-        }
-        else
-        {
-            return;
+            if (node.RegionCode != regionCode)
+            {
+                Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) so we set it from {source} to {regionCode}", node, node.RegionCode, source, regionCode);
+                node.RegionCode = regionCode;
+            }
         }
         
-        node.RegionCode = regionCode;
-        node.ModemPreset = modemPreset;
+        if (modemPreset.HasValue)
+        {
+            if (node.ModemPreset != modemPreset)
+            {
+                Logger.LogDebug("Node {node} does not have the same RegionCode ({oldModemPreset}) so we set it from {source} to {modemPreset}", node, node.ModemPreset, source, modemPreset);
+                node.ModemPreset = modemPreset;
+            }
+        }
 
         Context.Update(node);
         await Context.SaveChangesAsync();

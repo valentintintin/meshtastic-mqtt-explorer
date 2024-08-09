@@ -64,6 +64,7 @@ else
                 <Date Value="context.CreatedAt"></Date>
             </div>
         </PropertyColumn>
+        @* TODO fix hop difference *@
         <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="Sauts">
             <div style="width: 30px">
                 <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
