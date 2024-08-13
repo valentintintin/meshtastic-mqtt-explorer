@@ -128,44 +128,6 @@
     </GridCol>
 
     <GridCol Xs="24" Md="8">
-        <Card Title="10 derniers nœuds relais MQTT les plus lointains">
-            <ChildContent>
-                @if (NodeInfo?.PacketsFrom.Any() == true)
-                {
-                    <AntList DataSource="PacketsGateway" TItem="Packet">
-                        <ChildContent Context="packet">
-                            <ListItem>
-                                <ListItemMeta>
-                                    <AvatarTemplate>
-                                        <Avatar Src="@packet.Gateway.HardwareModel.GetImageUrl()"></Avatar>
-                                    </AvatarTemplate>
-                                    <TitleTemplate>
-                                        <a href="/node/@packet.Gateway.Id" target="_blank" rel="nofollow">@packet.Gateway.AllNames</a>
-                                    </TitleTemplate>
-                                    <DescriptionTemplate>
-                                        <Tooltip Title="@("Paquet ID : " + packet.PacketId)">
-                                            @if (packet.GatewayDistanceKm.HasValue)
-                                            {
-                                                <span>@(Math.Round(packet.GatewayDistanceKm.Value, 2)) Km</span>
-                                                <span> | </span>
-                                            }
-                                            <Date Value="packet.CreatedAt"></Date>
-                                        </Tooltip>
-                                    </DescriptionTemplate>
-                                </ListItemMeta>
-                            </ListItem>
-                        </ChildContent>
-                    </AntList>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
-
-    <GridCol Xs="24" Md="8">
         <Card Title="Voisins">
             <ChildContent>
                 @if (NodeInfo?.MyNeighbors.Any() == true || NodeInfo?.NeighborsFor.Any() == true)
@@ -180,7 +142,7 @@
                                             <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <text>Voisin de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
+                                            <text>Voisin (@neighbor.DataSource) de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -207,7 +169,7 @@
                                             <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <text>Voisin pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
+                                            <text>Voisin (@neighbor.DataSource) pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -524,7 +486,7 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
-                                Color = Utils.Red,
+                                Color = Utils.Gold,
                                 Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
@@ -539,7 +501,7 @@
                             Id = $"node(neightbor)-{n.Id}",
                             Latitude = n.Latitude!.Value,
                             Longitude = n.Longitude!.Value,
-                            Color = "red",
+                            Color = "yellow",
                             Label = $"Voisin : {n.AllNames}",
                             PopupOnHover = true,
                             Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></a></p>"
@@ -561,7 +523,7 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
-                                Color = Utils.Red,
+                                Color = Utils.Gold,
                                 Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                             })
                     );
@@ -576,47 +538,10 @@
                             Id = $"node(neightbor)-{n.Id}",
                             Latitude = n.Latitude!.Value,
                             Longitude = n.Longitude!.Value,
-                            Color = "red",
+                            Color = "yellow",
                             Label = $"Voisin pour : {n.AllNames}",
                             PopupOnHover = true,
                             Popup = $"<p>Voisin pour : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></p></a>"
-                        })
-                );
-            }
-            
-            if (NodeInfo.TraceroutesFrom.Any()) {
-                if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
-                {
-                    lines.AddRange(
-                        NodeInfo.NeighborsFor
-                            .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                            .Select(n => new Osm.Line
-                            {
-                                Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
-                                Points =
-                                [
-                                    [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
-                                    [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
-                                ],
-                                Color = Utils.Red,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
-                            })
-                    );
-                }
-                    
-                markers.AddRange(
-                    NodeInfo.NeighborsFor
-                        .Select(n => n.Node)
-                        .Where(n => n is { Latitude: not null, Longitude: not null })
-                        .Select(n => new Osm.Marker
-                        {
-                            Id = $"node(neightbor)-{n.Id}",
-                            Latitude = n.Latitude!.Value,
-                            Longitude = n.Longitude!.Value,
-                            Color = "red",
-                            Label = $"Voisin : {n.AllNames}",
-                            PopupOnHover = true,
-                            Popup = $"<p>Voisin : <a href=\"/node/{n.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{n.AllNames}</b></a></p>"
                         })
                 );
             }
@@ -656,8 +581,8 @@
                 );
             }
 
-            await Map.AddPolylines(lines);
-            await Map.AddMarkers(markers);
+            await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
+            await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
 
             HasRenderMapData = true;
         }

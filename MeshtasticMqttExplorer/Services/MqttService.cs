@@ -198,6 +198,11 @@ public class MqttService : BackgroundService
             
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, "MqttTopic");
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, "MqttTopic");
+
+            if (packet.Value.packet.HopStart == packet.Value.packet.HopLimit)
+            {
+                await meshtasticService.SetNeighbor(Context.Entities.NeighborInfo.Source.Gateway, packet.Value.packet, packet.Value.packet.From, packet.Value.packet.Gateway, packet.Value.packet.RxSnr ?? 0, packet.Value.packet.Position, packet.Value.packet.GatewayPosition);
+            }
             
             await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
         }
@@ -347,6 +352,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate && a.Node == node));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.Node == node));
 
         await context.SaveChangesAsync();
     }
@@ -362,6 +368,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate));
 
         await context.SaveChangesAsync();
     }

@@ -1,4 +1,5 @@
 using MeshtasticMqttExplorer.Context.Entities;
+using MeshtasticMqttExplorer.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -33,5 +34,7 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
             .WithMany()
             .HasForeignKey(a => a.NeighborPositionId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Property(a => a.DataSource).EnumToString();
     }
 }

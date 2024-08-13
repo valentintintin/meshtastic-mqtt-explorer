@@ -33,11 +33,10 @@
             <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)" />
         </div>
 
-        <div>
-            <Switch @bind-Checked="ShowNeighbors" Disabled="@Loading" CheckedChildren="Afficher les voisins" UnCheckedChildren="Cacher les voisins" OnChange="FetchData"/>
-            <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/>
-            <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les routes directes" UnCheckedChildren="Cacher les routes directes" OnChange="FetchData" />
-        </div>
+        @* <div> *@
+        @*     <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les liens" UnCheckedChildren="Cacher les liens" OnChange="FetchData" /> *@
+        @*     <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/> *@
+        @* </div> *@
 
         <div>
             <span>
@@ -50,7 +49,7 @@
                 <AntDesign.InputNumber Formatter="FormatKm" Parser="ParseKm" Min="10" Max="1000" Step="10" @bind-value="MaxDistanceLink" TValue="int" OnChange="FetchData" />
             </span>
         </div>
-        
+
         <div>
             <NodeSearch></NodeSearch>
         </div>
@@ -83,18 +82,11 @@
                 </GridCol>
     
                 <GridCol Xs="24" Md="12">
-                    @if (ShowNeighbors)
-                    {
-                        <div class="legend">
-                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                            Voisin du nœud
-                        </div>
-                    }
                     @if (ShowPaths)
                     {
                         <div class="legend">
                             <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                            Route directe
+                            Lien
                         </div>
                     }
                     @if (ShowPois)
@@ -116,7 +108,6 @@
     
     private bool Loading { get; set; }
     private bool HasRenderMapData { get; set; }
-    private bool ShowNeighbors { get; set; } = true;
     private bool ShowPaths { get; set; } = true;
     private bool ShowPois { get; set; } = true;
     private int Total { get; set; }
@@ -155,31 +146,7 @@
             
             foreach (var node in Nodes)
             {
-                if (ShowPaths && node.PacketsFrom.Any())
-                {
-                    lines.AddRange(
-                        node.PacketsFrom
-                            .Where(g => Math.Abs(g.GatewayDistanceKm!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, g.Gateway.Latitude!.Value, g.Gateway.Longitude!.Value)) < DifferenceBetweenDistanceAllowed)
-                            .Select(p =>
-                            {
-                                markers.Add(GetMarker(p.Gateway));
-                                
-                                return new Osm.Line
-                                {
-                                    Id = $"node(gateway)-{p.Gateway.Id}->node-{node.Id}",
-                                    Points =
-                                    [
-                                        [node.Latitude!.Value, node.Longitude!.Value],
-                                        [p.Gateway.Latitude!.Value, p.Gateway.Longitude!.Value]
-                                    ],
-                                    Color = Utils.Gold,
-                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(p.GatewayDistanceKm.HasValue ? Math.Round(p.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {p.RxSnr}</p>"
-                                };
-                            })
-                    );
-                }
-                
-                if (ShowNeighbors && node.MyNeighbors.Any())
+                if (ShowPaths && node.MyNeighbors.Any())
                 {
                     lines.AddRange(
                         node.MyNeighbors
@@ -197,8 +164,8 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                     ],
-                                    Color = Utils.Red,
-                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                    Color = Utils.Gold,
+                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                                 };
                             })
                     );
@@ -219,8 +186,8 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                     ],
-                                    Color = Utils.Red,
-                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                    Color = Utils.Gold,
+                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
                                 };
                             })
                     );
@@ -258,7 +225,7 @@
                 }
             }
 
-            await Map.AddPolylines(lines);
+            await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
 
             HasRenderMapData = true;
@@ -294,8 +261,16 @@
         Loading = true;
         
         Nodes = await Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => a.GatewayDistanceKm > 0 && a.GatewayId != a.FromId && a.Gateway.Latitude.HasValue && a.Gateway.Longitude.HasValue && a.GatewayDistanceKm < MaxDistanceLink && a.RxSnr != 0 && a.HopStart == a.HopLimit).OrderByDescending(a => a.CreatedAt).Take(1)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors.Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)).ThenInclude(n => n.Neighbor)
+            .Include(n => n.MyNeighbors
+                .Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(t => !FromDate.HasValue || t.UpdatedAt >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+                .OrderBy(t => t.UpdatedAt))
+            .ThenInclude(n => n.Neighbor)
+            .Include(n => n.NeighborsFor
+                .Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(t => !FromDate.HasValue || t.UpdatedAt >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+                .OrderBy(t => t.UpdatedAt))
+            .ThenInclude(n => n.Node)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => n.LastSeen.HasValue)

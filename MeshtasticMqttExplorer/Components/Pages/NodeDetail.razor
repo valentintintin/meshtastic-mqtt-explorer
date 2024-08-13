@@ -101,8 +101,14 @@
             .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
             .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
             .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
-            .Include(n => n.MyNeighbors/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Neighbor)
-            .Include(n => n.NeighborsFor/*.Where(a => a.UpdatedAt >= threeDays)*/.OrderByDescending(a => a.UpdatedAt)).ThenInclude(n => n.Node)
+            .Include(n => n.MyNeighbors
+                .Where(a => a.Distance > 0 && a.Distance <= 350 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .OrderBy(t => t.UpdatedAt))
+            .ThenInclude(n => n.Neighbor)
+            .Include(n => n.NeighborsFor
+                .Where(a => a.Distance > 0 && a.Distance <= 350 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .OrderBy(t => t.UpdatedAt))
+            .ThenInclude(n => n.Node)
             .Include(n => n.Positions.Where(a => a.UpdatedAt >= aDay).OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays).OrderBy(a => a.CreatedAt))
             .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Node)

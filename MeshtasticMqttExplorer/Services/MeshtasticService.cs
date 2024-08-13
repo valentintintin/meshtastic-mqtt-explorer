@@ -326,43 +326,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
             var nodePosition = nodeFrom.Positions.FirstOrDefault();
             var neighborPosition = neighborNode.Positions.FirstOrDefault();
-            double? distance = null;
-            
-            if (nodePosition != null && neighborPosition != null)
-            {
-                distance = Utils.CalculateDistance(nodePosition.Latitude, nodePosition.Longitude,
-                    neighborPosition.Latitude, neighborPosition.Longitude);
-            }
-            
-            var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
-            {
-                Node = nodeFrom,
-                NodePosition = nodePosition,
-                Packet = packet,
-                Neighbor = neighborNode,
-                NeighborPosition = neighborPosition,
-                Snr = neighbor.Snr,
-                Distance = distance
-            };
-            if (neighborInfo.Id == 0)
-            {
-                Logger.LogInformation("Add neighbor {neighbor} to {node}", neighborNode, nodeFrom);
-                Context.Add(neighborInfo);
-            }
-            else
-            {
-                Logger.LogInformation("Update neighbor {neighbor} to {node}", neighborNode, nodeFrom);
-                neighborInfo.UpdatedAt = packet.CreatedAt;
-                neighborInfo.Packet = packet;
-                neighborInfo.Snr = neighbor.Snr;
-                neighborInfo.NodePosition = nodePosition;
-                neighborInfo.NeighborPosition = neighborPosition;
-                neighborInfo.Distance = distance;
-                Context.Update(neighborInfo);
-            }
-        }
 
-        await Context.SaveChangesAsync();
+            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Neighbor, packet, nodeFrom, neighborNode, neighbor.Snr, nodePosition, neighborPosition);
+        }
     }
 
     public async Task DoTextMessagePacket(Node nodeFrom, Node nodeTo, Packet packet,
@@ -441,9 +407,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
 
         var hop = 0;
+        var lastNode = nodeFrom;
         foreach (var nodeId in payload.Route)
         {
-            var node = await Context.Nodes.FindByNodeIdAsync(nodeId) ?? new Node
+            var node = await Context.Nodes
+                .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
+                .FindByNodeIdAsync(nodeId) ?? new Node
             {
                 NodeId = nodeId
             };
@@ -460,13 +429,19 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 To = nodeTo,
                 Packet = packet,
                 Node = node,
-                Hop = hop++,
+                Hop = hop
             };
 
             Context.Add(traceroute);
+            
+            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute, packet, lastNode, node, hop == 0 ? packet.RxSnr ?? 0 : 0, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+
+            lastNode = node;
+            hop++;
         }
         
-        await Context.SaveChangesAsync();   
+        await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute, packet, lastNode, nodeTo, 0, lastNode.Positions.FirstOrDefault(), nodeTo.Positions.FirstOrDefault());
+        await Context.SaveChangesAsync();
     }
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)
@@ -566,6 +541,54 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         Context.Update(node);
         await Context.SaveChangesAsync();
+    }
+
+    public async Task<Context.Entities.NeighborInfo?> SetNeighbor(Context.Entities.NeighborInfo.Source source, Packet packet, Node nodeFrom, Node neighborNode, double snr, Position? nodePosition, Position? neighborPosition)
+    {
+        if (nodeFrom == neighborNode)
+        {
+            return null;
+        }
+        
+        double? distance = null;
+            
+        if (nodePosition != null && neighborPosition != null)
+        {
+            distance = Utils.CalculateDistance(nodePosition.Latitude, nodePosition.Longitude,
+                neighborPosition.Latitude, neighborPosition.Longitude);
+        }
+            
+        var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode && n.DataSource == source) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
+        {
+            Node = nodeFrom,
+            NodePosition = nodePosition,
+            Packet = packet,
+            Neighbor = neighborNode,
+            NeighborPosition = neighborPosition,
+            Snr = snr,
+            Distance = distance,
+            DataSource = source
+        };
+        if (neighborInfo.Id == 0)
+        {
+            Logger.LogInformation("Add neighbor {neighbor} to {node}", neighborNode, nodeFrom);
+            Context.Add(neighborInfo);
+        }
+        else
+        {
+            Logger.LogInformation("Update neighbor {neighbor} to {node}", neighborNode, nodeFrom);
+            neighborInfo.UpdatedAt = packet.CreatedAt;
+            neighborInfo.Packet = packet;
+            neighborInfo.Snr = snr;
+            neighborInfo.NodePosition = nodePosition;
+            neighborInfo.NeighborPosition = neighborPosition;
+            neighborInfo.Distance = distance;
+            Context.Update(neighborInfo);
+        }
+        
+        await Context.SaveChangesAsync();
+
+        return neighborInfo;
     }
 
     public MeshPacket CreateMeshPacket(uint nodeToId, uint nodeFromId, string channel, Data data, uint hopLimit = 3, string? key = null)

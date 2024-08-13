@@ -24,4 +24,13 @@ public class NeighborInfo : IEntity
     public double Snr { get; set; }
     
     public double? Distance { get; set; }
+
+    public Source DataSource { get; set; } = Source.Neighbor;
+    
+    public enum Source
+    {
+        Neighbor,
+        Gateway,
+        Traceroute
+    }
 }

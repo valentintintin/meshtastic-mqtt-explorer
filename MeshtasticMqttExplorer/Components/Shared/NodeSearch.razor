@@ -6,7 +6,7 @@
 @inject IMessageService Message
 @inject NavigationManager Navigation
 
-<Search Placeholder="Accéder à un nœud" EnterButton="true" OnSearch="OnSearch" @bind-Value="@SearchValue" />
+<Search Style="width: 200px" Placeholder="Accéder à un nœud" EnterButton="true" OnSearch="OnSearch" @bind-Value="@SearchValue" />
 
 @code {
     private string SearchValue { get; set; } = "";

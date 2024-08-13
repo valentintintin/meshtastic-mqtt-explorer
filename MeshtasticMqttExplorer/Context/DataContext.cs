@@ -17,7 +17,7 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
     public required DbSet<Node> Nodes { get; set; }
     public required DbSet<Position> Positions { get; set; }
     public required DbSet<Telemetry> Telemetries { get; set; }
-    public required DbSet<NeighborInfo> NeighborInfos { get; set; }
+    public required DbSet<NeighborInfo?> NeighborInfos { get; set; }
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }

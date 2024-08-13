@@ -34,8 +34,8 @@ public class GraphDto
         [JsonPropertyName("role")]
         public Config.Types.DeviceConfig.Types.Role? Role { get; set; }
         
-        // [JsonPropertyName("hardware_model")]
-        // public HardwareModel? HardwareModel { get; set; }
+        [JsonPropertyName("hardware_model")]
+        public HardwareModel? HardwareModel { get; set; }
         
         // [JsonPropertyName("battery_level")]
         // public double? BatteryLevel { get; set; }
