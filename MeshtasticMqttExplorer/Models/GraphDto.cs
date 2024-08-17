@@ -37,26 +37,26 @@ public class GraphDto
         [JsonPropertyName("hardware_model")]
         public HardwareModel? HardwareModel { get; set; }
         
-        // [JsonPropertyName("battery_level")]
-        // public double? BatteryLevel { get; set; }
-        //
-        // [JsonPropertyName("voltage")]
-        // public double? Voltage { get; set; }
-        //
-        // [JsonPropertyName("air_util_tx")]
-        // public double? AirUtilTx { get; set; }
-        //
-        // [JsonPropertyName("channel_utilization")]
-        // public double? ChannelUtilization { get; set; }
-        //
-        // [JsonPropertyName("temperature")]
-        // public double? Temperature { get; set; }
-        //
-        // [JsonPropertyName("relative_humidity")]
-        // public double? Humidity { get; set; }
-        //
-        // [JsonPropertyName("barometric_pressure")]
-        // public double? Pressure { get; set; }
+        [JsonPropertyName("battery_level")]
+        public double? BatteryLevel { get; set; }
+        
+        [JsonPropertyName("voltage")]
+        public double? Voltage { get; set; }
+        
+        [JsonPropertyName("air_util_tx")]
+        public double? AirUtilTx { get; set; }
+        
+        [JsonPropertyName("channel_utilization")]
+        public double? ChannelUtilization { get; set; }
+        
+        [JsonPropertyName("temperature")]
+        public double? Temperature { get; set; }
+        
+        [JsonPropertyName("relative_humidity")]
+        public double? Humidity { get; set; }
+        
+        [JsonPropertyName("barometric_pressure")]
+        public double? Pressure { get; set; }
     }
     
     public class LinkDto

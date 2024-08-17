@@ -12,13 +12,21 @@ public class PerformanceAndCultureMiddleware(
     {
         var headersAcceptLanguage = httpContext.Request.Headers.AcceptLanguage;
         var firstLanguage = headersAcceptLanguage.FirstOrDefault()?.Split(',').FirstOrDefault();
-        var culture = CultureInfo.GetCultureInfo(firstLanguage ?? "fr");
         
-        Thread.CurrentThread.CurrentCulture = culture;
-        Thread.CurrentThread.CurrentUICulture = culture;
+        try
+        {
+            var culture = CultureInfo.GetCultureInfo(firstLanguage ?? "fr");
 
-        LocaleProvider.SetLocale(culture.Name);	
-        
+            Thread.CurrentThread.CurrentCulture = culture;
+            Thread.CurrentThread.CurrentUICulture = culture;
+
+            LocaleProvider.SetLocale(culture.Name);
+        }
+        catch (CultureNotFoundException e)
+        {
+            logger.LogWarning(e, "Culture {language} not found", firstLanguage);
+        }
+
         Stopwatch watch = new();
         watch.Start();
 

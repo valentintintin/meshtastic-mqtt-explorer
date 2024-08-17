@@ -31,7 +31,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         },
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+        WriteIndented = true
     };
     
     public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(uint nodeGatewayId, string channelId, MeshPacket meshPacket, string origin, string[]? topics)
@@ -226,7 +227,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     
     public async Task DoPositionPacket(Node nodeFrom, Packet packet, Meshtastic.Protobufs.Position? positionPayload)
     {
-        if (positionPayload == null)
+        if (positionPayload == null || packet.WantResponse == true)
         {
             return;
         }
@@ -264,7 +265,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public async Task DoTelemetryPacket(Node nodeFrom, Packet packet, Meshtastic.Protobufs.Telemetry? telemetryPayload)
     {
-        if (telemetryPayload == null)
+        if (telemetryPayload == null || packet.WantResponse == true)
         {
             return;
         }
@@ -545,11 +546,14 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public async Task<Context.Entities.NeighborInfo?> SetNeighbor(Context.Entities.NeighborInfo.Source source, Packet packet, Node nodeFrom, Node neighborNode, double snr, Position? nodePosition, Position? neighborPosition)
     {
-        if (nodeFrom == neighborNode)
+        if (nodeFrom == neighborNode 
+            || (source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && snr == 0)
+            || NodesIgnored.Contains(nodeFrom.NodeId) 
+            || NodesIgnored.Contains(neighborNode.NodeId))
         {
             return null;
         }
-        
+
         double? distance = null;
             
         if (nodePosition != null && neighborPosition != null)

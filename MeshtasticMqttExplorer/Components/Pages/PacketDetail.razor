@@ -1,0 +1,88 @@
+﻿@page "/packet/{id:long}"
+@page "/packet/by-packetid/{packetId:long}"
+
+@implements IAsyncDisposable
+
+@using System.Globalization
+@using MeshtasticMqttExplorer.Context
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Extensions.Entities
+
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<PageTitle>Détail du packet @Packet?.PacketId</PageTitle>
+
+<Spin Spinning="Loading">
+    @if (Packet != null)
+    {
+        <PageHeader Title="@($"Trame #{Packet?.PacketId} {Packet?.PortNum} du noeud {Packet?.From.NodeIdString} pour {Packet?.To.NodeIdString}")" 
+                    Subtitle="@Packet?.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"></PageHeader>
+
+        <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
+    }
+    else if (Loading)
+    {
+        <Skeleton></Skeleton>
+    }
+    else
+    {
+        <Result Title="Paquet introuvable" Status="404"></Result>
+    }
+</Spin>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    [Parameter]
+    public long? PacketId { get; set; }
+
+    private bool Loading { get; set; } = true;
+    private Context.Entities.Packet? Packet { get; set; }
+    private DataContext Context { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await FetchData();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        
+        var query = Context.Packets
+            .Include(n => n.From)
+            .Include(n => n.To)
+        ;
+
+        if (Id.HasValue)
+        {
+            Packet = await query.FindByIdAsync(Id);
+        }
+        else if (PacketId != 0 && PacketId.HasValue)
+        {
+            Packet = await query.FindByPacketIdAsync((uint) PacketId.Value);
+        }
+
+        if (Packet == null)
+        {
+            Loading = false;
+
+            return;
+        }
+        
+        Loading = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

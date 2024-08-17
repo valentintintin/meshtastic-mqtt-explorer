@@ -1,6 +1,7 @@
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Models;
+using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DateTimeOffset = System.DateTimeOffset;
@@ -22,9 +23,11 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
         var minDate = DateTime.UtcNow.Date.AddDays(-1);
 
         var query = context.Nodes
+            .Where(n => !MeshtasticService.NodesIgnored.Contains(n.NodeId))
             .Include(n => n.MyNeighbors
                 .OrderByDescending(t => t.UpdatedAt)
                 .Where(t => t.UpdatedAt >= minDate)
+                .Where(t => t.Distance > 0 && t.Distance <= 350)
             )
             .ThenInclude(nn => nn.Neighbor);
 
@@ -53,6 +56,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
         return new GraphDto
         {
             Nodes = await query
+                .Include(a => a.Telemetries.OrderByDescending(aa => aa.UpdatedAt).Take(10))
                 .Where(n => nodeIds.Contains(n.NodeId))
                 .Select(n => new GraphDto.NodeDto
                 {
@@ -63,11 +67,15 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
                     NeighboursUpdatedAt = n.MyNeighbors.Count > 0 ? new DateTimeOffset(n.MyNeighbors.First().UpdatedAt).ToUnixTimeSeconds() : 0,
                     Role = n.Role,
                     HardwareModel = n.HardwareModel,
-                    // BatteryLevel = n.Telemetries.Count > 0 ? n.Telemetries.First().BatteryLevel : null,
-                    // Voltage = n.Telemetries.Count > 0 ? n.Telemetries.First().Voltage : null,
-                    // AirUtilTx = n.Telemetries.Count > 0 ? n.Telemetries.First().AirUtilTx : null,
-                    // ChannelUtilization = n.Telemetries.Count > 0 ? n.Telemetries.First().ChannelUtilization : null,
+                    BatteryLevel = n.Telemetries.Any(a => a.BatteryLevel != null) ? n.Telemetries.First(a => a.BatteryLevel != null).BatteryLevel : null,
+                    Voltage = n.Telemetries.Any(a => a.Voltage != null) ? n.Telemetries.First(a => a.Voltage != null).Voltage : null,
+                    AirUtilTx = n.Telemetries.Any(a => a.AirUtilTx != null) ? n.Telemetries.First(a => a.AirUtilTx != null).AirUtilTx : null,
+                    ChannelUtilization = n.Telemetries.Any(a => a.ChannelUtilization != null) ? n.Telemetries.First(a => a.BatteryLevel != null).ChannelUtilization : null,
+                    Temperature = n.Telemetries.Any(a => a.Temperature != null) ? n.Telemetries.First(a => a.Temperature != null).Temperature : null,
+                    Humidity = n.Telemetries.Any(a => a.RelativeHumidity != null) ? n.Telemetries.First(a => a.RelativeHumidity != null).RelativeHumidity : null,
+                    Pressure = n.Telemetries.Any(a => a.BarometricPressure != null) ? n.Telemetries.First(a => a.BarometricPressure != null).BarometricPressure : null,
                 })
+                .OrderBy(n => n.LongName)
                 .ToListAsync(),
             Links = links
         };

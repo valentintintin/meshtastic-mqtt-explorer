@@ -17,207 +17,201 @@
 <div style="display: flex; flex-direction: column">
     @if (Packet.PortNum != null)
     {
-        @switch (Packet.PortNum)
-        {
-            case PortNum.MapReportApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Nom court">
-                        @MapReport?.ShortName
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Nom long">
-                        @MapReport?.LongName
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Carte">
-                        @MapReport?.HwModel
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Rôle">
-                        @MapReport?.Role
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Bande">
-                        @MapReport?.Region
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Profil de modulation">
-                        @MapReport?.ModemPreset
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Version du firmware">
-                        @MapReport?.FirmwareVersion
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Nombre de nœuds locaux">
-                        @MapReport?.NumOnlineLocalNodes
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Canal par défaut">
-                        @(MapReport?.HasDefaultChannel == true ? "Oui" : "Non")
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Latitude">
-                        @(MapReport?.LatitudeI * 0.0000001)
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Longitude">
-                        @(MapReport?.LongitudeI * 0.0000001)
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Altitude">
-                        @(MapReport?.Altitude)m
-                    </DescriptionsItem>
-                </Descriptions>
-                
-                @if (Marker != null)
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+            <div style="flex: 1; max-width: 500px;">
+                @if (ShowJson)
                 {
-                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                    <b>Décodé</b>
                 }
-                break;
-            case PortNum.NodeinfoApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Nom court">
-                        @User?.ShortName
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Nom long">
-                        @User?.LongName
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Carte">
-                        @User?.HwModel
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Rôle">
-                        @User?.Role
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Licencié">
-                        @(User?.IsLicensed == true ? "Oui" : "Non")
-                    </DescriptionsItem>
-                </Descriptions>
-                break;
-            case PortNum.PositionApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Latitude">
-                        @(Position?.LatitudeI * 0.0000001)
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Longitude">
-                        @(Position?.LongitudeI * 0.0000001)
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Altitude">
-                        @(Position?.Altitude)m
-                    </DescriptionsItem>
-                </Descriptions>
-                
-                @if (Marker != null)
-                {
-                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
-                }
-                break;
-            case PortNum.TelemetryApp:
-                <Descriptions Column="1">
-                    @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
-                    {
-                        <DescriptionsItem Title="Niveau de batterie">
-                            @(Telemetry?.DeviceMetrics?.BatteryLevel)%
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Tension batterie">
-                            @(Telemetry?.DeviceMetrics?.Voltage)V
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Utilisation du canal">
-                            @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Emission sur l'air">
-                            @(Telemetry?.DeviceMetrics?.AirUtilTx)%
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Durée de fonctionnement">
-                            <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
-                        </DescriptionsItem>
-                    }
-                    @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
-                    {
-                        <DescriptionsItem Title="Température">
-                            @(Telemetry?.EnvironmentMetrics?.Temperature)°C
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Humidité">
-                            @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
-                        </DescriptionsItem>
-                        <DescriptionsItem Title="Pression atmosphérique">
-                            @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
-                        </DescriptionsItem>
-                    }
-                </Descriptions>
-                break;
-            case PortNum.SerialApp:
-            case PortNum.TextMessageApp:
-            case PortNum.RangeTestApp:
-                <p>@TextMessage</p>
-                break;
-            case PortNum.NeighborinfoApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Dernier envoi par">
-                        !@NeighborInfo?.LastSentById.ToString("X").ToLower()
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Interval">
-                        <TimeElapsed Value="@(TimeSpan.FromSeconds(NeighborInfo?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Voisins">
-                        @if (NeighborInfo?.Neighbors?.Any() == true)
-                        {
-                            <div style="display: flex; flex-wrap: wrap">
-                                @foreach (var neighbor in NeighborInfo?.Neighbors ?? [])
-                                {
-                                    <Tag>
-                                        !@neighbor.NodeId.ToString("X").ToLower()
-                                        (SNR : @neighbor.Snr)
-                                    </Tag>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <text>Aucun</text>
-                        }
-                    </DescriptionsItem>
-                </Descriptions>
-                break;
-            case PortNum.TracerouteApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Route">
-                        @if (TraceRoute?.Route?.Any() == true)
-                        {
-                            <Timeline>
-                                <TimelineItem Color="blue">
-                                    <a href="/node/@Packet.From.Id" target="_blank">@Packet.From.NodeIdString</a>
-                                </TimelineItem>
-                                
-                                @foreach (var nodeId in TraceRoute?.Route ?? [])
-                                {
-                                    <TimelineItem Color="green">
-                                        <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank">@nodeId.ToHexString()</a>
-                                    </TimelineItem>
-                                }
 
-                                <TimelineItem Color="red">
-                                    <a href="/node/@Packet.To.Id" target="_blank">@Packet.To.NodeIdString</a>
-                                </TimelineItem>
-                            </Timeline>
+                @switch (Packet.PortNum)
+                {
+                    case PortNum.MapReportApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Nom court">
+                                @MapReport?.ShortName
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Nom long">
+                                @MapReport?.LongName
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Carte">
+                                @MapReport?.HwModel
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Rôle">
+                                @MapReport?.Role
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Bande">
+                                @MapReport?.Region
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Profil de modulation">
+                                @MapReport?.ModemPreset
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Version du firmware">
+                                @MapReport?.FirmwareVersion
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Nombre de nœuds locaux">
+                                @MapReport?.NumOnlineLocalNodes
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Canal par défaut">
+                                @(MapReport?.HasDefaultChannel == true ? "Oui" : "Non")
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Latitude">
+                                @(MapReport?.LatitudeI * 0.0000001)
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Longitude">
+                                @(MapReport?.LongitudeI * 0.0000001)
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Altitude">
+                                @(MapReport?.Altitude)m
+                            </DescriptionsItem>
+                        </Descriptions>
+
+                        @if (Marker != null)
+                        {
+                            <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                        }
+
+                        break;
+                    case PortNum.NodeinfoApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Nom court">
+                                @User?.ShortName
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Nom long">
+                                @User?.LongName
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Carte">
+                                @User?.HwModel
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Rôle">
+                                @User?.Role
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Licencié">
+                                @(User?.IsLicensed == true ? "Oui" : "Non")
+                            </DescriptionsItem>
+                        </Descriptions>
+                        break;
+                    case PortNum.PositionApp:
+                        @if (Packet?.WantResponse == true)
+                        {
+                            <text>Demande de position</text>
                         }
                         else
                         {
-                            <text>Aucune</text>
+                            <Descriptions Column="1">
+                                <DescriptionsItem Title="Latitude">
+                                    @(Position?.LatitudeI * 0.0000001)
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Longitude">
+                                    @(Position?.LongitudeI * 0.0000001)
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Altitude">
+                                    @(Position?.Altitude)m
+                                </DescriptionsItem>
+                            </Descriptions>
+
+                            @if (Marker != null)
+                            {
+                                <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                            }
                         }
-                    </DescriptionsItem>
-                </Descriptions>
-                break;
-            case PortNum.RoutingApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Type de demande">
-                        @Routing?.VariantCase
-                    </DescriptionsItem>
-                    @switch (Routing?.VariantCase)
-                    {
-                        case Routing.VariantOneofCase.ErrorReason:
-                            <DescriptionsItem Title="Erreur">
-                                @Routing?.ErrorReason
+
+                        break;
+                    case PortNum.TelemetryApp:
+                        @if (Packet?.WantResponse == true)
+                        {
+                            <text>Demande d'une télémétrie de type @Telemetry?.VariantCase</text>
+                        }
+                        else
+                        {
+                            <Descriptions Column="1">
+                                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
+                                {
+                                    <DescriptionsItem Title="Niveau de batterie">
+                                        @(Telemetry?.DeviceMetrics?.BatteryLevel)%
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Tension batterie">
+                                        @(Telemetry?.DeviceMetrics?.Voltage)V
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Utilisation du canal">
+                                        @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Emission sur l'air">
+                                        @(Telemetry?.DeviceMetrics?.AirUtilTx)%
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Durée de fonctionnement">
+                                        <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
+                                    </DescriptionsItem>
+                                }
+                                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
+                                {
+                                    <DescriptionsItem Title="Température">
+                                        @(Telemetry?.EnvironmentMetrics?.Temperature)°C
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Humidité">
+                                        @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Pression atmosphérique">
+                                        @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
+                                    </DescriptionsItem>
+                                }
+                            </Descriptions>
+                        }
+
+                        break;
+                    case PortNum.SerialApp:
+                    case PortNum.TextMessageApp:
+                    case PortNum.RangeTestApp:
+                        <p>@TextMessage</p>
+                        break;
+                    case PortNum.NeighborinfoApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Dernier envoi par">
+                                !@NeighborInfo?.LastSentById.ToString("X").ToLower()
                             </DescriptionsItem>
-                            break;
-                        case Routing.VariantOneofCase.RouteRequest:
-                            <DescriptionsItem Title="Demande de routes">
-                                @if (Routing?.RouteRequest?.Route?.Any() == true)
+                            <DescriptionsItem Title="Interval">
+                                <TimeElapsed Value="@(TimeSpan.FromSeconds(NeighborInfo?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Voisins">
+                                @if (NeighborInfo?.Neighbors?.Any() == true)
+                                {
+                                    <div style="display: flex; flex-wrap: wrap">
+                                        @foreach (var neighbor in NeighborInfo?.Neighbors ?? [])
+                                        {
+                                            <Tag>
+                                                !@neighbor.NodeId.ToString("X").ToLower()
+                                                (SNR : @neighbor.Snr)
+                                            </Tag>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <text>Aucun</text>
+                                }
+                            </DescriptionsItem>
+                        </Descriptions>
+                        break;
+                    case PortNum.TracerouteApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Route">
+                                @if (TraceRoute?.Route?.Any() == true)
                                 {
                                     <Timeline>
-                                        @foreach (var nodeId in Routing?.RouteRequest?.Route ?? [])
+                                        <TimelineItem Color="blue">
+                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.NodeIdString</a>
+                                        </TimelineItem>
+
+                                        @foreach (var nodeId in TraceRoute?.Route ?? [])
                                         {
-                                            <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
+                                            <TimelineItem Color="green">
+                                                <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>
+                                            </TimelineItem>
                                         }
+
+                                        <TimelineItem Color="red">
+                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.NodeIdString</a>
+                                        </TimelineItem>
                                     </Timeline>
                                 }
                                 else
@@ -225,63 +219,111 @@
                                     <text>Aucune</text>
                                 }
                             </DescriptionsItem>
-                            break;
-                        case Routing.VariantOneofCase.RouteReply:
-                            <DescriptionsItem Title="Demande de réponses">
-                                @if (Routing?.RouteReply?.Route?.Any() == true)
-                                {
-                                    <Timeline>
-                                        @foreach (var nodeId in Routing?.RouteReply?.Route ?? [])
-                                        {
-                                            <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
-                                        }
-                                    </Timeline>
-                                }
-                                else
-                                {
-                                    <text>Aucune</text>
-                                }
+                        </Descriptions>
+                        break;
+                    case PortNum.RoutingApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Type de demande">
+                                @Routing?.VariantCase
                             </DescriptionsItem>
-                            break;
-                    }
-                </Descriptions>
-                break;
-            case PortNum.StoreForwardApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Type de demande">
-                        @StoreAndForward?.VariantCase
-                    </DescriptionsItem>
-                </Descriptions>
-                break;
-            case PortNum.WaypointApp:
-                <Descriptions Column="1">
-                    <DescriptionsItem Title="Id">
-                        @Waypoint?.Id
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Nom">
-                        @Waypoint?.Name
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Description">
-                        @Waypoint?.Description @Waypoint?.Icon 
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Expiration">
-                        <Date Value="@DateTimeOffset.FromUnixTimeSeconds(Waypoint?.Expire ?? 0).DateTime" Fallback="-"></Date>
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Latitude">
-                        @(Waypoint?.LatitudeI * 0.0000001)
-                    </DescriptionsItem>
-                    <DescriptionsItem Title="Longitude">
-                        @(Waypoint?.LongitudeI * 0.0000001)
-                    </DescriptionsItem>
-                </Descriptions>
-                
-                @if (Marker != null)
-                {
-                    <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude/@Marker.Longitude" target="_blank">Carte</a>
-                }
-                break;
-        }
+                            @switch (Routing?.VariantCase)
+                            {
+                                case Routing.VariantOneofCase.ErrorReason:
+                                    <DescriptionsItem Title="Erreur">
+                                        @Routing?.ErrorReason
+                                    </DescriptionsItem>
+                                    break;
+                                case Routing.VariantOneofCase.RouteRequest:
+                                    <DescriptionsItem Title="Demande de routes">
+                                        @if (Routing?.RouteRequest?.Route?.Any() == true)
+                                        {
+                                            <Timeline>
+                                                @foreach (var nodeId in Routing?.RouteRequest?.Route ?? [])
+                                                {
+                                                    <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
+                                                }
+                                            </Timeline>
+                                        }
+                                        else
+                                        {
+                                            <text>Aucune</text>
+                                        }
+                                    </DescriptionsItem>
+                                    break;
+                                case Routing.VariantOneofCase.RouteReply:
+                                    <DescriptionsItem Title="Demande de réponses">
+                                        @if (Routing?.RouteReply?.Route?.Any() == true)
+                                        {
+                                            <Timeline>
+                                                @foreach (var nodeId in Routing?.RouteReply?.Route ?? [])
+                                                {
+                                                    <TimelineItem>!@nodeId.ToString("X").ToLower()</TimelineItem>
+                                                }
+                                            </Timeline>
+                                        }
+                                        else
+                                        {
+                                            <text>Aucune</text>
+                                        }
+                                    </DescriptionsItem>
+                                    break;
+                            }
+                        </Descriptions>
+                        break;
+                    case PortNum.StoreForwardApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Type de demande">
+                                @StoreAndForward?.VariantCase
+                            </DescriptionsItem>
+                        </Descriptions>
+                        break;
+                    case PortNum.WaypointApp:
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Id">
+                                @Waypoint?.Id
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Nom">
+                                @Waypoint?.Name
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Description">
+                                @Waypoint?.Description @Waypoint?.Icon
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Expiration">
+                                <Date Value="@DateTimeOffset.FromUnixTimeSeconds(Waypoint?.Expire ?? 0).DateTime" Fallback="-"></Date>
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Latitude">
+                                @(Waypoint?.LatitudeI * 0.0000001)
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Longitude">
+                                @(Waypoint?.LongitudeI * 0.0000001)
+                            </DescriptionsItem>
+                        </Descriptions>
 
+                        @if (Marker != null)
+                        {
+                            <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude/@Marker.Longitude" target="_blank">Carte</a>
+                        }
+
+                        break;
+                }
+            </div>
+        
+            @if (ShowJson)
+            {
+                <div style="display: flex; flex-wrap: wrap; flex: 1; max-width: 700px;">
+                    <div>
+                        <b>Payload</b>
+                        <pre>@PayloadJson</pre>
+                    </div>
+                
+                    <div>
+                        <b>Brut</b>
+                        <pre>@RawJson</pre>
+                    </div>
+                </div>
+            }
+        </div>
+        
         <div>
             <Popover ContentTemplate="@ContentPayloadRaw" Title="Données JSON">
                 <Button OnClick="() => CopyTextToClipboard(PayloadJson)">Données JSON</Button>
@@ -298,6 +340,9 @@
 {
     [Parameter]
     public required Packet Packet { get; set; }
+    
+    [Parameter]
+    public bool ShowJson { get; set; }
 
     private RenderFragment ContentRaw => @<div>@RawJson</div>;
     private RenderFragment ContentPayloadRaw => @<div>@PayloadJson</div>;

@@ -7,120 +7,13 @@
    Meshtastic MQTT Explorer - Graph des noeuds
   </title>
 
-  <style>
-   body, html {
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
-    background-color: black;
-   }
-   svg {
-    width: 100%;
-    height: 100%;
-   }
-   .node text {
-    font-family: sans-serif;
-    fill: #fff;
-    text-anchor: middle;
-    dominant-baseline: middle;
-   }
-   .link.bidirectional {
-    stroke: #555;
-   }
-   .link.bidirectional-highlight {
-    stroke: #fff;
-   }
-   .link.unidirectional-red {
-    stroke: #400;
-   }
-   .link.unidirectional-green {
-    stroke: #040;
-   }
-   .link.unidirectional-red-highlight {
-    stroke: #f00;
-   }
-   .link.unidirectional-green-highlight {
-    stroke: #0f0;
-   }
-   .search-bar {
-    position: absolute;
-    top: 6px;
-    left: 5px;
-    z-index: 10;
-    font: 12px sans-serif;
-    padding: 2px;
-    width: 350px;
-    background-color: #333;
-    color: white;
-    border: 0px solid;
-   }
-   .results {
-    font: 12px sans-serif;
-    position: absolute;
-    top: 30px;
-    left: 5px;
-    z-index: 10;
-    background-color: #222;
-    color: white;
-    padding: 2px;
-    width: 350px;
-    bottom: 5px;
-    overflow-y: auto;
-    border: 0px solid;
-    display: none;
-   }
-   .results div {
-    padding: 2px;
-    cursor: pointer;
-   }
-   .results .separator, .results .separator:hover {
-    text-align: center;
-    color: #fff;
-    background-color: #000;
-    font-weight: bold;
-    cursor: default;
-   }
-   .results div:hover {
-    background-color: #111;
-   }
-   .tooltip {
-    position: fixed;
-    top: 30px;
-    left: 5px;
-    width: auto;
-    height: auto;
-    font: 12px sans-serif;
-    color: white;
-    pointer-events: none;
-   }
-   .tooltip b {
-    color: #0f0;
-   }
-   .shortname {
-    display: inline-block;
-    text-align: center;
-    width: 5ch;
-    color: white;
-    font-family: monospace;
-   }
-   .bottom {
-    position: absolute;
-    bottom: 5px;
-    left: 0px;
-    width: 100%;
-    text-align: center;
-    font: 12px sans-serif;
-    color: white;
-   }
-  </style>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-
+  <script src="scripts/graph_animation.js"></script>
+  
   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, user-scalable=yes" />
-  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="stylesheet" href="styles/graph_style.css" type="text/css" />
+<!--  <link rel="icon" href="favicon.png" type="image/png" />-->
  </head>
  <body>
   <input type="text" class="search-bar" placeholder="Search node..." />
@@ -129,21 +22,18 @@
   <script>
    function getShortnameColor(role) {
     switch(role) {
-     case "CLIENT":
+     case "Client":
       return "#080";
-     case "CLIENT_MUTE":
+     case "ClientMute":
       return "#00f";
-     case "ROUTER":
+     case "Router":
       return "#80f";
      default:
       return "#800";
     }
    }
 
-   let blinkInterval;
-
-   const tooltip = d3.select("body").append("div")
-   .attr("class", "tooltip");
+   const tooltip = d3.select("body").append("div").attr("class", "tooltip");
 
    const nodeSize = 25;
    const arrowSize = 6;
@@ -159,7 +49,7 @@
    fetch("/graph?_=" + new Date().getTime()).then(response => response.json()).then(data => {
     const initialData = JSON.parse(JSON.stringify(data));
 
-    function getMeshForNode(data, nodeId) {
+    function getSubgraphForNode(data, nodeId) {
      const visited = new Set();
      const stack = [nodeId];
      const component = new Set();
@@ -171,7 +61,7 @@
        component.add(id);
        const neighbors = data.links
         .filter(link => link.source === id || link.target === id)
-        .map(link => (link.source === id ? link.target : link.source))
+        .map(link => (link.target === id ? link.source : link.target))
         .filter(neighborId => !visited.has(neighborId));
        stack.push(...neighbors);
       }
@@ -191,7 +81,7 @@
 
      data.nodes.forEach(node => {
       if(!visited.has(node.id)) {
-       const component = getMeshForNode(data, node.id).nodes;
+       const component = getSubgraphForNode(data, node.id).nodes;
        component.forEach(n => visited.add(n.id));
        components.push(component);
       }
@@ -202,7 +92,7 @@
      return components;
     }
 
-    function reloadSimulation(mesh) {
+    function loadMeshSimulation(mesh) {
      d3.select("svg").selectAll("*").remove();
 
      const svg = d3.select("svg");
@@ -212,7 +102,7 @@
      svg.call(zoom.transform, zoomState);
 
      g.append("defs").append("marker")
-      .attr("id", "arrowhead-green")
+      .attr("id", "arrowhead-outbound")
       .attr("viewBox", "0 -5 10 10")
       .attr("refX", 5)
       .attr("refY", 0)
@@ -224,7 +114,7 @@
       .attr("fill", "#0f0");
 
      g.append("defs").append("marker")
-      .attr("id", "arrowhead-green-start")
+      .attr("id", "arrowhead-outbound-start")
       .attr("viewBox", "0 -5 10 10")
       .attr("refX", 5)
       .attr("refY", 0)
@@ -236,7 +126,7 @@
       .attr("fill", "#0f0");
 
      g.append("defs").append("marker")
-      .attr("id", "arrowhead-red")
+      .attr("id", "arrowhead-inbound")
       .attr("viewBox", "0 -5 10 10")
       .attr("refX", 5)
       .attr("refY", 0)
@@ -248,7 +138,7 @@
       .attr("fill", "#f00");
 
      g.append("defs").append("marker")
-      .attr("id", "arrowhead-red-start")
+      .attr("id", "arrowhead-inbound-start")
       .attr("viewBox", "0 -5 10 10")
       .attr("refX", 5)
       .attr("refY", 0)
@@ -263,41 +153,37 @@
      const nodeLayer = g.append("g").attr("class", "nodes");
      const arrowLayer = g.append("g").attr("class", "arrows");
 
-     const linkMap = new Map();
-     mesh.links.forEach(link => {
-      const key = `${link.source}-${link.target}`;
-      const reverseKey = `${link.target}-${link.source}`;
+     const linkDirectionMap = new Map();
 
-      if(linkMap.has(reverseKey)) {
-       const reverseLink = linkMap.get(reverseKey);
-       reverseLink.bidirectional = true;
-       reverseLink.snr = (reverseLink.snr + link.snr) / 2;
-      } else if(!linkMap.has(key)) {
-       link.bidirectional = false;
-       linkMap.set(key, link);
-      } else {
-       const existingLink = linkMap.get(key);
+     mesh.links.forEach(link => {
+      const key = `${Math.min(link.source, link.target)}-${Math.max(link.source, link.target)}`;
+
+      if(linkDirectionMap.has(key)) {
+       const existingLink = linkDirectionMap.get(key);
        existingLink.bidirectional = true;
        existingLink.snr = (existingLink.snr + link.snr) / 2;
+      } else {
+       link.bidirectional = false;
+       linkDirectionMap.set(key, link);
       }
      });
 
-     const filteredLinks = [...linkMap.values()];
+     const filteredLinks = [...linkDirectionMap.values()];
 
-     linkLayer.selectAll(".link.unidirectional-red")
+     const inboundSegment = linkLayer.selectAll(".link.inbound-unidirectional")
       .data(filteredLinks.filter(d => !d.bidirectional))
       .enter().append("line")
-      .attr("class", "link unidirectional-red");
+      .attr("class", "link inbound-unidirectional");
 
-     linkLayer.selectAll(".link.unidirectional-green")
+     const outboundSegment = linkLayer.selectAll(".link.outbound-unidirectional")
       .data(filteredLinks.filter(d => !d.bidirectional))
       .enter().append("line")
-      .attr("class", "link unidirectional-green");
+      .attr("class", "link outbound-unidirectional");
 
-     linkLayer.selectAll("line.bidirectional")
+     const fullLink = linkLayer.selectAll("line.full-bidirectional")
       .data(filteredLinks.filter(d => d.bidirectional))
       .enter().append("line")
-      .attr("class", "link bidirectional");
+      .attr("class", "link full-bidirectional");
 
      const node = nodeLayer.selectAll("g")
       .data(mesh.nodes)
@@ -306,12 +192,11 @@
       .attr("data-id", d => d.id)
       .style("cursor", "move")
       .on("mouseover", function(event, d) {
-       stopBlinking();
-       startBlinking(this, d);
+       animationManager.selectNode(this, d, mesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
        showTooltip(d);
       })
       .on("mouseout", function(event, d) {
-       stopBlinking();
+       animationManager.stopCurrentAnimation();
        hideTooltip();
       })
       .call(d3.drag()
@@ -330,12 +215,12 @@
       .text(d => d.short_name)
       .style("font-size", d => /\p{Extended_Pictographic}/u.test(d.short_name) ? "18px" : "12px");
 
-     arrowLayer.selectAll("line")
+     const arrows = arrowLayer.selectAll("line")
       .data(filteredLinks)
       .enter().append("line")
       .attr("class", "arrow")
-      .attr("marker-end", d => d.bidirectional || !d.unidirectional ? "url(#arrowhead-green)" : "url(#arrowhead-red)")
-      .attr("marker-start", d => d.bidirectional ? "url(#arrowhead-green-start)" : "url(#arrowhead-red-start)");
+      .attr("marker-end", d => d.bidirectional || !d.unidirectional ? "url(#arrowhead-outbound)" : "url(#arrowhead-inbound)")
+      .attr("marker-start", d => d.bidirectional ? "url(#arrowhead-outbound-start)" : "url(#arrowhead-inbound-start)");
 
      simulation = d3.forceSimulation(mesh.nodes)
       .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => 220 - d.snr * 15))
@@ -346,108 +231,97 @@
       .alphaMin(0.001);
 
      simulation.on("tick", () => {
-      linkLayer.selectAll("line.unidirectional-red")
+      inboundSegment
        .each(function(d) {
-        const middle = getMiddle(d.source, d.target);
+        const middle = calculateMidpoint(d.target, d.source);
         d3.select(this)
          .attr("x1", middle.x)
          .attr("y1", middle.y)
-         .attr("x2", adjustPosition(d.target, d.source, nodeSize).targetX)
-         .attr("y2", adjustPosition(d.target, d.source, nodeSize).targetY);
+         .attr("x2", calculateAdjustedPosition(d.source, d.target, nodeSize).targetX)
+         .attr("y2", calculateAdjustedPosition(d.source, d.target, nodeSize).targetY);
        });
 
-      linkLayer.selectAll("line.unidirectional-green")
+      outboundSegment
        .each(function(d) {
-        const middle = getMiddle(d.source, d.target);
+        const middle = calculateMidpoint(d.target, d.source);
         d3.select(this)
-         .attr("x1", adjustPosition(d.source, d.target, nodeSize).sourceX)
-         .attr("y1", adjustPosition(d.source, d.target, nodeSize).sourceY)
+         .attr("x1", calculateAdjustedPosition(d.target, d.source, nodeSize).sourceX)
+         .attr("y1", calculateAdjustedPosition(d.target, d.source, nodeSize).sourceY)
          .attr("x2", middle.x)
          .attr("y2", middle.y);
        });
 
-      linkLayer.selectAll("line.unidirectional-red-highlight")
+      const inboundSegmentHighlights = linkLayer.selectAll("line.inbound-unidirectional-highlight");
+      inboundSegmentHighlights
        .each(function(d) {
-        const middle = getMiddle(d.source, d.target);
+        const middle = calculateMidpoint(d.target, d.source);
         d3.select(this)
          .attr("x1", middle.x)
          .attr("y1", middle.y)
-         .attr("x2", adjustPosition(d.target, d.source, nodeSize).targetX)
-         .attr("y2", adjustPosition(d.target, d.source, nodeSize).targetY);
+         .attr("x2", calculateAdjustedPosition(d.source, d.target, nodeSize).targetX)
+         .attr("y2", calculateAdjustedPosition(d.source, d.target, nodeSize).targetY);
        });
 
-      linkLayer.selectAll("line.unidirectional-green-highlight")
+      const outboundSegmentHighlights = linkLayer.selectAll("line.outbound-unidirectional-highlight");
+      outboundSegmentHighlights
        .each(function(d) {
-        const middle = getMiddle(d.source, d.target);
+        const middle = calculateMidpoint(d.target, d.source);
         d3.select(this)
-         .attr("x1", adjustPosition(d.source, d.target, nodeSize).sourceX)
-         .attr("y1", adjustPosition(d.source, d.target, nodeSize).sourceY)
+         .attr("x1", calculateAdjustedPosition(d.target, d.source, nodeSize).sourceX)
+         .attr("y1", calculateAdjustedPosition(d.target, d.source, nodeSize).sourceY)
          .attr("x2", middle.x)
          .attr("y2", middle.y);
        });
 
-      linkLayer.selectAll("line.bidirectional")
+      fullLink
        .each(function(d) {
         d3.select(this)
-         .attr("x1", adjustPosition(d.target, d.source, nodeSize).sourceX)
-         .attr("y1", adjustPosition(d.target, d.source, nodeSize).sourceY)
-         .attr("x2", adjustPosition(d.source, d.target, nodeSize).targetX)
-         .attr("y2", adjustPosition(d.source, d.target, nodeSize).targetY);
+         .attr("x1", calculateAdjustedPosition(d.source, d.target, nodeSize).sourceX)
+         .attr("y1", calculateAdjustedPosition(d.source, d.target, nodeSize).sourceY)
+         .attr("x2", calculateAdjustedPosition(d.target, d.source, nodeSize).targetX)
+         .attr("y2", calculateAdjustedPosition(d.target, d.source, nodeSize).targetY);
        });
 
       node.attr("transform", d => `translate(${d.x},${d.y})`);
 
-      arrowLayer.selectAll("line")
+      arrows
        .each(function(d) {
         d3.select(this)
-         .attr("x1", adjustPosition(d.target, d.source, nodeSize - arrowSize / 2).sourceX)
-         .attr("y1", adjustPosition(d.target, d.source, nodeSize - arrowSize / 2).sourceY)
-         .attr("x2", adjustPosition(d.source, d.target, nodeSize - arrowSize / 2).targetX)
-         .attr("y2", adjustPosition(d.source, d.target, nodeSize - arrowSize / 2).targetY);
+         .attr("x1", calculateAdjustedPosition(d.source, d.target, nodeSize - arrowSize / 2).sourceX)
+         .attr("y1", calculateAdjustedPosition(d.source, d.target, nodeSize - arrowSize / 2).sourceY)
+         .attr("x2", calculateAdjustedPosition(d.target, d.source, nodeSize - arrowSize / 2).targetX)
+         .attr("y2", calculateAdjustedPosition(d.target, d.source, nodeSize - arrowSize / 2).targetY);
        });
      });
     }
 
-    function startBlinking(nodeElement, d) {
-     highlightNode(nodeElement, d);
-     function toggleHighlight() {
-      const isHighlighted = d3.select(nodeElement).select("circle").attr("opacity") == 1;
-      if(isHighlighted)
-       unhighlightNode(nodeElement, d);
-      else
-       highlightNode(nodeElement, d);
-     }
-     blinkInterval = setInterval(toggleHighlight, 50);
-    }
-
-    function stopBlinking() {
-     clearInterval(blinkInterval);
-     d3.selectAll(".node circle").attr("opacity", 0.5);
-     d3.selectAll(".link").classed("bidirectional-highlight", false)
-      .classed("unidirectional-red-highlight", false)
-      .classed("unidirectional-green-highlight", false);
-    }
-
-    function highlightNode(nodeElement, d) {
+    function highlightNodeAndLinks(nodeElement, d, links) {
      d3.select(nodeElement).select("circle").attr("opacity", 1);
 
-     d3.selectAll(".link.unidirectional-red")
-      .classed("unidirectional-red-highlight", l => l.source.id === d.id || l.target.id === d.id);
-
-     d3.selectAll(".link.unidirectional-green")
-      .classed("unidirectional-green-highlight", l => l.source.id === d.id || l.target.id === d.id);
-
-     d3.selectAll(".link").filter(l => l.source.id === d.id || l.target.id === d.id)
-      .classed("bidirectional-highlight", l => l.bidirectional)
-      .raise();
+     links.forEach(link => {
+      if(link.source.id === d.id || link.target.id === d.id) {
+       if(link.bidirectional)
+        d3.selectAll(".link").filter(l => l === link).classed("full-bidirectional-highlight", true).raise();
+       else if(!link.bidirectional) {
+        if(link.source.id === d.id) {
+         d3.selectAll(".link.inbound-unidirectional").filter(l => l === link).classed("inbound-unidirectional-highlight", true).raise();
+         d3.selectAll(".link.outbound-unidirectional").filter(l => l === link).classed("outbound-unidirectional-highlight", true).raise();
+        }
+       }
+      }
+     });
     }
 
-    function unhighlightNode(nodeElement, d) {
+    function unhighlightNodeAndLinks(nodeElement, d, links) {
      d3.select(nodeElement).select("circle").attr("opacity", 0.5);
 
-     d3.selectAll(".link").classed("bidirectional-highlight", false)
-      .classed("unidirectional-red-highlight", false)
-      .classed("unidirectional-green-highlight", false);
+     links.forEach(link => {
+      if(link.source.id === d.id || link.target.id === d.id) {
+       d3.selectAll(".link").filter(l => l === link).classed("full-bidirectional-highlight", false)
+        .classed("inbound-unidirectional-highlight", false)
+        .classed("outbound-unidirectional-highlight", false);
+      }
+     });
     }
 
     function showTooltip(d) {
@@ -466,7 +340,7 @@
      else
       tooltipHtml += "<br><b>Neighbors</b> " + neighborsUpdatedDate.toLocaleString();
 
-     if(d.role === "ROUTER_CLIENT")
+     if(d.role === "RouterClient")
       tooltipHtml += "<br><b>Role</b> <span style=\"background-color: #800;\">ROUTER_CLIENT is deprecated</span>";
      else
       tooltipHtml += `<br><b>Role</b> <span style="background-color: ${getShortnameColor(d.role)};">${d.role}</span>`;
@@ -507,7 +381,7 @@
      const singleNodes = [];
 
      components.forEach((component, index) => {
-      const mesh = getMeshForNode(initialData, component[0].id);
+      const mesh = getSubgraphForNode(initialData, component[0].id);
       const numberOfLinks = mesh.links.length;
 
       if(component.length > 1) {
@@ -525,15 +399,10 @@
         resultDiv.addEventListener("mousedown", () => {
          resultsDiv.style.display = "none";
          const freshData = JSON.parse(JSON.stringify(initialData));
-         const selectedMesh = getMeshForNode(freshData, node.id);
-         reloadSimulation(selectedMesh);
+         const selectedMesh = getSubgraphForNode(freshData, node.id);
+         loadMeshSimulation(selectedMesh);
 
-         if(selectedNode)
-          unhighlightNode(selectedNode.element, selectedNode.data);
-
-         const nodeElement = d3.select(`[data-id="${node.id}"]`).node();
-         selectedNode = {element: nodeElement, data: node};
-         startBlinking(selectedNode.element, selectedNode.data);
+         animationManager.selectNode(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
          showTooltip(node);
         });
 
@@ -557,15 +426,10 @@
        resultDiv.addEventListener("mousedown", () => {
         resultsDiv.style.display = "none";
         const freshData = JSON.parse(JSON.stringify(initialData));
-        const selectedMesh = getMeshForNode(freshData, node.id);
-        reloadSimulation(selectedMesh);
+        const selectedMesh = getSubgraphForNode(freshData, node.id);
+        loadMeshSimulation(selectedMesh);
 
-        if(selectedNode)
-         unhighlightNode(selectedNode.element, selectedNode.data);
-
-        const nodeElement = d3.select(`[data-id="${node.id}"]`).node();
-        selectedNode = {element: nodeElement, data: node};
-        startBlinking(selectedNode.element, selectedNode.data);
+        animationManager.selectNode(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
         showTooltip(node);
        });
 
@@ -623,14 +487,14 @@
      d.fy = null;
     }
 
-    function getMiddle(source, target) {
+    function calculateMidpoint(source, target) {
      return {
       x: (source.x + target.x) / 2,
       y: (source.y + target.y) / 2
      };
     }
 
-    function adjustPosition(source, target, margin) {
+    function calculateAdjustedPosition(source, target, margin) {
      const dx = target.x - source.x;
      const dy = target.y - source.y;
      const distance = Math.sqrt(dx * dx + dy * dy);
@@ -647,8 +511,8 @@
 
     populateSearchResults();
     const firstNode = getConnectedComponents(initialData)[0][0];
-    const selectedMesh = getMeshForNode(JSON.parse(JSON.stringify(initialData)), firstNode.id);
-    reloadSimulation(selectedMesh);
+    const selectedMesh = getSubgraphForNode(JSON.parse(JSON.stringify(initialData)), firstNode.id);
+    loadMeshSimulation(selectedMesh);
    });
   </script>
 

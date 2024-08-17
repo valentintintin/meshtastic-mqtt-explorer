@@ -2,13 +2,11 @@
 @page "/node/{id:long}/packets"
 @implements IAsyncDisposable
 
-@using AntDesign.TableModels
 @using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Context.Entities
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Context.Entities
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
-@using AntDesign
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject NavigationManager NavigationManager
@@ -42,7 +40,9 @@ else
        PaginationPosition="bottomRight" Locale="Utils.TableLocale">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
-            <div style="width: 80px">@context.PacketId</div>
+            <div style="width: 80px">
+                <a href="/packet/@context.Id" target="_blank" rel="nofollow">@context.PacketId</a>
+            </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Filterable>
             <div style="width: 150px">
@@ -79,11 +79,6 @@ else
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
             <div style="width: 100px">
                 @context.MqttServer<br />@context.MqttTopic
-            </div>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.Channel.Id" Title="Canal" Filters="_channelFilters">
-            <div style="width: 70px">
-                @context.Channel.Name
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"

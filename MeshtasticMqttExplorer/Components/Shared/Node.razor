@@ -37,7 +37,7 @@
                     
                     <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
                         @(NbPackets?.Today ?? 0)/@(NbPackets?.Yesterday ?? 0)/@(NbPackets?.Total ?? 0)
-                        <a href="/node/@NodeInfo.Id/packets">Voir</a>
+                        <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
                     </DescriptionsItem>
                     
                     <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
@@ -143,6 +143,7 @@
                                         </AvatarTemplate>
                                         <TitleTemplate>
                                             <text>Voisin (@neighbor.DataSource) de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
+                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Trame #@neighbor.Packet?.PacketId</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -170,6 +171,7 @@
                                         </AvatarTemplate>
                                         <TitleTemplate>
                                             <text>Voisin (@neighbor.DataSource) pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
+                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Trame #@neighbor.Packet?.PacketId</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -210,18 +212,19 @@
                         
                         <Timeline>
                             <TimelineItem Color="blue">
-                                <a href="/node/@NodeInfo.Id" target="_blank">@NodeInfo.AllNames</a>
+                                <a href="/node/@NodeInfo.Id" target="_blank" rel="nofollow">@NodeInfo.AllNames</a>
                             </TimelineItem>
                                 
                             @foreach (var traceroute in traceroutes.traceroutes)
                             {
                                 <TimelineItem Color="green">
-                                    <a href="/node/@traceroute.NodeId" target="_blank">@traceroute.Node.AllNames</a>
+                                    <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
+                                    <br /><a href="/packet/@traceroute.PacketId" target="_blank" rel="nofollow"><i>Trame #@traceroute.Packet?.PacketId</i></a>
                                 </TimelineItem>
                             }
 
                             <TimelineItem Color="red">
-                                <a href="/node/@traceroutes.to.Id" target="_blank">@traceroutes.to.AllNames</a>
+                                <a href="/node/@traceroutes.to.Id" target="_blank" rel="nofollow">@traceroutes.to.AllNames</a>
                             </TimelineItem>
                         </Timeline>
                     }

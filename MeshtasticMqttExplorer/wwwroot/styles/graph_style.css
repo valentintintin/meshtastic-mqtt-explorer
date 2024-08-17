@@ -1,0 +1,106 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+}
+svg {
+    width: 100%;
+    height: 100%;
+}
+.node text {
+    font-family: sans-serif;
+    fill: #fff;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}
+.link.full-bidirectional {
+    stroke: #555;
+}
+.link.inbound-unidirectional {
+    stroke: #400;
+}
+.link.outbound-unidirectional {
+    stroke: #040;
+}
+.link.full-bidirectional-highlight {
+    stroke: #fff;
+}
+.link.inbound-unidirectional-highlight {
+    stroke: #f00;
+}
+.link.outbound-unidirectional-highlight {
+    stroke: #0f0;
+}
+.search-bar {
+    position: absolute;
+    top: 6px;
+    left: 5px;
+    z-index: 10;
+    font: 12px sans-serif;
+    padding: 2px;
+    width: 350px;
+    background-color: #333;
+    color: white;
+    border: 0px solid;
+}
+.results {
+    font: 12px sans-serif;
+    position: absolute;
+    top: 30px;
+    left: 5px;
+    z-index: 10;
+    background-color: #222;
+    color: white;
+    padding: 2px;
+    width: 350px;
+    bottom: 5px;
+    overflow-y: auto;
+    border: 0px solid;
+    display: none;
+}
+.results div {
+    padding: 2px;
+    cursor: pointer;
+}
+.results .separator, .results .separator:hover {
+    text-align: center;
+    color: #fff;
+    background-color: #000;
+    font-weight: bold;
+    cursor: default;
+}
+.results div:hover {
+    background-color: #111;
+}
+.tooltip {
+    position: fixed;
+    top: 30px;
+    left: 5px;
+    width: auto;
+    height: auto;
+    font: 12px sans-serif;
+    color: white;
+    pointer-events: none;
+}
+.tooltip b {
+    color: #0f0;
+}
+.shortname {
+    display: inline-block;
+    text-align: center;
+    width: 5ch;
+    color: white;
+    font-family: monospace;
+}
+.bottom {
+    position: absolute;
+    bottom: 5px;
+    left: 0px;
+    width: 100%;
+    text-align: center;
+    font: 12px sans-serif;
+    color: white;
+}
