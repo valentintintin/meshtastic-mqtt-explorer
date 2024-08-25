@@ -143,7 +143,7 @@
                                         </AvatarTemplate>
                                         <TitleTemplate>
                                             <text>Voisin (@neighbor.DataSource) de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
-                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Trame #@neighbor.Packet?.PacketId</i></a>
+                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -171,7 +171,7 @@
                                         </AvatarTemplate>
                                         <TitleTemplate>
                                             <text>Voisin (@neighbor.DataSource) pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
-                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Trame #@neighbor.Packet?.PacketId</i></a>
+                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -219,7 +219,7 @@
                             {
                                 <TimelineItem Color="green">
                                     <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
-                                    <br /><a href="/packet/@traceroute.PacketId" target="_blank" rel="nofollow"><i>Trame #@traceroute.Packet?.PacketId</i></a>
+                                    <br /><a href="/packet/@traceroute.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                 </TimelineItem>
                             }
 

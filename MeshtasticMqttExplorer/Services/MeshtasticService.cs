@@ -88,7 +88,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             nodeFrom.LastSeen = DateTime.UtcNow;
             Context.Update(nodeFrom);
-            await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, $"Gateway-{nodeGateway}");
+            await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, RegionCodeAndModemPresetSource.Gateway);
         }
         await Context.SaveChangesAsync();
 
@@ -147,6 +147,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Priority = meshPacket.Priority,
             PacketId = meshPacket.Id,
             WantAck = meshPacket.WantAck,
+            ViaMqtt = meshPacket.ViaMqtt,
             RxSnr = meshPacket.RxSnr,
             RxRssi = meshPacket.RxRssi,
             HopStart = (int) meshPacket.HopStart,
@@ -221,7 +222,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         Context.Update(nodeFrom);
         await Context.SaveChangesAsync();
         
-        await UpdateRegionCodeAndModemPreset(nodeFrom, mapReport.Region, mapReport.ModemPreset, "MapReport");
+        await UpdateRegionCodeAndModemPreset(nodeFrom, mapReport.Region, mapReport.ModemPreset, RegionCodeAndModemPresetSource.MapReport);
         await UpdatePosition(nodeFrom, mapReport.LatitudeI, mapReport.LongitudeI, mapReport.Altitude, null);
     }
     
@@ -321,7 +322,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             }
             else
             {
-                await UpdateRegionCodeAndModemPreset(neighborNode, nodeFrom.RegionCode, nodeFrom.ModemPreset, $"Neighbor-{nodeFrom}");
+                await UpdateRegionCodeAndModemPreset(neighborNode, nodeFrom.RegionCode, nodeFrom.ModemPreset, RegionCodeAndModemPresetSource.Neighbor);
             }
             await Context.SaveChangesAsync();
 
@@ -520,12 +521,18 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
     }
 
-    public async Task UpdateRegionCodeAndModemPreset(Node node, Config.Types.LoRaConfig.Types.RegionCode? regionCode, Config.Types.LoRaConfig.Types.ModemPreset? modemPreset, string source)
+    public async Task UpdateRegionCodeAndModemPreset(Node node, Config.Types.LoRaConfig.Types.RegionCode? regionCode, Config.Types.LoRaConfig.Types.ModemPreset? modemPreset, RegionCodeAndModemPresetSource source)
     {
         if (regionCode.HasValue)
         {
+            if (node.RegionCode != null && source == RegionCodeAndModemPresetSource.Mqtt)
+            {
+                return;
+            }
+            
             if (node.RegionCode != regionCode)
             {
+                
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) so we set it from {source} to {regionCode}", node, node.RegionCode, source, regionCode);
                 node.RegionCode = regionCode;
             }
@@ -533,6 +540,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         if (modemPreset.HasValue)
         {
+            if (node.ModemPreset != null && source == RegionCodeAndModemPresetSource.Mqtt)
+            {
+                return;
+            }
+            
             if (node.ModemPreset != modemPreset)
             {
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldModemPreset}) so we set it from {source} to {modemPreset}", node, node.ModemPreset, source, modemPreset);
@@ -549,7 +561,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeFrom == neighborNode 
             || (source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && snr == 0)
             || NodesIgnored.Contains(nodeFrom.NodeId) 
-            || NodesIgnored.Contains(neighborNode.NodeId))
+            || NodesIgnored.Contains(neighborNode.NodeId)
+            || packet.ViaMqtt == true
+        )
         {
             return null;
         }
@@ -719,5 +733,14 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
 
         return base64;
+    }
+
+    public enum RegionCodeAndModemPresetSource
+    {
+        Gateway,
+        NodeInfo,
+        MapReport,
+        Neighbor,
+        Mqtt
     }
 }

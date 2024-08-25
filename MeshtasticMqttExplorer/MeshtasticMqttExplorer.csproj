@@ -4,25 +4,25 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyVersion>1.1.8</AssemblyVersion>
+        <AssemblyVersion>1.1.10</AssemblyVersion>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="AntDesign" Version="0.19.3" />
+      <PackageReference Include="AntDesign" Version="0.20.2.1" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
       <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
       <PackageReference Include="LibAES-CTR" Version="1.0.1" />
       <PackageReference Include="Meshtastic" Version="1.0.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.6" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="MQTTnet" Version="4.3.6.1152" />
-      <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.28.1" />
+      <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.33.0" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.1" />
-      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.11" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.12" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />

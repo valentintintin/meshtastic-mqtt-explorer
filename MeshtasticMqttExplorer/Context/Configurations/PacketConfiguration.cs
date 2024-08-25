@@ -47,7 +47,7 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
             .HasForeignKey(a => a.ToId);
         
         builder.HasOne(a => a.Channel)
-            .WithMany()
+            .WithMany(a => a.Packets)
             .HasForeignKey(a => a.ChannelId);
     }
 }

@@ -196,8 +196,8 @@ public class MqttService : BackgroundService
                 modemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongSlow;
             }
             
-            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, "MqttTopic");
-            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, "MqttTopic");
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
             if (packet.Value.packet.HopStart == packet.Value.packet.HopLimit)
             {
@@ -276,6 +276,20 @@ public class MqttService : BackgroundService
                     LongitudeI = (int) (dto.Longitude / 0.0000001),
                     LatitudeI = (int) (dto.Latitude / 0.0000001)
                 }.ToByteArray());
+                break;
+            case PublishMessageDto.MessageType.Raw:
+                if (string.IsNullOrWhiteSpace(dto.RawBase64))
+                {
+                    throw new ValidationException("La payload est vide");
+                }
+
+                if (!dto.PortNum.HasValue)
+                {
+                    throw new ValidationException("Aucun PortNum");
+                }
+                
+                data.Portnum = dto.PortNum.Value;
+                data.Payload = ByteString.FromBase64(dto.RawBase64);
                 break;
         }
         
@@ -497,11 +511,17 @@ public class PublishMessageDto
     
     public DateTime Expires { get; set; } = DateTime.UtcNow.AddDays(1);
     
+    public PortNum? PortNum { get; set; }
+    
+    [MinLength(1)]
+    public string? RawBase64 { get; set; }
+    
     public enum MessageType
     {
         Message,
         NodeInfo,
         Position,
-        Waypoint
+        Waypoint,
+        Raw
     }
 }

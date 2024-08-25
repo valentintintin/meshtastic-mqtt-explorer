@@ -37,13 +37,13 @@ else
                 <FormItem Label="Id destinataire (vide si tout le monde)">
                     <Input @bind-Value="@context.NodeToId" MaxLength="9" />
                 </FormItem>
+                <FormItem Label="Canal">
+                    <Input @bind-Value="@context.Channel"/>
+                </FormItem>
             </Panel>
             <Panel Header="Données" Key="2">
                 <Tabs Type="@TabType.Card" @bind-ActiveKey="@context.Type">
                     <TabPane Tab="Message" Key="@PublishMessageDto.MessageType.Message.ToString()">
-                        <FormItem Label="Canal">
-                            <Input @bind-Value="@context.Channel"/>
-                        </FormItem>
                         <FormItem Label="Message">
                             <TextArea ShowCount MaxLength="200" @bind-Value="@context.Message"></TextArea>
                         </FormItem>
@@ -85,6 +85,18 @@ else
                         </FormItem>
                         <FormItem Label="Id (optionnel)">
                             <AntDesign.InputNumber Width="150" TValue="uint?" Min="0" Max="MeshtasticService.NodeBroadcast" @bind-Value="@context.Id"/>
+                        </FormItem>
+                    </TabPane>
+                    <TabPane Tab="Brut" Key="@PublishMessageDto.MessageType.Raw.ToString()">
+                        <FormItem Label="Port num">
+                            <Select DataSource="@Utils.PortNumFilters"
+                                    @bind-Value="@context.PortNum"
+                                    ItemValue="c=>c.Value"
+                                    ItemLabel="c=>c.Value?.ToString()">
+                            </Select>
+                        </FormItem>
+                        <FormItem Label="Payload en base64">
+                            <TextArea @bind-Value="@context.RawBase64"></TextArea>
                         </FormItem>
                     </TabPane>
                 </Tabs>

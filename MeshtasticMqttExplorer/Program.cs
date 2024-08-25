@@ -1,11 +1,7 @@
 using System.Globalization;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using AntDesign;
 using Blazored.LocalStorage;
-using Google.Protobuf;
-using Meshtastic.Extensions;
-using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
@@ -106,7 +102,7 @@ try
     await context.Database.MigrateAsync();
 
     MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>().GetSection("NodesIgnored").Get<List<uint>>() ?? []);
-    Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToString()).JoinString()}");
+    Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToHexString()).JoinString()}");
 
     Console.WriteLine("Started");
 

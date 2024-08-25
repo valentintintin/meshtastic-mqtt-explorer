@@ -28,6 +28,8 @@
       return "#00f";
      case "Router":
       return "#80f";
+     case "IpGateway":
+      return "#888";
      default:
       return "#800";
     }
@@ -40,6 +42,7 @@
    let simulation;
    let zoomState = d3.zoomIdentity;
    let selectedNode = null;
+   let isNodeHovered = false;
 
    const zoom = d3.zoom().on("zoom", (event) => {
     d3.select("g").attr("transform", event.transform);
@@ -47,7 +50,7 @@
    });
 
    fetch("/graph?_=" + new Date().getTime()).then(response => response.json()).then(data => {
-    const initialData = JSON.parse(JSON.stringify(data));
+    const dataCopy = JSON.parse(JSON.stringify(data));
 
     function getSubgraphForNode(data, nodeId) {
      const visited = new Set();
@@ -92,7 +95,8 @@
      return components;
     }
 
-    function loadMeshSimulation(mesh) {
+    function loadMeshSimulation(selectedMesh) {
+     const selectedMeshCopy = JSON.parse(JSON.stringify(selectedMesh));
      d3.select("svg").selectAll("*").remove();
 
      const svg = d3.select("svg");
@@ -155,7 +159,7 @@
 
      const linkDirectionMap = new Map();
 
-     mesh.links.forEach(link => {
+     selectedMesh.links.forEach(link => {
       const key = `${Math.min(link.source, link.target)}-${Math.max(link.source, link.target)}`;
 
       if(linkDirectionMap.has(key)) {
@@ -173,31 +177,61 @@
      const inboundSegment = linkLayer.selectAll(".link.inbound-unidirectional")
       .data(filteredLinks.filter(d => !d.bidirectional))
       .enter().append("line")
-      .attr("class", "link inbound-unidirectional");
+      .attr("class", "link inbound-unidirectional")
+      .attr("data-source", d => d.source)
+      .attr("data-target", d => d.target);
 
      const outboundSegment = linkLayer.selectAll(".link.outbound-unidirectional")
       .data(filteredLinks.filter(d => !d.bidirectional))
       .enter().append("line")
-      .attr("class", "link outbound-unidirectional");
+      .attr("class", "link outbound-unidirectional")
+      .attr("data-source", d => d.source)
+      .attr("data-target", d => d.target);
 
      const fullLink = linkLayer.selectAll("line.full-bidirectional")
       .data(filteredLinks.filter(d => d.bidirectional))
       .enter().append("line")
-      .attr("class", "link full-bidirectional");
+      .attr("class", "link full-bidirectional")
+      .attr("data-source", d => d.source)
+      .attr("data-target", d => d.target);
 
      const node = nodeLayer.selectAll("g")
-      .data(mesh.nodes)
+      .data(selectedMesh.nodes)
       .enter().append("g")
       .attr("class", "node")
       .attr("data-id", d => d.id)
       .style("cursor", "move")
       .on("mouseover", function(event, d) {
-       animationManager.selectNode(this, d, mesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
-       showTooltip(d);
+       if(!isNodeHovered) {
+        isNodeHovered = true;
+
+        // Objet original avec que des liens unidirectionnels
+        animationManager.initialize(selectedMeshCopy);
+        animationManager.startNodeTransmission(this, d, selectedMeshCopy, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
+        // Objet D3.js avec les liens bidirectionnels fusionés et les données des noeuds dans les liens
+        //animationManager.initialize(selectedMesh);
+        //animationManager.startNodeTransmission(this, d, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
+        showTooltip(d);
+       }
       })
-      .on("mouseout", function(event, d) {
-       animationManager.stopCurrentAnimation();
-       hideTooltip();
+      .on("mouseleave", function(event, d) {
+       if(isNodeHovered) {
+        isNodeHovered = false;
+
+        // Objet original avec que des liens unidirectionnels
+        animationManager.stopCurrentAnimation(selectedMeshCopy);
+
+        // Objet D3.js avec les liens bidirectionnels fusionés et les données des noeuds dans les liens
+        //animationManager.stopCurrentAnimation(selectedMesh);
+
+        d3.selectAll(".node circle").attr("opacity", 0.5);
+        d3.selectAll(".link").classed("full-bidirectional-highlight", false)
+         .classed("inbound-unidirectional-highlight", false)
+         .classed("outbound-unidirectional-highlight", false);
+        hideTooltip();
+       }
       })
       .call(d3.drag()
        .on("start", dragstarted)
@@ -222,7 +256,7 @@
       .attr("marker-end", d => d.bidirectional || !d.unidirectional ? "url(#arrowhead-outbound)" : "url(#arrowhead-inbound)")
       .attr("marker-start", d => d.bidirectional ? "url(#arrowhead-outbound-start)" : "url(#arrowhead-inbound-start)");
 
-     simulation = d3.forceSimulation(mesh.nodes)
+     simulation = d3.forceSimulation(selectedMesh.nodes)
       .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(d => 220 - d.snr * 15))
       .force("charge", d3.forceManyBody().strength(-200))
       .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
@@ -295,7 +329,67 @@
      });
     }
 
+    // Objet original avec que des liens unidirectionnels
     function highlightNodeAndLinks(nodeElement, d, links) {
+     d3.select(nodeElement).select("circle").attr("opacity", 1);
+
+     links.forEach(link => {
+      if(link.source === d.id || link.target === d.id) {
+
+       d3.selectAll(`.link.full-bidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+        .classed("full-bidirectional-highlight", true)
+        .raise();
+       d3.selectAll(`.link.full-bidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+        .classed("full-bidirectional-highlight", true)
+        .raise();
+
+       if(link.source === d.id) {
+        d3.selectAll(`.link.outbound-unidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+         .classed("outbound-unidirectional-highlight", true)
+         .raise();
+        d3.selectAll(`.link.inbound-unidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+         .classed("inbound-unidirectional-highlight", true)
+         .raise();
+       } else {
+        d3.selectAll(`.link.outbound-unidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+         .classed("outbound-unidirectional-highlight", true)
+         .raise();
+        d3.selectAll(`.link.inbound-unidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+         .classed("inbound-unidirectional-highlight", true)
+         .raise();
+       }
+      }
+     });
+    }
+
+    function unhighlightNodeAndLinks(nodeElement, d, links) {
+     d3.select(nodeElement).select("circle").attr("opacity", 0.5);
+
+     links.forEach(link => {
+      if(link.source === d.id || link.target === d.id) {
+
+       d3.selectAll(`.link.full-bidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+        .classed("full-bidirectional-highlight", false);
+       d3.selectAll(`.link.full-bidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+        .classed("full-bidirectional-highlight", false);
+
+       if(link.source === d.id) {
+        d3.selectAll(`.link.outbound-unidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+         .classed("outbound-unidirectional-highlight", false);
+        d3.selectAll(`.link.inbound-unidirectional[data-source="${link.source}"][data-target="${link.target}"]`)
+         .classed("inbound-unidirectional-highlight", false);
+       } else {
+        d3.selectAll(`.link.outbound-unidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+         .classed("outbound-unidirectional-highlight", false);
+        d3.selectAll(`.link.inbound-unidirectional[data-source="${link.target}"][data-target="${link.source}"]`)
+         .classed("inbound-unidirectional-highlight", false);
+       }
+      }
+     });
+    }
+
+    // Objet D3.js avec les liens bidirectionnels fusionés et les données des noeuds dans les liens
+    /*function highlightNodeAndLinks(nodeElement, d, links) {
      d3.select(nodeElement).select("circle").attr("opacity", 1);
 
      links.forEach(link => {
@@ -322,7 +416,7 @@
         .classed("outbound-unidirectional-highlight", false);
       }
      });
-    }
+    }*/
 
     function showTooltip(d) {
      let updatedDate = new Date(d.updated_at * 1000);
@@ -375,13 +469,13 @@
     }
 
     function populateSearchResults() {
-     const components = getConnectedComponents(initialData);
+     const components = getConnectedComponents(data);
      resultsDiv.innerHTML = "";
 
      const singleNodes = [];
 
      components.forEach((component, index) => {
-      const mesh = getSubgraphForNode(initialData, component[0].id);
+      const mesh = getSubgraphForNode(data, component[0].id);
       const numberOfLinks = mesh.links.length;
 
       if(component.length > 1) {
@@ -398,11 +492,18 @@
         resultDiv.innerHTML = `<span class=\"shortname\" style=\"background-color: ${getShortnameColor(node.role)};\">${node.short_name}</span> ${node.long_name} <span style=\"color: #ff0;\">${node.id.toString(16)}</span>`;
         resultDiv.addEventListener("mousedown", () => {
          resultsDiv.style.display = "none";
-         const freshData = JSON.parse(JSON.stringify(initialData));
-         const selectedMesh = getSubgraphForNode(freshData, node.id);
-         loadMeshSimulation(selectedMesh);
+         const selectedMesh = getSubgraphForNode(dataCopy, node.id);
+         const selectedMeshCopy = JSON.parse(JSON.stringify(selectedMesh));
+         loadMeshSimulation(selectedMeshCopy);
 
-         animationManager.selectNode(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
+         // Objet original avec que des liens unidirectionnels
+         animationManager.initialize(selectedMesh);
+         animationManager.startNodeTransmission(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
+         // Objet D3.js avec les liens bidirectionnels fusionés et les données des noeuds dans les liens
+         //animationManager.initialize(selectedMeshCopy);
+         //animationManager.startNodeTransmission(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMeshCopy, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
          showTooltip(node);
         });
 
@@ -425,11 +526,18 @@
        resultDiv.innerHTML = `<span class=\"shortname\" style=\"background-color: ${getShortnameColor(node.role)};\">${node.short_name}</span> ${node.long_name} <span style=\"color: #ff0;\">${node.id.toString(16)}</span>`;
        resultDiv.addEventListener("mousedown", () => {
         resultsDiv.style.display = "none";
-        const freshData = JSON.parse(JSON.stringify(initialData));
-        const selectedMesh = getSubgraphForNode(freshData, node.id);
-        loadMeshSimulation(selectedMesh);
+        const selectedMesh = getSubgraphForNode(dataCopy, node.id);
+        const selectedMeshCopy = JSON.parse(JSON.stringify(selectedMesh));
+        loadMeshSimulation(selectedMeshCopy);
 
-        animationManager.selectNode(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
+        // Objet original avec que des liens unidirectionnels
+        animationManager.initialize(selectedMesh);
+        animationManager.startNodeTransmission(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMesh, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
+        // Objet D3.js avec les liens bidirectionnels fusionés et les données des noeuds dans les liens
+        //animationManager.initialize(selectedMeshCopy);
+        //animationManager.startNodeTransmission(d3.select(`[data-id="${node.id}"]`).node(), node, selectedMeshCopy, highlightNodeAndLinks, unhighlightNodeAndLinks);
+
         showTooltip(node);
        });
 
@@ -510,14 +618,14 @@
     }
 
     populateSearchResults();
-    const firstNode = getConnectedComponents(initialData)[0][0];
-    const selectedMesh = getSubgraphForNode(JSON.parse(JSON.stringify(initialData)), firstNode.id);
+    const firstNode = getConnectedComponents(data)[0][0];
+    const selectedMesh = getSubgraphForNode(data, firstNode.id);
     loadMeshSimulation(selectedMesh);
    });
   </script>
 
   <div class="bottom">
-   Meshtastic radio network - LoRa LONG_MODERATE 868 Mhz
+   Meshtastic Live Radio Network Topology and CSMA/CA Simulation - LoRa LONG_MODERATE 868 Mhz
   </div>
  </body>
 </html>

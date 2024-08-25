@@ -98,9 +98,6 @@
         var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         var query = Context.Nodes
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Position)
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.GatewayPosition)
-            .Include(n => n.PacketsFrom.Where(a => /*a.CreatedAt >= threeDays &&*/ a.GatewayId != a.FromId && a.HopStart == a.HopLimit && a.RxSnr != 0).OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Gateway)
             .Include(n => n.MyNeighbors
                 .Where(a => a.Distance > 0 && a.Distance <= 350 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))

@@ -20,6 +20,18 @@
         <PageHeader Title="@($"Trame #{Packet?.PacketId} {Packet?.PortNum} du noeud {Packet?.From.NodeIdString} pour {Packet?.To.NodeIdString}")" 
                     Subtitle="@Packet?.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"></PageHeader>
 
+        <Timeline>
+            <TimelineItem Color="blue">
+                <a href="/node/@Packet.FromId" target="_blank" rel="nofollow">@Packet.From.AllNames (Expéditeur)</a>
+            </TimelineItem>
+            <TimelineItem Color="green">
+                <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames (Passerelle)</a>
+            </TimelineItem>
+            <TimelineItem Color="red">
+                <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames (Destinataire)</a>
+            </TimelineItem>
+        </Timeline>
+        
         <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
     }
     else if (Loading)
@@ -60,6 +72,7 @@
         var query = Context.Packets
             .Include(n => n.From)
             .Include(n => n.To)
+            .Include(n => n.Gateway)
         ;
 
         if (Id.HasValue)

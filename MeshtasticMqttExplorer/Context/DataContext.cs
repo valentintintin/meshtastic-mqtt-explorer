@@ -11,13 +11,13 @@ using Waypoint = MeshtasticMqttExplorer.Context.Entities.Waypoint;
 
 namespace MeshtasticMqttExplorer.Context;
 
-public class DataContext(DbContextOptions<DataContext> options) : DbContext(options)
+public class DataContext(DbContextOptions<DataContext> options, ILogger<DataContext> logger) : DbContext(options)
 {
     public required DbSet<Packet> Packets { get; set; }
     public required DbSet<Node> Nodes { get; set; }
     public required DbSet<Position> Positions { get; set; }
     public required DbSet<Telemetry> Telemetries { get; set; }
-    public required DbSet<NeighborInfo?> NeighborInfos { get; set; }
+    public required DbSet<NeighborInfo> NeighborInfos { get; set; }
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
@@ -51,8 +51,23 @@ public class DataContext(DbContextOptions<DataContext> options) : DbContext(opti
         {
             if (entityEntry.Entity is Node node)
             {
-                node.NodeIdString = node.NodeIdAsString();
-                node.AllNames = node.FullName();
+                try
+                {
+                    node.NodeIdString = node.NodeIdAsString();
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Error while saving nodeIdString in SaveChanges for node #{node}", node.Id);
+                }
+
+                try 
+                {
+                    node.AllNames = node.FullName();
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Error while saving allNames in SaveChanges for node #{node}", node.Id);
+                }
             }
             
             if (entityEntry.Entity is IEntity entity)

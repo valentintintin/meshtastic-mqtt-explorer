@@ -41,6 +41,7 @@ public class Packet : IEntity
     public int? HopStart { get; set; }
     public int? HopLimit { get; set; }
     public bool? WantAck { get; set; }
+    public bool? ViaMqtt { get; set; }
     public MeshPacket.Types.Priority? Priority { get; set; }
     
     public PortNum? PortNum { get; set; }
