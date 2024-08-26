@@ -19,10 +19,14 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .ToList();
 
-        var message = $@"[{packet.Channel.Name}] {packet.From.AllNames}
-{(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour {packet.To.AllNames}" : "")}
-{(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}" : "")}
-> {meshPacket.GetPayload<string>()}";
+        var message = $"""
+                       [{packet.Channel.Name}] {packet.From.AllNames}
+                       {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour {packet.To.AllNames}" : "En broadcast")}
+
+                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr})" : "Via lui-même")}
+
+                       > {meshPacket.GetPayload<string>()}
+                       """;
         
         foreach (var notificationConfiguration in notificationsCanalToSend)
         {
