@@ -13,6 +13,7 @@ using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using NotificationService = MeshtasticMqttExplorer.Services.NotificationService;
 
 Console.WriteLine("Starting");
 
@@ -56,6 +57,7 @@ try
     });
 
     builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<NotificationService>();
     builder.Services.AddSingleton<MqttService>();
     builder.Services.AddHostedService(p => p.GetRequiredService<MqttService>());
 

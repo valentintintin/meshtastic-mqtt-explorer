@@ -166,7 +166,8 @@ public class MqttService : BackgroundService
 
         var nodeGatewayId = rootPacket.GatewayId.ToInteger();
 
-        var meshtasticService = _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<MeshtasticService>();
+        var serviceProvider = _serviceProvider.CreateScope().ServiceProvider;
+        var meshtasticService = serviceProvider.GetRequiredService<MeshtasticService>();
         var packet = await meshtasticService.DoReceive(nodeGatewayId, rootPacket.ChannelId, rootPacket.Packet, mqtt.Name, topics);
 
         if (packet != null)
@@ -199,6 +200,8 @@ public class MqttService : BackgroundService
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
+            await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
+            
             if (packet.Value.packet.HopStart == packet.Value.packet.HopLimit)
             {
                 await meshtasticService.SetNeighbor(Context.Entities.NeighborInfo.Source.Gateway, packet.Value.packet, packet.Value.packet.From, packet.Value.packet.Gateway, packet.Value.packet.RxSnr ?? 0, packet.Value.packet.Position, packet.Value.packet.GatewayPosition);
@@ -316,7 +319,6 @@ public class MqttService : BackgroundService
         _logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data} | {base64}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()), Convert.ToBase64String(packetBytes));
 
         await mqttConfiguration.Client.PublishBinaryAsync(topic, packetBytes);
-        await DoReceive(topic, packetBytes, mqttConfiguration.Configuration);
     }
 
     public async Task PurgePacketsForNode(Node node)
