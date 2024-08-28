@@ -228,7 +228,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     
     public async Task DoPositionPacket(Node nodeFrom, Packet packet, Meshtastic.Protobufs.Position? positionPayload)
     {
-        if (positionPayload == null || packet.WantResponse == true)
+        if (positionPayload == null || (packet.WantResponse == true && positionPayload is { LatitudeI: 0, LongitudeI: 0 }))
         {
             return;
         }

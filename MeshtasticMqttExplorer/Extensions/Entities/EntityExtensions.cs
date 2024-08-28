@@ -10,9 +10,9 @@ public static class EntityExtensions
         return id > 0 ? entities.SingleOrDefault(a => a.Id == id) : default;
     }
     
-    public static Task<T?> FindByIdAsync<T>(this IQueryable<T> entities, long? id) where T : IEntity
+    public static async Task<T?> FindByIdAsync<T>(this IQueryable<T> entities, long? id) where T : IEntity
     {
-        return id > 0 ? entities.SingleOrDefaultAsync(a => a.Id == id) : default;
+        return id > 0 ? await entities.SingleOrDefaultAsync(a => a.Id == id) : default;
     }
     
     public static IQueryable<T> CreatedAfter<T>(this IQueryable<T> entities, DateTime afterDate) where T : IEntity

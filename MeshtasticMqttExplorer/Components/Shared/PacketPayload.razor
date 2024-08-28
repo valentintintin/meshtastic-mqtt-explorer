@@ -92,72 +92,66 @@
                         </Descriptions>
                         break;
                     case PortNum.PositionApp:
-                        @if (Packet?.WantResponse == true)
+                        @if (Packet.WantResponse == true && Position is { LatitudeI: 0, LongitudeI: 0 })
                         {
                             <text>Demande de position</text>
                         }
-                        else
+                        
+                        <Descriptions Column="1">
+                            <DescriptionsItem Title="Latitude">
+                                @(Position?.LatitudeI * 0.0000001)
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Longitude">
+                                @(Position?.LongitudeI * 0.0000001)
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Altitude">
+                                @(Position?.Altitude)m
+                            </DescriptionsItem>
+                        </Descriptions>
+
+                        @if (Marker != null)
                         {
-                            <Descriptions Column="1">
-                                <DescriptionsItem Title="Latitude">
-                                    @(Position?.LatitudeI * 0.0000001)
-                                </DescriptionsItem>
-                                <DescriptionsItem Title="Longitude">
-                                    @(Position?.LongitudeI * 0.0000001)
-                                </DescriptionsItem>
-                                <DescriptionsItem Title="Altitude">
-                                    @(Position?.Altitude)m
-                                </DescriptionsItem>
-                            </Descriptions>
-
-                            @if (Marker != null)
-                            {
-                                <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
-                            }
+                            <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
                         }
-
                         break;
                     case PortNum.TelemetryApp:
-                        @if (Packet?.WantResponse == true)
+                        @if (Packet.WantResponse == true)
                         {
                             <text>Demande d'une télémétrie de type @Telemetry?.VariantCase</text>
                         }
-                        else
-                        {
-                            <Descriptions Column="1">
-                                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
-                                {
-                                    <DescriptionsItem Title="Niveau de batterie">
-                                        @(Telemetry?.DeviceMetrics?.BatteryLevel)%
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Tension batterie">
-                                        @(Telemetry?.DeviceMetrics?.Voltage)V
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Utilisation du canal">
-                                        @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Emission sur l'air">
-                                        @(Telemetry?.DeviceMetrics?.AirUtilTx)%
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Durée de fonctionnement">
-                                        <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
-                                    </DescriptionsItem>
-                                }
-                                @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
-                                {
-                                    <DescriptionsItem Title="Température">
-                                        @(Telemetry?.EnvironmentMetrics?.Temperature)°C
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Humidité">
-                                        @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
-                                    </DescriptionsItem>
-                                    <DescriptionsItem Title="Pression atmosphérique">
-                                        @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
-                                    </DescriptionsItem>
-                                }
-                            </Descriptions>
-                        }
-
+                         
+                        <Descriptions Column="1">
+                            @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
+                            {
+                                <DescriptionsItem Title="Niveau de batterie">
+                                    @(Telemetry?.DeviceMetrics?.BatteryLevel)%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Tension batterie">
+                                    @(Telemetry?.DeviceMetrics?.Voltage)V
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Utilisation du canal">
+                                    @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Emission sur l'air">
+                                    @(Telemetry?.DeviceMetrics?.AirUtilTx)%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Durée de fonctionnement">
+                                    <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
+                                </DescriptionsItem>
+                            }
+                            @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
+                            {
+                                <DescriptionsItem Title="Température">
+                                    @(Telemetry?.EnvironmentMetrics?.Temperature)°C
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Humidité">
+                                    @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Pression atmosphérique">
+                                    @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
+                                </DescriptionsItem>
+                            }
+                        </Descriptions>
                         break;
                     case PortNum.SerialApp:
                     case PortNum.TextMessageApp:

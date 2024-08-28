@@ -158,7 +158,14 @@ else
 
             if (!_allowedAnyId)
             {
-                _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
+                try
+                {
+                    _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
+                }
+                catch (Exception)
+                {
+                    _model.NodeFromId = "!12345678";
+                }
             }
             
             await InvokeAsync(StateHasChanged);

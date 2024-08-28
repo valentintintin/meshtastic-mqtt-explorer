@@ -276,7 +276,7 @@
             .Where(n => n.LastSeen.HasValue)
             .Where(n => !FromDate.HasValue || n.LastSeen >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
-            .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset)
+            .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset || n.ModemPreset == null)
             .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
             .AsSplitQuery()
             .ToListAsync();
