@@ -61,7 +61,7 @@
             {
                 @foreach (var message in TextMessages)
                 {
-                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName() + " via " + message.Packet?.Gateway.OneName() + " #" + message.Packet?.PacketId)"
+                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName() + " via " + message.Packet?.Gateway.OneName() + " #" + message.Packet?.Id)"
                              Avatar="@message.From.HardwareModel.GetImageUrl()"
                              Content="@message.Message"
                              Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"

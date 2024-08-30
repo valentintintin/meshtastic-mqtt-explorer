@@ -228,14 +228,19 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     
     public async Task DoPositionPacket(Node nodeFrom, Packet packet, Meshtastic.Protobufs.Position? positionPayload)
     {
-        if (positionPayload == null || (packet.WantResponse == true && positionPayload is { LatitudeI: 0, LongitudeI: 0 }))
+        if (positionPayload == null)
         {
             return;
         }
 
         var position = await UpdatePosition(nodeFrom, positionPayload.LatitudeI, positionPayload.LongitudeI, positionPayload.Altitude, packet);
 
-        if (packet.GatewayPosition != null && position != null)
+        if (position == null)
+        {
+            return;
+        }
+        
+        if (packet.GatewayPosition != null)
         {
             packet.Position = position;
             packet.GatewayDistanceKm = Utils.CalculateDistance(position.Latitude, position.Longitude,
@@ -448,15 +453,18 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)
     {
-        if (latitude == 0 && longitude == 0)
+        var decimalLatitude = latitude * 0.0000001; 
+        var decimalLongitude = longitude * 0.0000001; 
+        
+        if (latitude == longitude || (latitude == 0 && longitude == 0))
         {
-            Logger.LogWarning("Position given for {node} is incorrect : 0", node);
+            Logger.LogWarning("Position given for {node} is incorrect: {latitude}, {longitude}", node, decimalLatitude, decimalLongitude);
             
             return null;
         }
         
-        node.Latitude = latitude * 0.0000001;
-        node.Longitude = longitude * 0.0000001;
+        node.Latitude = decimalLatitude;
+        node.Longitude = decimalLongitude;
         node.Altitude = altitude;
 
         var position = await Context.Positions

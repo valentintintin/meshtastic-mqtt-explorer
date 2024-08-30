@@ -73,6 +73,11 @@
 
                         break;
                     case PortNum.NodeinfoApp:
+                        @if (Packet.WantResponse == true)
+                        {
+                            <text>Demande d'info</text>
+                        }
+                        
                         <Descriptions Column="1">
                             <DescriptionsItem Title="Nom court">
                                 @User?.ShortName
@@ -92,7 +97,7 @@
                         </Descriptions>
                         break;
                     case PortNum.PositionApp:
-                        @if (Packet.WantResponse == true && Position is { LatitudeI: 0, LongitudeI: 0 })
+                        @if (Packet.WantResponse == true)
                         {
                             <text>Demande de position</text>
                         }

@@ -21,7 +21,8 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         var message = $"""
                        [{packet.Channel.Name}] {packet.From.AllNames}
-                       {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour {packet.To.AllNames}" : "En broadcast")}
+                       
+                       {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour : {packet.To.AllNames}" : "En broadcast")}
 
                        {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr})" : "Via lui-même")}
 
