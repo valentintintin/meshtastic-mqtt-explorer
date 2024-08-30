@@ -10,24 +10,84 @@ window.initializeLeafletMap = (center, zoom) => {
         maxZoom: 17,
         attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
     });
+    
+    const satellite = L.geoportalLayer.WMTS({
+        layer: "ORTHOIMAGERY.ORTHOPHOTOS",
+    }, {
+        opacity: 0.4
+    });
+    
+    const courbeNiveau = L.geoportalLayer.WMTS({
+        layer: "ELEVATION.SLOPES",
+    }, {
+        opacity: 0.4
+    });
 
-    const proto = protomapsL.leafletLayer({url: 'mymap.pmtiles', theme: "light"});
-
-    const baseLayers = {
-        "OpenStreetMap": osm,
-        "OpenTopoMap": topo,
-        "ProtoMaps depuis serveur (bout d'AURA)": proto,
-    };
+    const proto = protomapsL.leafletLayer({
+        url: 'mymap.pmtiles',
+        theme: "light"
+    });
 
     window.leafletMap = L.map('map', {
         preferCanvas: true,
-        layers: [osm],
+        layers: [osm, topo, satellite, courbeNiveau, proto],
     }).setView(center, zoom);
 
-    const elevationPath = L.geoportalControl.ElevationPath({});
+    const layerSwitcher = L.geoportalControl.LayerSwitcher({
+        layers : [
+            {
+                layer : osm,
+                config : {
+                    title : "OpenStreetMap",
+                    description : "Couche Open Street Maps"
+                }
+            },
+            {
+                layer : topo,
+                config : {
+                    title : "OpenTopoMap",
+                    description : "Couche Open Topo Maps",
+                    visibility: false
+                }
+            },
+            {
+                layer : satellite,
+                config : {
+                    title : "IGN Satellite",
+                    description : "Couche satellite issue de l'IGN",
+                    visibility: false
+                }
+            },
+            {
+                layer : courbeNiveau,
+                config : {
+                    title : "IGN Altitude",
+                    description : "Couche coloriée de l'altitude issue de l'IGN"
+                }
+            },
+            {
+                layer : proto,
+                config : {
+                    title : "ProtoMaps AURA",
+                    description : "Couche stockée sur le serveur",
+                    visibility: false
+                }
+            }
+        ]
+    });
+    window.leafletMap.addControl(layerSwitcher);
+    
+    const elevationPath = L.geoportalControl.ElevationPath();
     window.leafletMap.addControl(elevationPath);
     
-    L.control.layers(baseLayers).addTo(window.leafletMap);
+    const mousePosition = L.geoportalControl.MousePosition({
+        displayCoordinate : true,
+        editCoordinates: true,
+        altitude : {
+            triggerDelay : 250
+        }
+    });
+    window.leafletMap.addControl(mousePosition);
     
     console.debug('Map created');
 };
