@@ -27,7 +27,7 @@
             <TimelineItem Color="green">
                 <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames (Passerelle)</a>
                 <br />
-                Distance de <b>@Packet.GatewayDistanceKm Km</b> - SNR <b>@Packet.RxSnr</b>
+                Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - SNR <b>@Packet.RxSnr</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts
             </TimelineItem>
             <TimelineItem Color="red">
                 <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames (Destinataire)</a>
