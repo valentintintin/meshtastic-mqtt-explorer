@@ -115,13 +115,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
         }
-
-        if (await Context.Packets.AnyAsync(a => a.PacketId == meshPacket.Id && a.FromId == meshPacket.From && (DateTime.UtcNow - a.CreatedAt).TotalMinutes < 1))
-        {
-            Logger.LogWarning("Packet #{packetId} from {from} to {to} by {gateway} duplicated, ignored", meshPacket.Id, nodeFrom, nodeTo, nodeGateway);
-            return null;
-        }
-
+        
         var isEncrypted = meshPacket.Decoded == null;
         meshPacket.Decoded ??= Decrypt(meshPacket.Encrypted.ToByteArray(), "AQ==", meshPacket.Id, meshPacket.From);
         
@@ -162,7 +156,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             From = nodeFrom,
             To = nodeTo,
             MqttServer = origin,
-            MqttTopic = topics?.Take(topics.Length - 1).JoinString("/")
+            MqttTopic = topics?.Take(topics.Length - 1).JoinString("/"),
+            PacketDuplicated = await Context.Packets.OrderBy(a => a.CreatedAt)
+                .Where(a => a.PortNum != PortNum.MapReportApp)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && (DateTime.UtcNow - a.CreatedAt).TotalMinutes < 1)
         };
 
         Context.Add(packet);
@@ -171,32 +168,39 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         Logger.LogInformation("Add new packet #{id}|{idPacket} of type {type} from {from} to {to} by {gateway}. Encrypted : {encrypted}", packet.Id, meshPacket.Id, packet.PortNum, nodeFrom, nodeTo, nodeGateway, packet.Encrypted);
         Logger.LogDebug("New packet #{id} of type {type} {payload}", meshPacket.Id, meshPacket.Decoded?.Portnum, meshPacket.GetPayload());
         
-        switch (meshPacket.Decoded?.Portnum)
+        if (packet.PacketDuplicated != null)
         {
-            case PortNum.MapReportApp:
-                await DoMapReportingPacket(nodeFrom, meshPacket.GetPayload<MapReport>());
-                break;
-            case PortNum.NodeinfoApp:
-                await DoNodeInfoPacket(nodeFrom, meshPacket.GetPayload<User>());
-                break;
-            case PortNum.PositionApp:
-                await DoPositionPacket(nodeFrom, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Position>());
-                break;
-            case PortNum.TelemetryApp:
-                await DoTelemetryPacket(nodeFrom, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
-                break;
-            case PortNum.NeighborinfoApp:
-                await DoNeighborInfoPacket(nodeFrom, packet, meshPacket.GetPayload<NeighborInfo>());
-                break;
-            case PortNum.TextMessageApp:
-                await DoTextMessagePacket(nodeFrom, nodeTo, packet, meshPacket.GetPayload<string>());
-                break;
-            case PortNum.WaypointApp:
-                await DoWaypointPacket(nodeFrom, packet, meshPacket.GetPayload<Waypoint>());
-                break;
-            case PortNum.TracerouteApp:
-                await DoTraceroutePacket(nodeFrom, nodeTo, packet, meshPacket.GetPayload<RouteDiscovery>());
-                break;
+            Logger.LogWarning("Packet #{packetId} from {from} to {to} by {gateway} duplicated with #{packetDuplicated}, saved but ignored", meshPacket.Id, nodeFrom, nodeTo, nodeGateway, packet.PacketDuplicated.Id);
+        }
+        else
+        {
+            switch (meshPacket.Decoded?.Portnum)
+            {
+                case PortNum.MapReportApp:
+                    await DoMapReportingPacket(nodeFrom, meshPacket.GetPayload<MapReport>());
+                    break;
+                case PortNum.NodeinfoApp:
+                    await DoNodeInfoPacket(nodeFrom, meshPacket.GetPayload<User>());
+                    break;
+                case PortNum.PositionApp:
+                    await DoPositionPacket(nodeFrom, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Position>());
+                    break;
+                case PortNum.TelemetryApp:
+                    await DoTelemetryPacket(nodeFrom, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
+                    break;
+                case PortNum.NeighborinfoApp:
+                    await DoNeighborInfoPacket(nodeFrom, packet, meshPacket.GetPayload<NeighborInfo>());
+                    break;
+                case PortNum.TextMessageApp:
+                    await DoTextMessagePacket(nodeFrom, nodeTo, packet, meshPacket.GetPayload<string>());
+                    break;
+                case PortNum.WaypointApp:
+                    await DoWaypointPacket(nodeFrom, packet, meshPacket.GetPayload<Waypoint>());
+                    break;
+                case PortNum.TracerouteApp:
+                    await DoTraceroutePacket(nodeFrom, nodeTo, packet, meshPacket.GetPayload<RouteDiscovery>());
+                    break;
+            }
         }
 
         return (packet, meshPacket);
@@ -567,7 +571,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     public async Task<Context.Entities.NeighborInfo?> SetNeighbor(Context.Entities.NeighborInfo.Source source, Packet packet, Node nodeFrom, Node neighborNode, double snr, Position? nodePosition, Position? neighborPosition)
     {
         if (nodeFrom == neighborNode 
-            || (source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && snr == 0)
+            || packet.PortNum == PortNum.MapReportApp
+            || (source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && (snr == 0 || packet is { HopStart: not null, HopLimit: not null } && Math.Abs(packet.HopLimit.Value - packet.HopStart.Value) != 0))
             || NodesIgnored.Contains(nodeFrom.NodeId) 
             || NodesIgnored.Contains(neighborNode.NodeId)
             || packet.ViaMqtt == true

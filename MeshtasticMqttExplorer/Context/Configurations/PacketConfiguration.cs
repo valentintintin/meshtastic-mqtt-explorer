@@ -49,5 +49,10 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
         builder.HasOne(a => a.Channel)
             .WithMany(a => a.Packets)
             .HasForeignKey(a => a.ChannelId);
+        
+        builder.HasOne(a => a.PacketDuplicated)
+            .WithMany()
+            .HasForeignKey(a => a.PacketDuplicatedId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

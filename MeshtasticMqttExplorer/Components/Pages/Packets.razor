@@ -42,6 +42,11 @@ else
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
             <div style="width: 80px">
                 <a href="/packet/@context.Id" target="_blank" rel="nofollow">@context.PacketId</a>
+                @if (context.PacketDuplicated != null)
+                {
+                    <br/>
+                    <text>Doublon avec </text><a href="/packet/@context.PacketDuplicatedId" target="_blank" rel="nofollow">@context.PacketDuplicated.PacketId</a>
+                }
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Filterable>
@@ -126,6 +131,7 @@ else
             .Include(a => a.Gateway)
             .Include(a => a.From)
             .Include(a => a.To)
+            .Include(a => a.PacketDuplicated)
             .Where(a => !Id.HasValue || a.From.Id == Id);
         
         var localContext = await ContextFactory.CreateDbContextAsync();

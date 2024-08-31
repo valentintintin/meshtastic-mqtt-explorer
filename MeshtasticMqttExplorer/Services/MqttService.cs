@@ -200,13 +200,11 @@ public class MqttService : BackgroundService
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
-            await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
-            
-            if (packet.Value.packet.HopStart == packet.Value.packet.HopLimit)
+            if (packet.Value.packet.PacketDuplicated == null)
             {
-                await meshtasticService.SetNeighbor(Context.Entities.NeighborInfo.Source.Gateway, packet.Value.packet, packet.Value.packet.From, packet.Value.packet.Gateway, packet.Value.packet.RxSnr ?? 0, packet.Value.packet.Position, packet.Value.packet.GatewayPosition);
+                await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
             }
-            
+
             await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
         }
     }

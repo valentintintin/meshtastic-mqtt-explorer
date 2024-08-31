@@ -26,7 +26,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
                        {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr})" : "Via lui-même")}
 
-                       > {meshPacket.GetPayload<string>()}
+                       > {meshPacket.GetPayload()}
                        """;
         
         foreach (var notificationConfiguration in notificationsCanalToSend)

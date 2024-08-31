@@ -26,11 +26,20 @@
             </TimelineItem>
             <TimelineItem Color="green">
                 <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames (Passerelle)</a>
+                <br />
+                Distance de <b>@Packet.GatewayDistanceKm Km</b> - SNR <b>@Packet.RxSnr</b>
             </TimelineItem>
             <TimelineItem Color="red">
                 <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames (Destinataire)</a>
             </TimelineItem>
         </Timeline>
+        
+        @if (Packet.PacketDuplicated != null)
+        {
+            <p>
+                <text>Doublon avec </text><a href="/packet/@Packet.PacketDuplicatedId" target="_blank" rel="nofollow">@Packet.PacketDuplicated.PacketId</a>
+            </p>
+        }
         
         <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
     }
