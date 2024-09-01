@@ -200,7 +200,7 @@ public class MqttService : BackgroundService
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
-            if (packet.Value.packet.PacketDuplicated == null)
+            if (packet.Value.packet.PacketDuplicated == null || (packet.Value.packet is { HopStart: not null, HopLimit: not null } && Math.Abs(packet.Value.packet.HopLimit.Value - packet.Value.packet.HopStart.Value) == 0))
             {
                 await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
             }

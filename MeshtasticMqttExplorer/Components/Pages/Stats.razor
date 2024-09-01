@@ -15,23 +15,23 @@
 
 <Spin Spinning="Loading">
     <GridRow Gutter="(16, 16)" Justify="center">
-        <GridCol Xs="24" Lg="12">
-            <Card Title="Type de paquet (hors chiffrés)">
-                <ChildContent>
-                    @if (Loading)
-                    {
-                        <Skeleton></Skeleton>
-                    }
-                    else
-                    {
-                        <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configBarType"/>
-                    }
-                </ChildContent>
-            </Card>
-        </GridCol>
+        @* <GridCol Xs="24" Lg="12"> *@
+        @*     <Card Title="Type de paquet (hors chiffrés)"> *@
+        @*         <ChildContent> *@
+        @*             @if (Loading) *@
+        @*             { *@
+        @*                 <Skeleton></Skeleton> *@
+        @*             } *@
+        @*             else *@
+        @*             { *@
+        @*                 <AntDesign.Charts.Column Data="DataPacketTypes" Config="_configBarType"/> *@
+        @*             } *@
+        @*         </ChildContent> *@
+        @*     </Card> *@
+        @* </GridCol> *@
         
         <GridCol Xs="24" Lg="12">
-            <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour hier">
+            <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
                 <ChildContent>
                     <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
                         <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
@@ -124,7 +124,6 @@
 {
     private bool Loading { get; set; } = true;
     private DataContext Context { get; set; } = null!;
-    private List<ChartData<int>> DataPacketTypes { get; set; } = [];
     private List<ChartData<int>> DataProfileTypes { get; set; } = [];
     private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
@@ -146,41 +145,27 @@
         },
     };
     
-    private readonly ColumnConfig _configBarType = new()
-    {
-        XField = "type",
-        YField = "value",
-        Meta = new
-        {
-            Type = new
-            {
-                Alias = "Donnée",
-            },
-            Value = new
-            {
-                Alias = "Nombre",
-            },
-        },
-    };
+    // private readonly ColumnConfig _configBarType = new()
+    // {
+    //     XField = "type",
+    //     YField = "value",
+    //     Meta = new
+    //     {
+    //         Type = new
+    //         {
+    //             Alias = "Donnée",
+    //         },
+    //         Value = new
+    //         {
+    //             Alias = "Nombre",
+    //         },
+    //     },
+    // };
     
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
-        DataPacketTypes = await Context.Packets
-            .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))
-            .GroupBy(a => new
-            {
-                a.MqttServer,
-                a.PortNum
-            }, (grouped, packets) => new ChartData<int>
-            {
-                type = $"[{grouped.MqttServer}] {(grouped.PortNum.HasValue ? grouped.PortNum.ToString() : "Chiffrés")!}",
-                value = packets.Count()
-            })
-            .OrderByDescending(v => v.value)
-            .ToListAsync();
-        
         DataNodeTypes = await Context.Nodes
             .Where(a => a.Role.HasValue)
             .GroupBy(a => a.Role, (role, nodes) => new ChartData<int>
@@ -229,7 +214,7 @@
         
         DataYesterdayNodePackets = await Context.Packets
             .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))
-            .Where(a => a.CreatedAt.Date == yesterday)
+            .Where(a => a.CreatedAt.Date >= yesterday)
             .GroupBy(a => new
             {
                 a.MqttServer,
