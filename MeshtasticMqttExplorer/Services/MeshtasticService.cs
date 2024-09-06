@@ -540,14 +540,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     {
         if (regionCode.HasValue)
         {
-            if (node.RegionCode != null && source == RegionCodeAndModemPresetSource.Mqtt)
+            if (node.RegionCode != regionCode && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo 
+                || node.RegionCode != null && source is RegionCodeAndModemPresetSource.Mqtt or RegionCodeAndModemPresetSource.Neighbor
+            )
             {
-                return;
-            }
-            
-            if (node.RegionCode != regionCode)
-            {
-                
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) so we set it from {source} to {regionCode}", node, node.RegionCode, source, regionCode);
                 node.RegionCode = regionCode;
             }
@@ -555,12 +551,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         if (modemPreset.HasValue)
         {
-            if (node.ModemPreset != null && source == RegionCodeAndModemPresetSource.Mqtt)
-            {
-                return;
-            }
-            
-            if (node.ModemPreset != modemPreset)
+            if (node.ModemPreset != modemPreset && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo 
+                || node.ModemPreset != null && source is RegionCodeAndModemPresetSource.Mqtt or RegionCodeAndModemPresetSource.Neighbor
+            )
             {
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldModemPreset}) so we set it from {source} to {modemPreset}", node, node.ModemPreset, source, modemPreset);
                 node.ModemPreset = modemPreset;
