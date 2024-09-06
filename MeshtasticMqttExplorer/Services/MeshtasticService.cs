@@ -150,6 +150,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             RxTime = meshPacket.RxTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(meshPacket.RxTime) : null,
             PortNum = meshPacket.Decoded?.Portnum,
             WantResponse = meshPacket.Decoded?.WantResponse,
+            RequestId = meshPacket.Decoded?.RequestId > 0 ? meshPacket.Decoded?.RequestId : null,
             ReplyId = meshPacket.Decoded?.ReplyId > 0 ? meshPacket.Decoded?.ReplyId : null,
             Payload = meshPacket.ToByteArray(),
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
@@ -419,6 +420,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         var hop = 0;
         var lastNode = nodeFrom;
+        
         foreach (var nodeId in payload.Route)
         {
             var node = await Context.Nodes
@@ -427,6 +429,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             {
                 NodeId = nodeId
             };
+            
             if (node.Id == 0)
             {
                 Context.Add(node);
