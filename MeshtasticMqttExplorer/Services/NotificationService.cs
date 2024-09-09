@@ -19,6 +19,8 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .ToList();
 
+        var isText = meshPacket.Decoded?.Portnum is PortNum.TextMessageApp;
+        
         var message = $"""
                        [{packet.Channel.Name}] {packet.From.AllNames}
                        
@@ -26,7 +28,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
                        {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}{(packet is { HopStart: not null, HopLimit: not null } && Math.Abs(packet.HopLimit.Value - packet.HopStart.Value) == 0 ? " reçu en direct": "")})" : "Via lui-même")}
 
-                       > {meshPacket.GetPayload()}
+                       > {(isText ? "" : $"{meshPacket.Decoded?.Portnum} :\n")} {meshPacket.GetPayload()}
                        """;
         
         foreach (var notificationConfiguration in notificationsCanalToSend)
