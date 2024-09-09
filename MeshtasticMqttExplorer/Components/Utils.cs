@@ -73,7 +73,7 @@ public static class Utils
         .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
         .OrderBy(p => p.Text)
         .ToArray();
-    public static List<TableFilter<string?>> MqttServerFilters = [];
+    public static readonly List<TableFilter<string?>> MqttServerFilters = [];
 
     public static readonly TableLocale TableLocale = new()
     {
@@ -133,7 +133,7 @@ public static class Utils
         return Math.Round(distance, 2);
     }
 
-    public static double DegreesToRadians(double degrees)
+    private static double DegreesToRadians(double degrees)
     {
         return degrees * Math.PI / 180;
     }

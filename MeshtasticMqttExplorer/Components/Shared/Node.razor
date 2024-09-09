@@ -392,7 +392,7 @@
     private Osm? Map { get; set; }
 
     private readonly LineConfig _configAirUtilPercentage = Utils.GetLineConfig("Pourcentage (%)", 0, 100);
-    private readonly LineConfig _configVoltageBattery = Utils.GetLineConfig("Tension (V)", 0, 5);
+    private readonly LineConfig _configVoltageBattery = Utils.GetLineConfig("Tension (V)", 0);
     private readonly LineConfig _configTemperature = Utils.GetLineConfig("Température (°C) / Humidité (%)", -10, 100);
     private readonly LineConfig _configPressure = Utils.GetLineConfig("Pression atmosphérique (hPa)", 950, 1050);
     private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)", 0);
