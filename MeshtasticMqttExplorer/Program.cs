@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using AntDesign;
 using Blazored.LocalStorage;
+using Google.Protobuf;
+using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
@@ -106,6 +108,45 @@ try
     MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>().GetSection("NodesIgnored").Get<List<uint>>() ?? []);
     Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToHexString()).JoinString()}");
 
+    // var packets = context.Packets.Where(a => a.PortNum != PortNum.TracerouteApp && !a.RequestId.HasValue).Take(1000).ToList();
+    // var i = 0;
+    //
+    // do
+    // {
+    //     foreach (var packet in packets)
+    //     {
+    //         var packetData = new MeshPacket();
+    //
+    //         var rootPacket = new ServiceEnvelope();
+    //         rootPacket.MergeFrom(packet.Payload);
+    //
+    //         if (rootPacket.Packet != null)
+    //         {
+    //             packetData = rootPacket.Packet;
+    //         }
+    //         else
+    //         {
+    //             packetData.MergeFrom(packet.Payload);
+    //         }
+    //
+    //         if (packetData != null)
+    //         {
+    //             packet.RequestId = packetData.Decoded?.RequestId;
+    //             context.Update(packet);
+    //         }
+    //         else
+    //         {
+    //             Console.WriteLine("Error : " + packet.Id);
+    //         }
+    //     }
+    //
+    //     await context.SaveChangesAsync();
+    //     
+    //     Console.WriteLine(i++ * 1000);
+    //     
+    //     packets = context.Packets.Where(a => a.PortNum != PortNum.TracerouteApp && !a.RequestId.HasValue).Take(1000).ToList();
+    // } while(packets.Count > 0);
+    
     Console.WriteLine("Started");
 
     await app.RunAsync();

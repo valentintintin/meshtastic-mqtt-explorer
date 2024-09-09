@@ -11,4 +11,5 @@
   &lt;Assembly Path="/usr/lib/dotnet/shared/Microsoft.NETCore.App/8.0.0/System.Private.CoreLib.dll" /&gt;
 &lt;/AssemblyExplorer&gt;</s:String>
 	<s:String x:Key="/Default/Monitoring/PerformanceProfilingMode/@EntryValue">Sampling</s:String>
+	<s:String x:Key="/Default/Monitoring/StartMode/@EntryValue">OnDebug</s:String>
 	</wpf:ResourceDictionary>

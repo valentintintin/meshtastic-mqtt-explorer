@@ -387,7 +387,6 @@
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsCurrent { get; set; }
-    private List<Packet> PacketsGateway { get; set; } = [];
     private bool HasRenderMapData { get; set; }
     private Osm? Map { get; set; }
 
@@ -698,10 +697,6 @@
                 }
             }).ToList();
 
-        PacketsGateway = NodeInfo?.PacketsFrom?
-            .GroupBy(a => a.Gateway, (node, packets) =>  packets.OrderByDescending(p => p.GatewayDistanceKm).ThenByDescending(p => p.UpdatedAt).First())
-            .ToList() ?? [];
-        
         base.OnParametersSet();
     }
     

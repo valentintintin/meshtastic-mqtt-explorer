@@ -418,10 +418,17 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
-        var hop = 0;
-        var lastNode = nodeFrom;
+        // On ne regarde que la réponse du traceroute qui PART du destinaite voulu pour arriver à l'expéditeur et donc contient la route en inversé 
         
-        foreach (var nodeId in payload.Route)
+        if (packet.RequestId == 0)
+        {
+            return;
+        }
+        
+        var hop = 0;
+        var lastNode = nodeTo; // En fait correspond au from dans le message retour
+        
+        foreach (var nodeId in payload.Route.Reverse())
         {
             var node = await Context.Nodes
                 .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
@@ -439,8 +446,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             
             var traceroute = new Traceroute
             {
-                From = nodeFrom,
-                To = nodeTo,
+                From = nodeTo, // From
+                To = nodeFrom, // To
                 Packet = packet,
                 Node = node,
                 Hop = hop
@@ -455,7 +462,6 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         
         await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute, packet, lastNode, nodeTo, 0, lastNode.Positions.FirstOrDefault(), nodeTo.Positions.FirstOrDefault());
-        await Context.SaveChangesAsync();
     }
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)

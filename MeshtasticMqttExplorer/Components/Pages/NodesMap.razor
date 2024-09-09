@@ -130,9 +130,9 @@
         .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(null, "Tous")])
         .ToList();
     private List<SegmentedOption<string[]>> Frequencies { get; } = [ 
-        new SegmentedOption<string[]>([""], "Tous"),
-        new SegmentedOption<string[]>(["869.4", ".400"], "869.400 Mhz"),
-        new SegmentedOption<string[]>([".4625"], "869.4625 Mhz"),
+        new([""], "Tous"),
+        new([".4625"], "869.4625 Mhz"),
+        new(["869.4", ".400"], "869.400 Mhz"),
     ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

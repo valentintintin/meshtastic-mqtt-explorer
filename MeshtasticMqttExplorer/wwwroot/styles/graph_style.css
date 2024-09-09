@@ -41,7 +41,7 @@ svg {
     z-index: 10;
     font: 12px sans-serif;
     padding: 2px;
-    width: 350px;
+    width: 360px;
     background-color: #333;
     color: white;
     border: 0px solid;
@@ -55,7 +55,7 @@ svg {
     background-color: #222;
     color: white;
     padding: 2px;
-    width: 350px;
+    width: 360px;
     bottom: 5px;
     overflow-y: auto;
     border: 0px solid;

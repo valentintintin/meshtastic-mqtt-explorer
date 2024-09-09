@@ -11,14 +11,14 @@
 @using Telemetry = Meshtastic.Protobufs.Telemetry
 @using Waypoint = Meshtastic.Protobufs.Waypoint
 
-@inject IJSRuntime JSRuntime
+@inject IJSRuntime JsRuntime
 @inject IMessageService Message
 
 <div style="display: flex; flex-direction: column">
     @if (Packet.PortNum != null)
     {
         <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
-            <div style="flex: 1; max-width: 500px;">
+            <div style="max-width: 500px;">
                 @if (ShowJson)
                 {
                     <b>Décodé</b>
@@ -466,7 +466,7 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("copyTextToClipboard", text);
+            await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
             await Message.Info("JSON copié  !");
         }
         catch (Exception)
