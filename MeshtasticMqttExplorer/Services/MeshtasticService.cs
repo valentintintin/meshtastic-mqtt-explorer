@@ -160,7 +160,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             MqttTopic = topics?.Take(topics.Length - 1).JoinString("/"),
             PacketDuplicated = await Context.Packets.OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && (DateTime.UtcNow - a.CreatedAt).TotalMinutes < 1)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && (DateTime.UtcNow - a.CreatedAt).TotalHours < 1)
         };
 
         Context.Add(packet);
@@ -590,7 +590,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             distance = Utils.CalculateDistance(nodePosition.Latitude, nodePosition.Longitude,
                 neighborPosition.Latitude, neighborPosition.Longitude);
         }
-            
+        
         var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode && n.DataSource == source) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
         {
             Node = nodeFrom,
@@ -616,6 +616,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             neighborInfo.NodePosition = nodePosition;
             neighborInfo.NeighborPosition = neighborPosition;
             neighborInfo.Distance = distance;
+            neighborInfo.DataSource = source;
             Context.Update(neighborInfo);
         }
         
