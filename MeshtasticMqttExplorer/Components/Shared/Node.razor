@@ -134,7 +134,7 @@
                 {
                     if (NodeInfo?.MyNeighbors.Any() == true)
                     {
-                        <AntList DataSource="@NodeInfo.MyNeighbors" TItem="NeighborInfo">
+                        <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
                                     <ListItemMeta>
@@ -162,7 +162,7 @@
 
                     @if (NodeInfo?.NeighborsFor.Any() == true)
                     {
-                        <AntList DataSource="@NodeInfo.NeighborsFor" TItem="NeighborInfo">
+                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
                                     <ListItemMeta>
