@@ -546,8 +546,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     {
         if (regionCode.HasValue)
         {
-            if (node.RegionCode != regionCode && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo 
-                || node.RegionCode != null && source is RegionCodeAndModemPresetSource.Mqtt or RegionCodeAndModemPresetSource.Neighbor
+            if (node.RegionCode == null
+                || node.RegionCode != regionCode && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo
             )
             {
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldRegionCode}) so we set it from {source} to {regionCode}", node, node.RegionCode, source, regionCode);
@@ -557,8 +557,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         if (modemPreset.HasValue)
         {
-            if (node.ModemPreset != modemPreset && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo 
-                || node.ModemPreset != null && source is RegionCodeAndModemPresetSource.Mqtt or RegionCodeAndModemPresetSource.Neighbor
+            if (node.ModemPreset == null
+                || node.ModemPreset != modemPreset && source is RegionCodeAndModemPresetSource.MapReport or RegionCodeAndModemPresetSource.NodeInfo 
             )
             {
                 Logger.LogDebug("Node {node} does not have the same RegionCode ({oldModemPreset}) so we set it from {source} to {modemPreset}", node, node.ModemPreset, source, modemPreset);
@@ -591,7 +591,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 neighborPosition.Latitude, neighborPosition.Longitude);
         }
         
-        var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode && n.DataSource == source) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
+        var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new MeshtasticMqttExplorer.Context.Entities.NeighborInfo
         {
             Node = nodeFrom,
             NodePosition = nodePosition,
