@@ -95,19 +95,18 @@
         var today = DateTime.UtcNow.Date;
         var aDay = DateTime.UtcNow.AddHours(-24);
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
-        var threeDays = DateTime.UtcNow.Date.AddDays(-3);
         
         var query = Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.Distance > 0 && a.Distance <= 350 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance > 0 && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && a.Distance <= 350 && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance > 0 && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
-            .Include(n => n.Positions.Where(a => a.UpdatedAt >= aDay).OrderByDescending(a => a.UpdatedAt))
-            .Include(n => n.Telemetries.Where(a => a.CreatedAt >= threeDays).OrderBy(a => a.CreatedAt))
+            .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt))
+            .Include(n => n.Telemetries.OrderBy(a => a.CreatedAt))
             .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Node)
             .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.To)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
@@ -131,7 +130,7 @@
         
         Alive = Node.LastSeen >= aDay;
         
-        var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp);
+        var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null);
         NbPackets.Total = await countPackets.CountAsync();
         NbPackets.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
         NbPackets.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);

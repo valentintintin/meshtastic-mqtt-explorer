@@ -15,6 +15,9 @@ public static class Utils
     public static readonly string Blue = Color.DodgerBlue.Name.ToLower();
     public static readonly string Gray = Color.DarkGray.Name.ToLower();
     public static readonly string Orange = Color.OrangeRed.Name.ToLower();
+
+    public static readonly int DefaultDistanceAllowed = 350; 
+    public static readonly int DifferenceBetweenDistanceAllowed = 50; 
     
     public static readonly TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>[] RegionCodeFilters = ((Config.Types.LoRaConfig.Types.RegionCode[])Enum.GetValues(typeof(Config.Types.LoRaConfig.Types.RegionCode)))
         .Select(p => new TableFilter<Config.Types.LoRaConfig.Types.RegionCode?>

@@ -178,7 +178,7 @@
                                         @foreach (var neighbor in NeighborInfo?.Neighbors ?? [])
                                         {
                                             <Tag>
-                                                !@neighbor.NodeId.ToString("X").ToLower()
+                                                <a href="/node/by-nodeid/@neighbor.NodeId.ToHexString()" target="_blank" rel="nofollow">@neighbor.NodeId.ToHexString()</a>
                                                 (SNR : @neighbor.Snr)
                                             </Tag>
                                         }

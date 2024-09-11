@@ -12,7 +12,14 @@
         <Card Style="width:100%;" Title="Position">
             @if (NodeInfo?.Latitude.HasValue == true && NodeInfo?.Longitude.HasValue == true)
             {
-                <p>Altitude : <b>@(NodeInfo.Altitude?.ToString() ?? "-")m</b></p>
+                
+                <p>
+                    Latitude : <b>@(NodeInfo.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
+                    <br />
+                    Longitude : <b>@(NodeInfo.Longitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
+                    <br />
+                    Altitude : <b>@(NodeInfo.Altitude?.ToString() ?? "-")m</b>
+                </p>
 
                 <Osm Latitude="NodeInfo.Latitude!.Value" Longitude="NodeInfo.Longitude!.Value" Zoom="13" @ref="Map"></Osm>
             }
@@ -480,6 +487,7 @@
                     lines.AddRange(
                         NodeInfo.MyNeighbors
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Neighbor.Id}->node-{NodeInfo.Id}",
@@ -517,6 +525,7 @@
                     lines.AddRange(
                         NodeInfo.NeighborsFor
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
