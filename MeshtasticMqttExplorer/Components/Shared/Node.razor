@@ -43,7 +43,7 @@
                     </DescriptionsItem>
                     
                     <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                        @(NbPackets?.Today ?? 0)/@(NbPackets?.Yesterday ?? 0)/@(NbPackets?.Total ?? 0)
+                        @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)/@(PacketsInfo?.Total ?? 0)
                         <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
                     </DescriptionsItem>
                     
@@ -51,8 +51,29 @@
                         @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
                     </DescriptionsItem>
                     
+                    @if (!string.IsNullOrWhiteSpace(PacketsInfo?.MqttServer))
+                    {
+                        <DescriptionsItem Title="Serveur MQTT" ContentStyle="font-weight: bold">
+                            @PacketsInfo.MqttServer
+                        </DescriptionsItem>
+                    }
+                    
+                    @if (PacketsInfo?.MqttTopics.Any() == true)
+                    {
+                        <DescriptionsItem Title="Topics MQTT" ContentStyle="font-weight: bold">
+                            @foreach (var topic in PacketsInfo.MqttTopics)
+                            {
+                                @topic
+                            }
+                        </DescriptionsItem>
+                    }
+                    
                     <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
                         @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
+                        @if (!string.IsNullOrWhiteSpace(PacketsInfo?.PrimaryTopic))
+                        {
+                            <text> (@PacketsInfo.PrimaryTopic)</text>
+                        }
                     </DescriptionsItem>
                     
                     <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold">
@@ -383,7 +404,7 @@
     public required Context.Entities.Node? NodeInfo { get; set; }
     
     [Parameter]
-    public NbPacketsMetrics? NbPackets { get; set; }
+    public PacketsStats? PacketsInfo { get; set; }
 
     private Telemetry? LastTelemetryDevice { get; set; }
     private Telemetry? LastTelemetryEnvironment { get; set; }
@@ -709,10 +730,13 @@
         base.OnParametersSet();
     }
     
-    public class NbPacketsMetrics
+    public class PacketsStats
     {
         public int Today { get; set; }
         public int Yesterday { get; set; }
         public int Total { get; set; }
+        public string? MqttServer { get; set; }
+        public string? PrimaryTopic { get; set; }
+        public List<string> MqttTopics = [];
     }
 }

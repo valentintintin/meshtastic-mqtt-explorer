@@ -52,7 +52,7 @@
             </PageHeaderExtra>
         </PageHeader>
 
-        <Node NodeInfo="Node" NbPackets="NbPackets"></Node>
+        <Node NodeInfo="Node" PacketsInfo="PacketsStats"></Node>
     }
     else if (Loading)
     {
@@ -75,7 +75,7 @@
     private bool Loading { get; set; } = true;
     private bool Alive { get; set; }
     private Context.Entities.Node? Node { get; set; }
-    private Node.NbPacketsMetrics NbPackets { get; } = new();
+    private Node.PacketsStats PacketsStats { get; } = new();
     private DataContext Context { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
@@ -131,10 +131,34 @@
         Alive = Node.LastSeen >= aDay;
         
         var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null);
-        NbPackets.Total = await countPackets.CountAsync();
-        NbPackets.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
-        NbPackets.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
+        PacketsStats.Total = await countPackets.CountAsync();
+        PacketsStats.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
+        PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
+        PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
+
+        var mqttPackets = await Context.Packets.Where(a => a.Gateway == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
+            .GroupBy(a => new { a.MqttServer, a.MqttTopic, PrimaryTopic = a.PortNum == PortNum.TextMessageApp })
+            .Select(a => new { a.Key.MqttServer, a.Key.MqttTopic, a.Key.PrimaryTopic, Count = a.Count() })
+            .OrderByDescending(a => a.Count)
+            .ToListAsync();
         
+        PacketsStats.MqttServer =  mqttPackets.FirstOrDefault()?.MqttServer;
+
+        if (!string.IsNullOrWhiteSpace(PacketsStats.MqttServer))
+        {
+            PacketsStats.PrimaryTopic = mqttPackets
+                .Where(a => a.MqttServer! == PacketsStats.MqttServer && a.PrimaryTopic)
+                .Select(a => a.MqttTopic!)
+                .FirstOrDefault();
+            
+            PacketsStats.MqttTopics = mqttPackets
+                .Where(a => a.MqttServer! == PacketsStats.MqttServer)
+                .Select(a => a.MqttTopic!)
+                .Distinct()
+                .Order()
+                .ToList();
+        }
+
         Loading = false;
     }
 
