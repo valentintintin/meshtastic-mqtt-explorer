@@ -8,6 +8,7 @@
 @using MeshtasticMqttExplorer.Context.Entities
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
+@inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject NavigationManager NavigationManager
 
@@ -17,7 +18,7 @@
 {
     <PageHeader Title="Trames" OnBack="OnBack">
         <SubtitleTemplate>
-            @Total trames @(Node?.AllNames) depuis les 15 derniers jours
+            @Total trames @(Node?.AllNames) depuis les @NbDaysPurge derniers jours
         </SubtitleTemplate>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
@@ -34,6 +35,11 @@ else
             <Button OnClick="FetchData">Actualiser</Button>
         </PageHeaderExtra>
     </PageHeader>
+}
+
+@if (Id.HasValue)
+{
+    <Segmented Options="@ShowTypesOptions" Value="CurrentShowType" TValue="ShowType" OnChange="SetShowType"/>
 }
 
 <Table TItem="Packet" DataSource="PacketsQueryable" Responsive
@@ -119,46 +125,80 @@ else
     private IQueryable<Packet> PacketsQueryable { get; set; } = null!;
     private int Total { get; set; }
     private DataContext Context { get; set; } = null!;
-
-    private TableFilter<long>[] _channelFilters = [];
-
+    private int NbDaysPurge { get; set; }
+    private ShowType CurrentShowType { get; set; } = ShowType.From;
+    
+    private readonly List<SegmentedOption<ShowType>> ShowTypesOptions = [
+        new(ShowType.From, "En tant qu'expéditeur"),
+        new(ShowType.To, "En tant que destinataire"),
+        new(ShowType.Gateway, "En tant que passerelle"),
+        new(ShowType.FromTo, "En tant qu'expéditeur et destinaire"),
+        new(ShowType.All, "Tous"),
+    ];
+    
     protected override async Task OnInitializedAsync()
     {
+        NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
+        
         Context = await ContextFactory.CreateDbContextAsync();
-        
-        PacketsQueryable =  PacketsQueryable = Context.Packets
-            .Include(a => a.Channel)
-            .Include(a => a.Gateway)
-            .Include(a => a.From)
-            .Include(a => a.To)
-            .Include(a => a.PacketDuplicated)
-            .Where(a => !Id.HasValue || a.From.Id == Id);
-        
-        var localContext = await ContextFactory.CreateDbContextAsync();
-
-        _channelFilters = await localContext.Channels
-            .OrderBy(c => c.Name)
-            .Select(c => new TableFilter<long>
-            {
-                Text = c.Name,
-                Value = c.Id
-            }).ToArrayAsync();
         
         if (Id.HasValue)
         {
-            Node = await Context.Nodes.FindAsync(Id);
+            Node = Context.Nodes.Find(Id);
         }
         
-        Total = localContext.Packets.Count(a => !Id.HasValue || a.FromId == Id);
-
-        await localContext.DisposeAsync();
+        FetchData();
         
         await base.OnInitializedAsync();
     }
 
     private void FetchData()
     {
-        Total = Context.Packets.Count(a => !Id.HasValue || a.FromId == Id);
+        PacketsQueryable = Context.Packets
+                .Include(a => a.Channel)
+                .Include(a => a.Gateway)
+                .Include(a => a.From)
+                .Include(a => a.To)
+                .Include(a => a.PacketDuplicated);
+
+        IQueryable<Packet> totalQueryable = Context.Packets;
+
+        if (Id.HasValue)
+        {
+            switch (CurrentShowType)
+            {
+                case ShowType.From:
+                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id);
+                    totalQueryable = totalQueryable.Where(a => a.FromId == Id);
+                    break;
+                case ShowType.Gateway:
+                    PacketsQueryable = PacketsQueryable.Where(a => a.GatewayId == Id);
+                    totalQueryable = totalQueryable.Where(a => a.GatewayId == Id);
+                    break;
+                case ShowType.To:
+                    PacketsQueryable = PacketsQueryable.Where(a => a.ToId == Id);
+                    totalQueryable = totalQueryable.Where(a => a.ToId == Id);
+                    break;
+                case ShowType.FromTo:
+                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id || a.ToId == Id);
+                    totalQueryable = totalQueryable.Where(a => a.FromId == Id || a.ToId == Id);
+                    break;
+                case ShowType.All:
+                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id);
+                    totalQueryable = totalQueryable.Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+        
+        Total = totalQueryable.Count();
+    }
+
+    private void SetShowType(ShowType showType)
+    {
+        CurrentShowType = showType;
+        FetchData();
     }
 
     public async ValueTask DisposeAsync()
@@ -169,5 +209,14 @@ else
     private void OnBack()
     {
         NavigationManager.NavigateTo($"/node/{Id}");
+    }
+    
+    private enum ShowType
+    {
+        From,
+        Gateway,
+        To,
+        FromTo,
+        All
     }
 }
