@@ -160,7 +160,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             MqttTopic = topics?.Take(topics.Length - 1).JoinString("/"),
             PacketDuplicated = await Context.Packets.OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && (DateTime.UtcNow - a.CreatedAt).TotalHours < 1)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && (DateTime.UtcNow - a.CreatedAt).TotalDays < 1)
         };
 
         Context.Add(packet);
