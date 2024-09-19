@@ -149,7 +149,7 @@ else
     {
         if (Id.HasValue)
         {
-            Node = await Context.Nodes.FindAsync(Id);
+            Node = Context.Nodes.Find(Id);
         }
         
         FetchData();
