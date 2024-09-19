@@ -121,12 +121,15 @@
         Loading = true;
 
         Channels = await Context.Channels
-            .Where(a => a.TextMessages.Count > 0)
+            .Where(a => a.TextMessages.Any(aa => aa.To!.NodeId == MeshtasticService.NodeBroadcast))
             .OrderBy(a => a.Name)
+            .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
 
         Totals = await Context.TextMessages
+            .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
             .GroupBy(t => t.ChannelId)
+            .AsNoTrackingWithIdentityResolution()
             .ToDictionaryAsync(a => a.Key, messages => messages.Count());
         
         if (ChannelId.HasValue)
@@ -141,8 +144,10 @@
                     .Include(a => a.Packet)
                     .ThenInclude(a => a.Gateway)
                     .Where(a => a.Channel == Channel)
+                    .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
                     .OrderByDescending(a => a.CreatedAt)
                     .Skip(PageIndex * PageSize).Take(PageSize)
+                    .AsNoTrackingWithIdentityResolution()
                     .ToListAsync();
                 Total = Totals[Channel.Id];
             }

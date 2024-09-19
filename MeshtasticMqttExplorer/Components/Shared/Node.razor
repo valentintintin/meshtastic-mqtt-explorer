@@ -51,10 +51,10 @@
                         @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
                     </DescriptionsItem>
                     
-                    @if (!string.IsNullOrWhiteSpace(PacketsInfo?.MqttServer))
+                    @if (!string.IsNullOrWhiteSpace(NodeInfo.MqttServer))
                     {
                         <DescriptionsItem Title="Serveur MQTT" ContentStyle="font-weight: bold">
-                            @PacketsInfo.MqttServer
+                            @NodeInfo.MqttServer
                         </DescriptionsItem>
                     }
                     
@@ -63,16 +63,17 @@
                         <DescriptionsItem Title="Topics MQTT" ContentStyle="font-weight: bold">
                             @foreach (var topic in PacketsInfo.MqttTopics)
                             {
-                                @topic
+                                <text>@topic</text>
+                                <br />
                             }
                         </DescriptionsItem>
                     }
                     
                     <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
                         @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
-                        @if (!string.IsNullOrWhiteSpace(PacketsInfo?.PrimaryTopic))
+                        @if (!string.IsNullOrWhiteSpace(NodeInfo.PrimaryChannel))
                         {
-                            <text> (@PacketsInfo.PrimaryTopic)</text>
+                            <text> (@NodeInfo.PrimaryChannel)</text>
                         }
                     </DescriptionsItem>
                     
@@ -232,28 +233,27 @@
                     @foreach (var traceroutes in NodeInfo.TraceroutesFrom.GroupBy(t => t.PacketId, (_, traceroutes) => new
                               {
                                   traceroutes = traceroutes.OrderBy(t => t.Hop).ToList(),
+                                  packetId = traceroutes.First().PacketId,
                                   date = traceroutes.First().CreatedAt,
                                   to = traceroutes.Last().To
                               }).Take(10))
                     {
-                        <p>@traceroutes.date.ToFrench()</p>
+                        <p>
+                            @traceroutes.date.ToFrench()
+                            <br /><a href="/packet/@traceroutes.packetId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                        </p>
                         
                         <Timeline>
                             <TimelineItem Color="blue">
                                 <a href="/node/@NodeInfo.Id" target="_blank" rel="nofollow">@NodeInfo.AllNames</a>
                             </TimelineItem>
-                                
+                            
                             @foreach (var traceroute in traceroutes.traceroutes)
                             {
-                                <TimelineItem Color="green">
+                                <TimelineItem Color="@(traceroute.Node == traceroutes.to ? "red": "green")">
                                     <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
-                                    <br /><a href="/packet/@traceroute.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                 </TimelineItem>
                             }
-
-                            <TimelineItem Color="red">
-                                <a href="/node/@traceroutes.to.Id" target="_blank" rel="nofollow">@traceroutes.to.AllNames</a>
-                            </TimelineItem>
                         </Timeline>
                     }
                 }
@@ -482,7 +482,7 @@
                                 Label = $"Passerelle MQTT : {p.Gateway.AllNames} - Position le {p.GatewayPosition.UpdatedAt.ToFrench()}",
                                 PopupOnHover = true,
                                 Popup = $"<p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{p.Gateway.AllNames}</b></a></p><p>Position le {p.GatewayPosition.UpdatedAt.ToFrench()}</p>",
-                                LinesOnHover = p.Packets.OrderBy(p => p.CreatedAt).Select(pp => new Osm.Line
+                                LinesOnHover = p.Packets.OrderBy(ppp => ppp.CreatedAt).Select(pp => new Osm.Line
                                 {
                                     Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}->node-{NodeInfo.Id}",
                                     Points =
@@ -517,8 +517,8 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
-                                Color = Utils.Gold,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
                 }
@@ -555,8 +555,8 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
-                                Color = Utils.Gold,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Voisin : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p>"
+                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
                 }
@@ -735,8 +735,6 @@
         public int Today { get; set; }
         public int Yesterday { get; set; }
         public int Total { get; set; }
-        public string? MqttServer { get; set; }
-        public string? PrimaryTopic { get; set; }
         public List<string> MqttTopics = [];
     }
 }

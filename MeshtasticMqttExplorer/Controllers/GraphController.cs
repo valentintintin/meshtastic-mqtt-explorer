@@ -1,4 +1,5 @@
 using Meshtastic.Protobufs;
+using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Models;
 using MeshtasticMqttExplorer.Services;
@@ -27,7 +28,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
             .Include(n => n.MyNeighbors
                 .OrderByDescending(t => t.UpdatedAt)
                 .Where(t => t.UpdatedAt >= minDate)
-                .Where(t => t.Distance > 0 && t.Distance <= 350)
+                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed)
             )
             .ThenInclude(nn => nn.Neighbor);
 

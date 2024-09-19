@@ -24,6 +24,14 @@
     margin-bottom: 5px;
 }
 
+.ant-segmented-item-label {
+    white-space: normal;
+}
+
+.leaflet-container a {
+    word-wrap: break-word;
+}
+
 @media screen and (max-width: 576px) {
     td.ant-table-cell:first-child {
         background-color: #d0d0d0 !important;

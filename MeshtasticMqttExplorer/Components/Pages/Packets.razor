@@ -39,7 +39,7 @@ else
 
 @if (Id.HasValue)
 {
-    <Segmented Options="@ShowTypesOptions" Value="CurrentShowType" TValue="ShowType" OnChange="SetShowType"/>
+    <Segmented Block Options="@ShowTypesOptions" Value="CurrentShowType" TValue="ShowType" OnChange="SetShowType"/>
 }
 
 <Table TItem="Packet" DataSource="PacketsQueryable" Responsive
@@ -142,14 +142,19 @@ else
         
         Context = await ContextFactory.CreateDbContextAsync();
         
+        await base.OnInitializedAsync();
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
         if (Id.HasValue)
         {
-            Node = Context.Nodes.Find(Id);
+            Node = await Context.Nodes.FindAsync(Id);
         }
         
         FetchData();
         
-        await base.OnInitializedAsync();
+        await base.OnParametersSetAsync();
     }
 
     private void FetchData()
@@ -159,7 +164,8 @@ else
                 .Include(a => a.Gateway)
                 .Include(a => a.From)
                 .Include(a => a.To)
-                .Include(a => a.PacketDuplicated);
+                .Include(a => a.PacketDuplicated)
+                .AsNoTrackingWithIdentityResolution();
 
         IQueryable<Packet> totalQueryable = Context.Packets;
 
@@ -192,7 +198,9 @@ else
             }
         }
         
-        Total = totalQueryable.Count();
+        Total = totalQueryable
+            .AsNoTrackingWithIdentityResolution()
+            .Count();
     }
 
     private void SetShowType(ShowType showType)

@@ -73,6 +73,7 @@
             .Where(n => n.Node.Latitude.HasValue && n.Node.Longitude.HasValue)
             .GroupBy(n => n.NodeId)
             .Select(a => a.OrderByDescending(b => b.CreatedAt).First())
+            .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
 
         Loading = false;

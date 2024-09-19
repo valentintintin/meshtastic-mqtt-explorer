@@ -31,6 +31,7 @@ public class NeighborInfo : IEntity
     {
         Neighbor,
         Gateway,
-        Traceroute
+        Traceroute,
+        Unknown
     }
 }

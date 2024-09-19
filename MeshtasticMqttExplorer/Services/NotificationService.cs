@@ -26,7 +26,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
                        
                        {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour : {packet.To.AllNames}" : "En broadcast")}
 
-                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}{(packet is { HopStart: not null, HopLimit: not null } && Math.Abs(packet.HopLimit.Value - packet.HopStart.Value) == 0 ? " reçu en direct": "")})" : "Via lui-même")}
+                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}{(packet is { HopStart: not null, HopLimit: not null } && packet.HopLimit == packet.HopStart ? " reçu en direct": "")})" : "Via lui-même")}
 
                        > {(isText ? "" : $"{meshPacket.Decoded?.Portnum} :\n")} {meshPacket.GetPayload()}
                        """;

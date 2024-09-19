@@ -121,6 +121,7 @@
         Nodes = await Context.Nodes
             .Include(n => n.Waypoints.Where(w => w.ExpiresAt >= DateTime.UtcNow))
             .Where(n => n.Waypoints.Any(w => w.ExpiresAt >= DateTime.UtcNow))
+            .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
 
         Loading = false;

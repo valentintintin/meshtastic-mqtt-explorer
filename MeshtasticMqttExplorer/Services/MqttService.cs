@@ -115,6 +115,17 @@ public class MqttService : BackgroundService
         }
     }
 
+    public async Task<string?> GetMqttServerForNode(Node node)
+    {
+        var mqttPackets = await (await _contextFactory.CreateDbContextAsync()).Packets.Where(a => a.Gateway == node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
+            .GroupBy(a => new { a.MqttServer, a.MqttTopic, PrimaryTopic = a.PortNum == PortNum.TextMessageApp })
+            .Select(a => new { a.Key.MqttServer, a.Key.MqttTopic, a.Key.PrimaryTopic, Count = a.Count() })
+            .OrderByDescending(a => a.Count)
+            .ToListAsync();
+        
+        return mqttPackets.FirstOrDefault()?.MqttServer;
+    }
+
     private async Task DoReceive(string topic, byte[]? data, MqttConfiguration mqttConfiguration)
     {
         var topicSegments = topic.Split("/");
@@ -172,6 +183,12 @@ public class MqttService : BackgroundService
 
         if (packet != null)
         {
+            packet.Value.packet.From.MqttServer = await GetMqttServerForNode(packet.Value.packet.From);
+            var dataContext = await _contextFactory.CreateDbContextAsync();
+            dataContext.Attach(packet.Value.packet.From);
+            dataContext.Update(packet.Value.packet.From);
+            await dataContext.SaveChangesAsync();
+            
             Config.Types.LoRaConfig.Types.RegionCode? regionCode = null;
             Config.Types.LoRaConfig.Types.ModemPreset? modemPreset = null;
             
@@ -202,8 +219,9 @@ public class MqttService : BackgroundService
 
             // TODO doublon ne pas renvoyer sauf si direct. Cas des serveurs MQTT différents
             if (packet.Value.packet.PacketDuplicated == null
-                || packet.Value.packet.Gateway == packet.Value.packet.To
-                || (packet.Value.packet is { HopStart: not null, HopLimit: not null } && Math.Abs(packet.Value.packet.HopLimit.Value - packet.Value.packet.HopStart.Value) == 0))
+                // || packet.Value.packet.Gateway == packet.Value.packet.To
+                // || (packet.Value.packet is { HopStart: not null, HopLimit: not null } && packet.Value.packet.HopLimit == packet.Value.packet.HopStart)
+            )
             {
                 await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
             }
@@ -369,7 +387,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate && a.Node == node));
-        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.Node == node));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate.AddMonths(-1) && a.Node == node));
 
         await context.SaveChangesAsync();
     }
@@ -385,7 +403,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate));
-        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate.AddMonths(-1)));
 
         await context.SaveChangesAsync();
     }

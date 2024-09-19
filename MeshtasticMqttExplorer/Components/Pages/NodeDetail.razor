@@ -8,6 +8,7 @@
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using MeshtasticMqttExplorer.Extensions.Entities
+@using MeshtasticMqttExplorer.Services
 
 @inject IDbContextFactory<DataContext> ContextFactory
 
@@ -82,9 +83,14 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
 
+        await base.OnInitializedAsync();
+    }
+    
+    protected override async Task OnParametersSetAsync()
+    {
         await FetchData();
 
-        await base.OnInitializedAsync();
+        await base.OnParametersSetAsync();
     }
 
     private async Task FetchData()
@@ -110,6 +116,7 @@
             .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Node)
             .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.To)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
+            .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery();
 
         if (Id.HasValue)
@@ -121,42 +128,35 @@
             Node = await query.FindByNodeIdStringAsync(NodeId);
         }
 
-        if (Node == null)
+        if (Node == null || Node.NodeId == MeshtasticService.NodeBroadcast)
         {
             Loading = false;
+            Node = null;
 
             return;
         }
         
         Alive = Node.LastSeen >= aDay;
         
-        var countPackets = Context.Packets.Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null);
+        var countPackets = Context.Packets
+            .Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null)
+            .AsNoTrackingWithIdentityResolution();
         PacketsStats.Total = await countPackets.CountAsync();
         PacketsStats.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
-
-        var mqttPackets = await Context.Packets.Where(a => a.Gateway == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
-            .GroupBy(a => new { a.MqttServer, a.MqttTopic, PrimaryTopic = a.PortNum == PortNum.TextMessageApp })
-            .Select(a => new { a.Key.MqttServer, a.Key.MqttTopic, a.Key.PrimaryTopic, Count = a.Count() })
-            .OrderByDescending(a => a.Count)
-            .ToListAsync();
         
-        PacketsStats.MqttServer =  mqttPackets.FirstOrDefault()?.MqttServer;
-
-        if (!string.IsNullOrWhiteSpace(PacketsStats.MqttServer))
+        if (!string.IsNullOrWhiteSpace(Node.MqttServer))
         {
-            PacketsStats.PrimaryTopic = mqttPackets
-                .Where(a => a.MqttServer! == PacketsStats.MqttServer && a.PrimaryTopic)
-                .Select(a => a.MqttTopic!)
-                .FirstOrDefault();
-            
-            PacketsStats.MqttTopics = mqttPackets
-                .Where(a => a.MqttServer! == PacketsStats.MqttServer)
+            var mqttPackets = await Context.Packets
+                .Where(a => a.Gateway == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
+                .Where(a => a.MqttServer! == Node.MqttServer)
                 .Select(a => a.MqttTopic!)
                 .Distinct()
-                .Order()
-                .ToList();
+                .AsNoTrackingWithIdentityResolution()
+                .ToListAsync();
+            
+            PacketsStats.MqttTopics = mqttPackets.Order().ToList();
         }
 
         Loading = false;

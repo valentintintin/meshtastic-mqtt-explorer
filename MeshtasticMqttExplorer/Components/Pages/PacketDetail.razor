@@ -82,6 +82,7 @@
             .Include(n => n.From)
             .Include(n => n.To)
             .Include(n => n.Gateway)
+            .AsNoTrackingWithIdentityResolution()
         ;
 
         if (Id.HasValue)

@@ -8,6 +8,7 @@
 @using MeshtasticMqttExplorer.Context
 @using MeshtasticMqttExplorer.Extensions
 @using Microsoft.EntityFrameworkCore
+@using NeighborInfo = MeshtasticMqttExplorer.Context.Entities.NeighborInfo
 @using Node = MeshtasticMqttExplorer.Context.Entities.Node
 
 @inject IConfiguration Configuration
@@ -17,7 +18,7 @@
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position dont @TotalAlive en vie
+        @Total nœuds avec position dont @TotalAlive en vie depuis les @NbDaysPurge derniers jours
         @if (Total > 0)
         {
             @Math.Round((double) TotalAlive / (double) Total * 100)<text>%</text>
@@ -37,18 +38,6 @@
         @*     <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les liens" UnCheckedChildren="Cacher les liens" OnChange="FetchData" /> *@
         @*     <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/> *@
         @* </div> *@
-
-        <div>
-            <span>
-                Depuis :
-                <DatePicker TValue="DateOnly?" Picker="@DatePickerType.Date" @bind-Value="FromDate" DisabledDate="date => date > DateTime.Today || date < DateTime.Today.AddDays(-NbDaysPurge - 1)" OnChange="FetchData"/>
-            </span>
-
-            <span>
-                Distance max des liens :
-                <AntDesign.InputNumber Formatter="FormatKm" Parser="ParseKm" Min="10" Max="1000" Step="10" @bind-value="MaxDistanceLink" TValue="int" OnChange="FetchData" />
-            </span>
-        </div>
 
         <div>
             <NodeSearch></NodeSearch>
@@ -86,7 +75,15 @@
                     {
                         <div class="legend">
                             <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                            Lien
+                            Lien radio direct
+                        </div>
+                        <div class="legend">
+                            <span style="background-color: @Utils.Blue" class="legend-bar"></span>
+                            Lien possiblement incorrect
+                        </div>
+                        <div class="legend">
+                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
+                            Lien avec "trous"
                         </div>
                     }
                     @if (ShowPois)
@@ -111,8 +108,6 @@
     private int Total { get; set; }
     private int TotalAlive { get; set; }
     private int NbDaysPurge { get; set; }
-    private int MaxDistanceLink { get; set; } = Utils.DefaultDistanceAllowed;
-    private DateOnly? FromDate { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
@@ -129,8 +124,8 @@
         .ToList();
     private List<SegmentedOption<string[]>> Frequencies { get; } = [ 
         new([""], "Tous"),
-        new([".4625"], "869.4625 Mhz"),
-        new(["869.4", ".400"], "869.400 Mhz"),
+        new([".4625", "Gaulix"], "869.4625 Mhz (Gaulix)"),
+        new(["869.4", ".400"], "869.400 Mhz (Paris)"),
     ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -162,7 +157,7 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                     ],
-                                    Color = Utils.Gold,
+                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
                                     Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                 };
                             })
@@ -184,7 +179,7 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                     ],
-                                    Color = Utils.Gold,
+                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
                                     Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                 };
                             })
@@ -260,24 +255,22 @@
         
         Nodes = await Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
-                .Where(t => !FromDate.HasValue || t.UpdatedAt >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && a.Distance < MaxDistanceLink && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
-                .Where(t => !FromDate.HasValue || t.UpdatedAt >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => n.LastSeen.HasValue)
-            .Where(n => !FromDate.HasValue || n.LastSeen >= FromDate.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
             .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset || n.ModemPreset == null)
             .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
             .AsSplitQuery()
+            .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
 
         Total = Nodes.Count;
@@ -300,7 +293,7 @@
             Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             IconType = Osm.IconType.Circle,
             Color = color,
-            FillColor = node.RegionCode.HasValue ? color : Utils.Gray,
+            FillColor = node is { RegionCode: not null, ModemPreset: not null } ? color : Utils.Gray,
             Opacity = 1
         };
     }

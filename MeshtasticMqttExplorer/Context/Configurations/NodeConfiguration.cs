@@ -41,5 +41,8 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         builder.HasIndex(a => a.Role);
         
         builder.HasIndex(a => a.LastSeen).IsDescending();
+        
+        builder.Property(a => a.MqttServer).HasMaxLength(128);
+        builder.Property(a => a.PrimaryChannel).HasMaxLength(32);
     }
 }

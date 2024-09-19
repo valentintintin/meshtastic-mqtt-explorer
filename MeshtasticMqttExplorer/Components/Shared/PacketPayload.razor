@@ -13,6 +13,7 @@
 
 @inject IJSRuntime JsRuntime
 @inject IMessageService Message
+@inject MeshtasticService MeshtasticService
 
 <div style="display: flex; flex-direction: column">
     @if (Packet.PortNum != null)
@@ -132,13 +133,13 @@
                                     @(Telemetry?.DeviceMetrics?.BatteryLevel)%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Tension batterie">
-                                    @(Telemetry?.DeviceMetrics?.Voltage)V
+                                    @(Telemetry?.DeviceMetrics?.Voltage.IfNaNGetNull())V
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Utilisation du canal">
-                                    @(Telemetry?.DeviceMetrics?.ChannelUtilization)%
+                                    @(Telemetry?.DeviceMetrics?.ChannelUtilization.IfNaNGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Emission sur l'air">
-                                    @(Telemetry?.DeviceMetrics?.AirUtilTx)%
+                                    @(Telemetry?.DeviceMetrics?.AirUtilTx.IfNaNGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Durée de fonctionnement">
                                     <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
@@ -147,13 +148,34 @@
                             @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
                             {
                                 <DescriptionsItem Title="Température">
-                                    @(Telemetry?.EnvironmentMetrics?.Temperature)°C
+                                    @(Telemetry?.EnvironmentMetrics?.Temperature.IfNaNGetNull())°C
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Humidité">
-                                    @(Telemetry?.EnvironmentMetrics?.RelativeHumidity)%
+                                    @(Telemetry?.EnvironmentMetrics?.RelativeHumidity.IfNaNGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Pression atmosphérique">
-                                    @(Telemetry?.EnvironmentMetrics?.BarometricPressure)hPa
+                                    @(Telemetry?.EnvironmentMetrics?.BarometricPressure.IfNaNGetNull())hPa
+                                </DescriptionsItem>
+                            }
+                            @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.PowerMetrics)
+                            {
+                                <DescriptionsItem Title="Voltage 1">
+                                    @(Telemetry?.PowerMetrics?.Ch1Voltage.IfNaNGetNull())°C
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Intensité 1">
+                                    @(Telemetry?.PowerMetrics?.Ch1Current.IfNaNGetNull())%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Voltage 2">
+                                    @(Telemetry?.PowerMetrics?.Ch2Voltage.IfNaNGetNull())°C
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Intensité 2">
+                                    @(Telemetry?.PowerMetrics?.Ch2Current.IfNaNGetNull())%
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Voltage 3">
+                                    @(Telemetry?.PowerMetrics?.Ch3Voltage.IfNaNGetNull())°C
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Intensité 3">
+                                    @(Telemetry?.PowerMetrics?.Ch3Current.IfNaNGetNull())%
                                 </DescriptionsItem>
                             }
                         </Descriptions>
@@ -198,10 +220,10 @@
                                 {
                                     <Timeline>
                                         <TimelineItem Color="blue">
-                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.NodeIdString</a>
+                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.NodeIdString</a>
                                         </TimelineItem>
 
-                                        @foreach (var nodeId in TraceRoute?.Route ?? [])
+                                        @foreach (var nodeId in TraceRoute?.Route?.Reverse() ?? [])
                                         {
                                             <TimelineItem Color="green">
                                                 <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>
@@ -209,7 +231,7 @@
                                         }
 
                                         <TimelineItem Color="red">
-                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.NodeIdString</a>
+                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.NodeIdString</a>
                                         </TimelineItem>
                                     </Timeline>
                                 }
@@ -331,6 +353,11 @@
             <Popover ContentTemplate="@ContentRaw" Title="Paquet JSON">
                 <Button OnClick="() => CopyTextToClipboard(RawJson)">Paquet JSON</Button>
             </Popover>
+
+            @if (ShowJson)
+            {
+                <Button OnClick="() => ComputeAgain()">Traiter la trame</Button>
+            }
         </div>
     }
 </div>
@@ -364,18 +391,7 @@
     protected override void OnParametersSet()
     {
         var packetData = new MeshPacket();
-        
-        var rootPacket = new ServiceEnvelope();
-        rootPacket.MergeFrom(Packet.Payload);
-
-        if (rootPacket.Packet != null)
-        {
-            packetData = rootPacket.Packet;
-        }
-        else
-        {
-            packetData.MergeFrom(Packet.Payload);
-        }
+        packetData.MergeFrom(Packet.Payload);
         
         RawJson = JsonSerializer.Serialize(packetData, MeshtasticService.JsonSerializerOptions);
         PayloadJson = JsonSerializer.Serialize(packetData.GetPayload(), MeshtasticService.JsonSerializerOptions);
@@ -467,11 +483,17 @@
         try
         {
             await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
-            await Message.Info("JSON copié  !");
+            await Message.Info("JSON copié !");
         }
         catch (Exception)
         {
             await Message.Error("Impossible d'accéder au presse-papier");
         }
+    }
+
+    private async Task ComputeAgain()
+    {
+        await MeshtasticService.DoReceive(Packet);
+        await Message.Info("Trame traitée !");
     }
 }

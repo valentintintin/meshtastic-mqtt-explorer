@@ -33,6 +33,9 @@ public class Node : IEntity
     public bool? HasDefaultChannel { get; set; }
     
     public bool? IsMqttGateway { get; set; }
+    
+    public string? MqttServer { get; set; }
+    public string? PrimaryChannel { get; set; }
 
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];

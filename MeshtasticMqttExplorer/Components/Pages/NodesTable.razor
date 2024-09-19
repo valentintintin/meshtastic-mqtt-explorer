@@ -41,18 +41,28 @@
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.ModemPreset" Title="Profil de modulation" Sortable Filters="Utils.ModemPresetFilters">
-            <div style="width: 80px">
+            <div style="width: 100px">
                 @(context.ModemPreset?.ToString() ?? "-")
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="Utils.RoleFilters">
-            <div style="width: 80px">
+            <div style="width: 100px">
                 @(context.Role?.ToString() ?? "-")
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
             <div style="width: 30px">
                 @(context.IsMqttGateway == true ? "Oui" : "Non")
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
+            <div style="width: 150px">
+                @context.MqttServer
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.PrimaryChannel" Title="Canal principal" Filterable>
+            <div style="width: 150px">
+                @context.PrimaryChannel
             </div>
         </PropertyColumn>
     </ChildContent>
@@ -71,11 +81,15 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
         
-        NodesQueryable = Context.Nodes.Where(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
+        NodesQueryable = Context.Nodes
+            .Where(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId))
+            .AsNoTrackingWithIdentityResolution();
         
         var localContext = await ContextFactory.CreateDbContextAsync();
         
-        Total = localContext.Nodes.Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
+        Total = localContext.Nodes
+            .AsNoTrackingWithIdentityResolution()
+            .Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
         
         await localContext.DisposeAsync();
 
@@ -84,7 +98,9 @@
 
     private void FetchData()
     {
-        Total = Context.Nodes.Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
+        Total = Context.Nodes
+            .AsNoTrackingWithIdentityResolution()
+            .Count(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId));
     }
 
     public async ValueTask DisposeAsync()

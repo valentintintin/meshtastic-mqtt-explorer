@@ -75,8 +75,15 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
                 switch (entityEntry.State)
                 {
                     case EntityState.Added:
-                        entity.CreatedAt = DateTime.UtcNow;
-                        entity.UpdatedAt = entity.CreatedAt;
+                        if (entity.CreatedAt == DateTime.MinValue)
+                        {
+                            entity.CreatedAt = DateTime.UtcNow;
+                        }
+
+                        if (entity.UpdatedAt == DateTime.MinValue)
+                        {
+                            entity.UpdatedAt = DateTime.UtcNow;
+                        }
                         break;
                     case EntityState.Modified:
                         entity.UpdatedAt = DateTime.UtcNow;
