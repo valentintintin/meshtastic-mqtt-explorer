@@ -18,11 +18,7 @@
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position dont @TotalAlive en vie depuis les @NbDaysPurge derniers jours
-        @if (Total > 0)
-        {
-            @Math.Round((double) TotalAlive / (double) Total * 100)<text>%</text>
-        }
+        @Total nœuds avec position dont @TotalAlive en ligne depuis le @MinDate.ToFrench().ToString("d")
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -108,6 +104,7 @@
     private int Total { get; set; }
     private int TotalAlive { get; set; }
     private int NbDaysPurge { get; set; }
+    private DateTime MinDate { get; set; } = DateTime.MinValue;
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
@@ -230,6 +227,7 @@
     protected override async Task OnInitializedAsync()
     {
         NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
+        MinDate = DateTime.Today.ToUniversalTime().AddDays(-NbDaysPurge);
         
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {
@@ -265,7 +263,7 @@
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => n.LastSeen.HasValue)
+            .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
             .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset || n.ModemPreset == null)
             .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
