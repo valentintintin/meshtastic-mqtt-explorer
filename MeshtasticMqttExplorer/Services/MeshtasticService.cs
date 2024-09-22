@@ -454,6 +454,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             return;
         }
+
+        if (packet.RxSnr == 0)
+        {
+            return;
+        }
         
         // On ne regarde que la réponse du traceroute qui PART du destinaite voulu pour arriver à l'expéditeur et donc contient la route en inversé 
         if (packet.RequestId is null or 0)
@@ -620,6 +625,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             || NodesIgnored.Contains(nodeFrom.NodeId) 
             || NodesIgnored.Contains(neighborNode.NodeId)
             || packet.ViaMqtt == true
+            || packet.RxSnr == 0
         )
         {
             return null;
