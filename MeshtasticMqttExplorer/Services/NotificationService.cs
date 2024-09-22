@@ -13,10 +13,25 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
     {
         var notificationsCanalToSend = (configuration.GetSection("Notifications").Get<List<NotificationConfiguration>>() ?? [])
             .Where(n => n.Enabled)
+            .Where(n =>
+            {
+                if (packet.PacketDuplicated != null
+                    // || packet.Value.packet.Gateway == packet.Value.packet.To
+                    // || (packet.Value.packet is { HopStart: not null, HopLimit: not null } && packet.Value.packet.HopLimit == packet.Value.packet.HopStart)
+                   )
+                {
+                    return n.AllowDuplication;
+                }
+
+                return true;
+            })
             .Where(n => !n.PortNum.HasValue || packet.PortNum == n.PortNum)
-            .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
             .Where(n => !n.From.HasValue || packet.From.NodeId == n.From)
+            .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
+            .Where(n => !n.Gateway.HasValue || packet.Gateway.NodeId == n.Gateway)
+            .Where(n => !n.FromOrTo.HasValue || packet.From.NodeId == n.FromOrTo || packet.To.NodeId == n.FromOrTo)
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
+            .DistinctBy(n => n.Url)
             .ToList();
 
         var isText = meshPacket.Decoded?.Portnum is PortNum.TextMessageApp;

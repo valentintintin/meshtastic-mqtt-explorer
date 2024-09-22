@@ -178,14 +178,16 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             meshPacket.MergeFrom(packet.Payload);
         }
         
+        var nodeFromPosition = packet.From.Positions.FirstOrDefault();
+        
         if (packet.PacketDuplicated != null)
         {
+            await SetPositionForPacket(packet, nodeFromPosition);
+            
             Logger.LogWarning("Packet #{packetId} from {from} to {to} by {gateway} duplicated with #{packetDuplicated}, saved but ignored", meshPacket.Id, packet.From, packet.To, packet.Gateway, packet.PacketDuplicated.Id);
 
             return (packet, meshPacket);
         }
-
-        var nodeFromPosition = packet.From.Positions.FirstOrDefault();
         
         switch (meshPacket.Decoded?.Portnum)
         {
@@ -230,6 +232,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 break;
         }
 
+        await SetPositionForPacket(packet, nodeFromPosition);
+
+        return (packet, meshPacket);
+    }
+
+    private async Task SetPositionForPacket(Packet packet, Position? nodeFromPosition)
+    {
         var latitude1 = nodeFromPosition?.Latitude ?? packet.From.Latitude;
         var longitude1 = nodeFromPosition?.Longitude ?? packet.From.Longitude;
         var latitude2 = packet.GatewayPosition?.Latitude ?? packet.Gateway.Latitude;
@@ -251,10 +260,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Unknown, packet, packet.From, packet.Gateway, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
         }
-
-        return (packet, meshPacket);
     }
-    
+
     private async Task<Position?> DoMapReportingPacket(Node nodeFrom, MapReport? mapReport)
     {
         if (mapReport == null)
@@ -416,7 +423,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                            Latitude = payload.LatitudeI * 0.0000001,
                            Longitude = payload.LongitudeI * 0.0000001,
                            Name = payload.Name,
-                           ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime,
+                           ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime.ToUniversalTime(),
                            Description = payload.Description,
                            Icon = payload.Icon
                        };
@@ -430,7 +437,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             waypoint.Latitude = payload.LatitudeI * 0.0000001;
             waypoint.Longitude = payload.LongitudeI * 0.0000001;
             waypoint.Name = payload.Name;
-            waypoint.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime;
+            waypoint.ExpiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.Expire).DateTime.ToUniversalTime();
             waypoint.Description = payload.Description;
             waypoint.Icon = payload.Icon;
             waypoint.Packet = packet;

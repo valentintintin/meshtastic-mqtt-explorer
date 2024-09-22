@@ -250,9 +250,18 @@
                             @switch (Routing?.VariantCase)
                             {
                                 case Routing.VariantOneofCase.ErrorReason:
-                                    <DescriptionsItem Title="Erreur">
-                                        @Routing?.ErrorReason
-                                    </DescriptionsItem>
+                                    if (Routing?.ErrorReason == Routing.Types.Error.None)
+                                    {
+                                        <DescriptionsItem Title="Acquittement">
+                                            Aucune erreur, bien reçu
+                                        </DescriptionsItem>
+                                    }
+                                    else
+                                    {
+                                        <DescriptionsItem Title="Erreur">
+                                            @Routing?.ErrorReason
+                                        </DescriptionsItem>
+                                    }
                                     break;
                                 case Routing.VariantOneofCase.RouteRequest:
                                     <DescriptionsItem Title="Demande de routes">

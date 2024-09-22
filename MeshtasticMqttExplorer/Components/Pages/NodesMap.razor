@@ -288,7 +288,7 @@
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
             Label = node.AllNames,
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? "Passerelle MQTT" : "")}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? $"Passerelle MQTT {node.MqttServer}" : "Radio uniquement")} | {node.PrimaryChannel}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             IconType = Osm.IconType.Circle,
             Color = color,
             FillColor = node is { RegionCode: not null, ModemPreset: not null } ? color : Utils.Gray,

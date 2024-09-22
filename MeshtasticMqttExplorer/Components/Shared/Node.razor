@@ -31,7 +31,7 @@
     </GridCol>
     
     <GridCol Xs="24" Md="8">
-        <Card Title="Activité">
+        <Card Title="Informations">
             <ChildContent>
                 <Descriptions Bordered="true" Column="1">
                     <DescriptionsItem Title="Vu pour la dernière fois" ContentStyle="font-weight: bold">
@@ -79,6 +79,10 @@
                     
                     <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold">
                         @(NodeInfo?.NumOnlineLocalNodes ?? 0)
+                    </DescriptionsItem>
+
+                    <DescriptionsItem Title="ID décimal" ContentStyle="font-weight: bold">
+                        @NodeInfo?.NodeId
                     </DescriptionsItem>
                 </Descriptions>
             </ChildContent>
@@ -163,6 +167,8 @@
                 {
                     if (NodeInfo?.MyNeighbors.Any() == true)
                     {
+                        <b>A entendu</b>
+
                         <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
@@ -171,8 +177,8 @@
                                             <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <text>Voisin (@neighbor.DataSource) de : </text> <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames</a>
-                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                            <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
+                                            <br/><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -191,6 +197,8 @@
 
                     @if (NodeInfo?.NeighborsFor.Any() == true)
                     {
+                        <b>Entendu par</b>
+                        
                         <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
@@ -199,7 +207,7 @@
                                             <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <text>Voisin (@neighbor.DataSource) pour : </text> <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames</a>
+                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
                                             <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
                                         </TitleTemplate>
                                         <DescriptionTemplate>

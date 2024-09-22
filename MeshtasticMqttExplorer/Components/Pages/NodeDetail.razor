@@ -32,6 +32,16 @@
                 {
                     <Tag Color="@PresetColor.Green.ToString()">Passerelle MQTT</Tag>
                 }
+
+                @if (!string.IsNullOrWhiteSpace(Node?.MqttServer))
+                {
+                    <Tag>@Node.MqttServer</Tag>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Node?.PrimaryChannel))
+                {
+                    <Tag>@Node.PrimaryChannel</Tag>
+                }
                 
                 @if (Node?.RegionCode != null)
                 {

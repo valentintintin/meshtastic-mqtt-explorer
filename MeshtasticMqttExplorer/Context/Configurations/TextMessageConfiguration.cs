@@ -27,6 +27,6 @@ public class TextMessageConfiguration : IEntityTypeConfiguration<TextMessage>
             .WithMany(a => a.TextMessages)
             .HasForeignKey(a => a.ChannelId);
 
-        builder.Property(a => a.Message).HasMaxLength(256);
+        builder.Property(a => a.Message).HasMaxLength(512);
     }
 }

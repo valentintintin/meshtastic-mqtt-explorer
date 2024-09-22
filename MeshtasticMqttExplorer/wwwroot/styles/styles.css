@@ -6,6 +6,10 @@
     flex-wrap: wrap;
 }
 
+.ant-page-header-heading-title {
+    white-space: normal;
+}
+
 .ant-layout-sider-zero-width-trigger {
     top: -40px;
     left: -10px;

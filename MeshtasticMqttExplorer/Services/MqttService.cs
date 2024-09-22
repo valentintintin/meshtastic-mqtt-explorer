@@ -217,14 +217,7 @@ public class MqttService : BackgroundService
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
             await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
-            // TODO doublon ne pas renvoyer sauf si direct. Cas des serveurs MQTT différents
-            if (packet.Value.packet.PacketDuplicated == null
-                // || packet.Value.packet.Gateway == packet.Value.packet.To
-                // || (packet.Value.packet is { HopStart: not null, HopLimit: not null } && packet.Value.packet.HopLimit == packet.Value.packet.HopStart)
-            )
-            {
-                await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
-            }
+            await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
 
             await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
         }
