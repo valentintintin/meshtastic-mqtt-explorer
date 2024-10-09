@@ -71,12 +71,19 @@
                     
                     <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
                         @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
-                        @if (!string.IsNullOrWhiteSpace(NodeInfo.PrimaryChannel))
+                        @if (!string.IsNullOrWhiteSpace(NodeInfo?.PrimaryChannel))
                         {
-                            <text> (@NodeInfo.PrimaryChannel)</text>
+                            <text> (@NodeInfo?.PrimaryChannel)</text>
                         }
                     </DescriptionsItem>
                     
+                    @if (NodeInfo?.HopStart.HasValue == true)
+                    {
+                        <DescriptionsItem Title="Nombre de sauts paramétré" ContentStyle="font-weight: bold">
+                            @NodeInfo?.HopStart
+                        </DescriptionsItem>
+                    }
+
                     <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold">
                         @(NodeInfo?.NumOnlineLocalNodes ?? 0)
                     </DescriptionsItem>

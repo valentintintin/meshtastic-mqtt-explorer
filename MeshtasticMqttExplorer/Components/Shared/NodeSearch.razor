@@ -30,9 +30,10 @@
 
         await Task.Delay(250);
 
-        var node = await Context.Nodes.SingleOrDefaultAsync(a => a.NodeIdString != null && (a.NodeIdString.ToLower().TrimStart('!') == SearchValue.ToLower().TrimStart('!') || a.NodeIdString.ToLower().EndsWith(SearchValue.ToLower()))
-                                                                 || a.ShortName == SearchValue.ToLower() 
-                                                                 || a.LongName == SearchValue.ToLower());
+        var node = await Context.Nodes.FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().TrimStart('!') == SearchValue.ToLower().TrimStart('!'))
+            ?? await Context.Nodes.FirstOrDefaultAsync(a => a.LongName == SearchValue.ToLower())
+            ?? await Context.Nodes.FirstOrDefaultAsync(a => a.ShortName == SearchValue.ToLower())
+            ?? await Context.Nodes.FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().EndsWith(SearchValue.ToLower()));
         
         if (node != null) {
             Navigation.NavigateTo($"/node/{node.Id}");

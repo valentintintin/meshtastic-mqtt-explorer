@@ -117,7 +117,8 @@ public class MqttService : BackgroundService
 
     public async Task<string?> GetMqttServerForNode(Node node)
     {
-        var mqttPackets = await (await _contextFactory.CreateDbContextAsync()).Packets.Where(a => a.Gateway == node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
+        var mqttPackets = await (await _contextFactory.CreateDbContextAsync()).Packets
+            .Where(a => a.Gateway == node && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
             .GroupBy(a => new { a.MqttServer, a.MqttTopic, PrimaryTopic = a.PortNum == PortNum.TextMessageApp })
             .Select(a => new { a.Key.MqttServer, a.Key.MqttTopic, a.Key.PrimaryTopic, Count = a.Count() })
             .OrderByDescending(a => a.Count)
@@ -380,7 +381,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate && a.Node == node));
-        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate.AddMonths(-1) && a.Node == node));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.Node == node));
 
         await context.SaveChangesAsync();
     }

@@ -223,7 +223,7 @@
                                             <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.NodeIdString</a>
                                         </TimelineItem>
 
-                                        @foreach (var nodeId in TraceRoute?.Route?.Reverse() ?? [])
+                                        @foreach (var nodeId in TraceRoute?.Route ?? [])
                                         {
                                             <TimelineItem Color="green">
                                                 <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>

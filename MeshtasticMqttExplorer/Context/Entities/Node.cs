@@ -36,6 +36,10 @@ public class Node : IEntity
     
     public string? MqttServer { get; set; }
     public string? PrimaryChannel { get; set; }
+    
+    public bool Ignored { get; set; }
+    
+    public int? HopStart { get; set; }
 
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];

@@ -4,7 +4,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyVersion>1.4.4</AssemblyVersion>
+        <AssemblyVersion>1.4.6</AssemblyVersion>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
 
@@ -24,6 +24,7 @@
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.1" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.12" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
+      <PackageReference Include="QuickGraph" Version="3.6.61119.7" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>

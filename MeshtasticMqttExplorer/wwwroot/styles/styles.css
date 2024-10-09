@@ -6,7 +6,8 @@
     flex-wrap: wrap;
 }
 
-.ant-page-header-heading-title {
+.ant-page-header-heading-title, {
+.ant-page-header-heading-sub-title {
     white-space: normal;
 }
 

@@ -79,7 +79,7 @@
                         </div>
                         <div class="legend">
                             <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                            Lien avec "trous"
+                            Lien avec indirect
                         </div>
                     }
                     @if (ShowPois)
@@ -254,16 +254,21 @@
         Nodes = await Context.Nodes
             .Include(n => n.MyNeighbors
                 .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => !a.Neighbor.Ignored)
+                .Where(a => a.Neighbor.LastSeen.HasValue && a.Neighbor.LastSeen >= MinDate)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Node.Latitude.HasValue && a.Node.Longitude.HasValue)
+                .Where(a => !a.Node.Ignored)
+                .Where(a => a.Node.LastSeen.HasValue && a.Node.LastSeen >= MinDate)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
+            .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
+            .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
             .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset || n.ModemPreset == null)
             .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))

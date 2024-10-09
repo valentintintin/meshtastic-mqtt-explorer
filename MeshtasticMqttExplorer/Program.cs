@@ -107,15 +107,24 @@ try
 
     MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>().GetSection("NodesIgnored").Get<List<uint>>() ?? []);
     Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToHexString()).JoinString()}");
-
+    
     if (false && app.Environment.IsDevelopment())
     {
-        var i = 0;
+        var n1 = context.Nodes.Find(2090);
+        var n2 = context.Nodes.Find(2807);
         var meshtasticService = app.Services.CreateScope().ServiceProvider.GetRequiredService<MeshtasticService>();
+        meshtasticService.SimplifyNeighborForNode(n1, n2);
+        return;
+    
+        var i = 0;
 
         var packets = context.Packets
             .Include(a => a.From)
+            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .Include(a => a.To)
+            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
+            .Include(a => a.Gateway)
+            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .Where(a => a.PacketDuplicated == null)
             .Where(a => a.PortNum == PortNum.TracerouteApp && a.RequestId > 0)
             .ToList();
@@ -130,7 +139,7 @@ try
 
                 if (i % 10 == 0)
                 {
-                    Console.WriteLine($"{i} #{packet.Id}");
+                    Console.WriteLine($"\n\n{i} #{packet.Id}\n\n");
                 }
             }
             catch (Exception e)

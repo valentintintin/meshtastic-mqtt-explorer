@@ -12,6 +12,7 @@ using MeshtasticMqttExplorer.Context.Entities;
 using MeshtasticMqttExplorer.Extensions;
 using MeshtasticMqttExplorer.Extensions.Entities;
 using Microsoft.EntityFrameworkCore;
+using QuickGraph;
 using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
 using Position = MeshtasticMqttExplorer.Context.Entities.Position;
 using Telemetry = MeshtasticMqttExplorer.Context.Entities.Telemetry;
@@ -48,7 +49,6 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .FindByNodeIdAsync(nodeGatewayId) ?? new Node
         {
             NodeId = nodeGatewayId,
-            LastSeen = DateTime.UtcNow,
             IsMqttGateway = true
         };
         if (nodeGateway.Id == 0)
@@ -58,10 +58,16 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         else
         {
-            nodeGateway.LastSeen = DateTime.UtcNow;
+            if (nodeGateway.Ignored)
+            {
+                Logger.LogInformation("Node (gateway) ignored : {node}", nodeGateway);
+                return null;
+            }
+            
             nodeGateway.IsMqttGateway = true;
             Context.Update(nodeGateway);
         }
+        nodeGateway.LastSeen = DateTime.UtcNow;
         await Context.SaveChangesAsync();
         
         if (NodesIgnored.Contains(meshPacket.From))
@@ -75,7 +81,6 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .FindByNodeIdAsync(meshPacket.From) ?? new Node
         {
             NodeId = meshPacket.From,
-            LastSeen = DateTime.UtcNow,
             ModemPreset = nodeGateway.ModemPreset,
             RegionCode = nodeGateway.RegionCode
         };
@@ -86,10 +91,22 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         else
         {
-            nodeFrom.LastSeen = DateTime.UtcNow;
+            if (nodeFrom.Ignored)
+            {
+                Logger.LogInformation("Node (from) ignored : {node}", nodeFrom);
+                return null;
+            }
+
             Context.Update(nodeFrom);
             await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, RegionCodeAndModemPresetSource.Gateway);
         }
+        nodeFrom.LastSeen = DateTime.UtcNow;
+        nodeFrom.HopStart = Math.Max((int) meshPacket.HopStart, 
+            await Context.Packets
+            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp)
+            .OrderByDescending(p => p.UpdatedAt)
+            .Take(10)
+            .MaxAsync(p => p.HopStart) ?? 0);
         await Context.SaveChangesAsync();
 
         var nodeTo = await Context.Nodes.FindByNodeIdAsync(meshPacket.To) ?? new Node
@@ -114,6 +131,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Add(channel);
             await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
+        }
+        else
+        {
+            channel.UpdatedAt = DateTime.UtcNow;
+            Context.Update(channel);
+            await Context.SaveChangesAsync();
         }
         
         var isEncrypted = meshPacket.Decoded == null;
@@ -460,13 +483,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
         
-        // On ne regarde que la réponse du traceroute qui PART du destinaite voulu pour arriver à l'expéditeur et donc contient la route en inversé 
+        // On ne regarde que la réponse du traceroute qui PART du destinaire voulu pour arriver à l'expéditeur et donc contient la route en inversé 
         if (packet.RequestId is null or 0)
         {
             return;
         }
 
-        var nodesIds = payload.Route.Reverse()
+        var nodesIds = payload.Route
             .Concat([nodeFrom.NodeId])
             .ToList();
         
@@ -621,11 +644,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     {
         if (nodeFrom == neighborNode 
             || packet.PortNum == PortNum.MapReportApp
-            || source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && (snr == 0 || packet.HopLimit != packet.HopStart)
+            || source == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway && (snr == 0 || packet.HopLimit != packet.HopStart) // Utile ?
             || NodesIgnored.Contains(nodeFrom.NodeId) 
             || NodesIgnored.Contains(neighborNode.NodeId)
             || packet.ViaMqtt == true
-            || packet.RxSnr == 0
+            || packet.RxSnr == 0 // Attention avec l'argument snr ?
         )
         {
             return null;
@@ -675,6 +698,25 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         await Context.SaveChangesAsync();
 
         return neighborInfo;
+    }
+
+    public void SimplifyNeighborForNode(Node nodeFrom, Node nodeTo)
+    {
+        var graph = new AdjacencyGraph<Node, Edge<Node>>();
+        
+        var findNeighborForNode = Context.NeighborInfos.Where(n => (n.Node == nodeFrom || n.Neighbor == nodeTo) && (
+                n.DataSource == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway
+                || n.DataSource == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute
+                || n.DataSource == MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Neighbor))
+            .Include(n => n.Node)
+            .Include(n => n.Neighbor);
+        
+        foreach (var neighbor in findNeighborForNode)
+        {
+            graph.AddVertex(neighbor.Node);
+            graph.AddVertex(neighbor.Neighbor);
+            graph.AddEdge(new Edge<Node>(neighbor.Node, neighbor.Neighbor));
+        }
     }
 
     public MeshPacket CreateMeshPacket(uint nodeToId, uint nodeFromId, string channel, Data data, uint hopLimit = 3, string? key = null)

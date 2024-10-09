@@ -40,6 +40,14 @@ else
                 <FormItem Label="Canal">
                     <Input @bind-Value="@context.Channel"/>
                 </FormItem>
+                <FormItem Label="Serveur MQTT">
+                    <Select DataSource="@MqttConfigurations"
+                            @bind-Value="@context.MqttServer"
+                            ItemValue="c => c.Name"
+                            ItemLabel="c => c.Name"
+                            Style="width:120px">
+                    </Select>
+                </FormItem>
             </Panel>
             <Panel Header="Données" Key="2">
                 <Tabs Type="@TabType.Card" @bind-ActiveKey="@context.Type">
@@ -107,14 +115,6 @@ else
                 </FormItem>
                 <FormItem Label="Nombre de sauts">
                     <AntDesign.InputNumber Min="0" Max="7" @bind-Value="@context.HopLimit" TValue="uint"/>
-                </FormItem>
-                <FormItem Label="Serveur MQTT">
-                    <Select DataSource="@MqttConfigurations"
-                            @bind-Value="@context.MqttServer"
-                            ItemValue="c => c.Name"
-                            ItemLabel="c => c.Name"
-                            Style="width:120px">
-                    </Select>
                 </FormItem>
                 <FormItem Label="Topic racine MQTT">
                     <Input @bind-Value="@context.RootTopic"/>
