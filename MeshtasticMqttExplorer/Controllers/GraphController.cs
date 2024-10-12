@@ -29,7 +29,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
                 .OrderByDescending(t => t.UpdatedAt)
                 .Where(t => t.UpdatedAt >= minDate)
                 .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed)
-                .Where(a => a.DataSource == NeighborInfo.Source.Gateway || a.DataSource == NeighborInfo.Source.Neighbor || a.DataSource == NeighborInfo.Source.Traceroute)
+                .Where(a => a.DataSource == NeighborInfo.Source.Neighbor || a.DataSource == NeighborInfo.Source.Traceroute)
             )
             .ThenInclude(nn => nn.Neighbor);
 

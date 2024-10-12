@@ -215,12 +215,22 @@
                         break;
                     case PortNum.TracerouteApp:
                         <Descriptions Column="1">
+                            <DescriptionsItem Title="Direction">
+                                @if (Packet.RequestId is null or 0)
+                                {
+                                    <text>Demande d'un traceroute (aller)</text>
+                                }
+                                else
+                                {
+                                    <text>Réponse du traceroute (retour)</text>
+                                }
+                            </DescriptionsItem>
                             <DescriptionsItem Title="Route">
                                 @if (TraceRoute?.Route?.Any() == true)
                                 {
                                     <Timeline>
                                         <TimelineItem Color="blue">
-                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.NodeIdString</a>
+                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
                                         </TimelineItem>
 
                                         @foreach (var nodeId in TraceRoute?.Route ?? [])
@@ -231,7 +241,7 @@
                                         }
 
                                         <TimelineItem Color="red">
-                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.NodeIdString</a>
+                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
                                         </TimelineItem>
                                     </Timeline>
                                 }

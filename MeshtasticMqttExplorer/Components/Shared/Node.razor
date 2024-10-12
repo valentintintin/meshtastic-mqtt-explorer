@@ -12,7 +12,6 @@
         <Card Style="width:100%;" Title="Position">
             @if (NodeInfo?.Latitude.HasValue == true && NodeInfo?.Longitude.HasValue == true)
             {
-                
                 <p>
                     Latitude : <b>@(NodeInfo.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
                     <br />
@@ -84,9 +83,9 @@
                         </DescriptionsItem>
                     }
 
-                    <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.NumOnlineLocalNodes ?? 0)
-                    </DescriptionsItem>
+                    @* <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold"> *@
+                    @*     @(NodeInfo?.NumOnlineLocalNodes ?? 0) *@
+                    @* </DescriptionsItem> *@
 
                     <DescriptionsItem Title="ID décimal" ContentStyle="font-weight: bold">
                         @NodeInfo?.NodeId
@@ -96,7 +95,7 @@
         </Card>
     </GridCol>
 
-    <GridCol Xs="24" Md="12">
+    <GridCol Xs="24" Md="8">
         <Card Title="Télémétrie">
             <ChildContent>
                 <Descriptions Bordered="true" Column="1">
@@ -112,27 +111,39 @@
                         @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
                     </DescriptionsItem>
 
-                    <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
-                        @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
-                    </DescriptionsItem>
+                    @if (LastTelemetryDevice?.BatteryLevel.HasValue == true)
+                    {
+                        <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
+                        </DescriptionsItem>
+                    }
+                    
+                    @if (LastTelemetryEnvironment?.Temperature.HasValue == true)
+                    {
+                        <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
+                        </DescriptionsItem>
+                    }
+                    
+                    @if (LastTelemetryEnvironment?.RelativeHumidity.HasValue == true)
+                    {
+                        <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
+                        </DescriptionsItem>
+                    }
+                    
+                    @if (LastTelemetryEnvironment?.BarometricPressure.HasValue == true)
+                    {
+                        <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
+                            @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
+                        </DescriptionsItem>
+                    }
                 </Descriptions>
             </ChildContent>
         </Card>
     </GridCol>
 
-    <GridCol Xs="24" Md="12">
+    <GridCol Xs="24" Md="8">
         <Card Title="Configuration">
             <ChildContent>
                 <Descriptions Bordered="true" Column="1">
@@ -167,14 +178,48 @@
         </Card>
     </GridCol>
 
-    <GridCol Xs="24" Md="8">
-        <Card Title="Voisins">
-            <ChildContent>
-                @if (NodeInfo?.MyNeighbors.Any() == true || NodeInfo?.NeighborsFor.Any() == true)
-                {
-                    if (NodeInfo?.MyNeighbors.Any() == true)
+    @if (NodeInfo?.MyNeighbors.Any() == true || NodeInfo?.NeighborsFor.Any() == true)
+    {
+        <GridCol Xs="24" Md="8">
+            <Card Title="Voisins">
+                <ChildContent>
+                    @if (NodeInfo?.NeighborsFor.Any() == true)
                     {
                         <b>A entendu</b>
+
+                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
+                            <ChildContent Context="neighbor">
+                                <ListItem>
+                                    <ListItemMeta>
+                                        <AvatarTemplate>
+                                            <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
+                                        </AvatarTemplate>
+                                        <TitleTemplate>
+                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
+                                            @if (neighbor.PacketId.HasValue)
+                                            {
+                                                <br/>
+                                                <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                            }
+                                        </TitleTemplate>
+                                        <DescriptionTemplate>
+                                            @if (neighbor.Distance.HasValue)
+                                            {
+                                                <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
+                                            }
+                                            <span>SNR : @neighbor.Snr</span>
+                                            <span> | </span>
+                                            <Date Value="neighbor.UpdatedAt"></Date>
+                                        </DescriptionTemplate>
+                                    </ListItemMeta>
+                                </ListItem>
+                            </ChildContent>
+                        </AntList>
+                    }
+
+                    @if (NodeInfo?.MyNeighbors.Any() == true)
+                    {
+                        <b>Entendu par</b>
 
                         <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
@@ -185,7 +230,11 @@
                                         </AvatarTemplate>
                                         <TitleTemplate>
                                             <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
-                                            <br/><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                            @if (neighbor.PacketId.HasValue)
+                                            {
+                                                <br/>
+                                                <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                            }
                                         </TitleTemplate>
                                         <DescriptionTemplate>
                                             @if (neighbor.Distance.HasValue)
@@ -201,90 +250,56 @@
                             </ChildContent>
                         </AntList>
                     }
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-                    @if (NodeInfo?.NeighborsFor.Any() == true)
-                    {
-                        <b>Entendu par</b>
-                        
-                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
-                            <ChildContent Context="neighbor">
-                                <ListItem>
-                                    <ListItemMeta>
-                                        <AvatarTemplate>
-                                            <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
-                                        </AvatarTemplate>
-                                        <TitleTemplate>
-                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
-                                            <br /><a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
-                                        </TitleTemplate>
-                                        <DescriptionTemplate>
-                                            @if (neighbor.Distance.HasValue)
-                                            {
-                                                <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
-                                            }
-                                            <span>SNR : @neighbor.Snr</span>
-                                            <span> | </span>
-                                            <Date Value="neighbor.UpdatedAt"></Date>
-                                        </DescriptionTemplate>
-                                    </ListItemMeta>
-                                </ListItem>
-                            </ChildContent>
-                        </AntList>
-                    }
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
-        
-    <GridCol Xs="24" Md="8">
-        <Card Title="Traceroutes">
-            <ChildContent>
-                @if (NodeInfo.TraceroutesFrom.Any())
-                {
-                    @foreach (var traceroutes in NodeInfo.TraceroutesFrom.GroupBy(t => t.PacketId, (_, traceroutes) => new
-                              {
-                                  traceroutes = traceroutes.OrderBy(t => t.Hop).ToList(),
-                                  packetId = traceroutes.First().PacketId,
-                                  date = traceroutes.First().CreatedAt,
-                                  to = traceroutes.Last().To
-                              }).Take(10))
-                    {
-                        <p>
-                            @traceroutes.date.ToFrench()
-                            <br /><a href="/packet/@traceroutes.packetId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
-                        </p>
-                        
-                        <Timeline>
-                            <TimelineItem Color="blue">
-                                <a href="/node/@NodeInfo.Id" target="_blank" rel="nofollow">@NodeInfo.AllNames</a>
-                            </TimelineItem>
+    @if (NodeInfo?.TraceroutesFrom.Any() == true)
+    {
+        <GridCol Xs="24" Md="8">
+            <Card Title="Traceroutes">
+                <ChildContent>
+                        @foreach (var traceroutes in NodeInfo.TraceroutesFrom.GroupBy(t => t.PacketId, (_, traceroutes) => new
+                                  {
+                                      traceroutes = traceroutes.OrderBy(t => t.Hop).ToList(),
+                                      packetId = traceroutes.First().PacketId,
+                                      date = traceroutes.First().CreatedAt,
+                                      to = traceroutes.Last().To
+                                  }).Take(10))
+                        {
+                            <p>
+                                @traceroutes.date.ToFrench()
+                                @if (traceroutes.packetId.HasValue)
+                                {
+                                    <br/>
+                                    <a href="/packet/@traceroutes.packetId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                }
+                            </p>
                             
-                            @foreach (var traceroute in traceroutes.traceroutes)
-                            {
-                                <TimelineItem Color="@(traceroute.Node == traceroutes.to ? "red": "green")">
-                                    <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
+                            <Timeline>
+                                <TimelineItem Color="blue">
+                                    <a href="/node/@NodeInfo.Id" target="_blank" rel="nofollow">@NodeInfo.AllNames</a>
                                 </TimelineItem>
-                            }
-                        </Timeline>
-                    }
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                                
+                                @foreach (var traceroute in traceroutes.traceroutes)
+                                {
+                                    <TimelineItem Color="@(traceroute.Node == traceroutes.to ? "red": "green")">
+                                        <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
+                                    </TimelineItem>
+                                }
+                            </Timeline>
+                        }
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-    <GridCol Xs="24" Md="8">
-        <Card Title="Points d'intérêts">
-            <ChildContent>
-                @if (NodeInfo?.Waypoints.Any() == true)
-                {
+    @if (NodeInfo?.Waypoints.Any() == true)
+    {
+        <GridCol Xs="24" Md="8">
+            <Card Title="Points d'intérêts">
+                <ChildContent>
                     <AntList DataSource="@NodeInfo.Waypoints" TItem="Waypoint">
                         <ChildContent Context="waypoint">
                             <ListItem>
@@ -312,15 +327,11 @@
                             </ListItem>
                         </ChildContent>
                     </AntList>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
-
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
+    
     <GridCol Xs="24" Md="12">
         <Card Title="Courbe d'utilisation sur l'air">
             <ChildContent>
@@ -336,80 +347,60 @@
         </Card>
     </GridCol>
 
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe de la batterie">
-            <ChildContent>
-                @if (DataVoltageBattery?.Any() == true)
-                {
+    @if (DataVoltageBattery?.Any() == true)
+    {
+        <GridCol Xs="24" Md="12">
+            <Card Title="Courbe de la batterie">
+                <ChildContent>
                     <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery"/>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe de température et humidité">
-            <ChildContent>
-                @if (DataWeather?.Any() == true)
-                {
+    @if (DataWeather?.Any() == true)
+    {
+        <GridCol Xs="24" Md="12">
+            <Card Title="Courbe de température et humidité">
+                <ChildContent>
                     <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature"/>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe de pression atmosphérique">
-            <ChildContent>
-                @if (DataWeatherPressure?.Any() == true)
-                {
+    @if (DataWeatherPressure?.Any() == true)
+    {
+        <GridCol Xs="24" Md="12">
+            <Card Title="Courbe de pression atmosphérique">
+                <ChildContent>
                     <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure"/>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe de tension">
-            <ChildContent>
-                @if (DataPowerMetricsVoltage?.Any() == true)
-                {
+    @if (DataPowerMetricsVoltage?.Any() == true)
+    {
+        <GridCol Xs="24" Md="12">
+            <Card Title="Courbe de tension">
+                <ChildContent>
                     <AntDesign.Charts.Line Data="DataPowerMetricsVoltage" Config="_configVoltage"/>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
 
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe d'intensité">
-            <ChildContent>
-                @if (DataPowerMetricsCurrent?.Any() == true)
-                {
+    @if (DataPowerMetricsCurrent?.Any() == true)
+    {
+        <GridCol Xs="24" Md="12">
+            <Card Title="Courbe d'intensité">
+                <ChildContent>
                     <AntDesign.Charts.Line Data="DataPowerMetricsCurrent" Config="_configCurrent"/>
-                }
-                else
-                {
-                    <Empty></Empty>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                </ChildContent>
+            </Card>
+        </GridCol>
+    }
     </GridRow>
 }
 

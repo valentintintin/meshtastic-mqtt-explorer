@@ -134,7 +134,7 @@ else
 {
     private bool _allowed;
     private bool _allowedAnyId;
-    private PublishMessageDto _model;
+    private PublishMessageDto _model = null!;
     private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
 
     protected override void OnInitialized()

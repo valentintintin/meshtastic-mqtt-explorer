@@ -397,7 +397,7 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate));
-        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate.AddMonths(-1)));
+        context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate));
 
         await context.SaveChangesAsync();
     }

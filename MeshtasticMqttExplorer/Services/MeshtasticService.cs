@@ -103,7 +103,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         nodeFrom.LastSeen = DateTime.UtcNow;
         nodeFrom.HopStart = Math.Max((int) meshPacket.HopStart, 
             await Context.Packets
-            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp)
+            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp && p.ViaMqtt != true)
             .OrderByDescending(p => p.UpdatedAt)
             .Take(10)
             .MaxAsync(p => p.HopStart) ?? 0);

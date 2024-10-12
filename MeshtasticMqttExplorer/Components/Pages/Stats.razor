@@ -4,16 +4,60 @@
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Context
 @using MeshtasticMqttExplorer.Context.Entities
+@using MeshtasticMqttExplorer.Extensions
 @using MeshtasticMqttExplorer.Models
 @using Microsoft.EntityFrameworkCore
 
 @inject IDbContextFactory<DataContext> ContextFactory;
+@inject IConfiguration Configuration;
 
 <PageTitle>Statistiques</PageTitle>
 
-<PageHeader Title="Statistiques" />
+<PageHeader Title="Statistiques">
+    <SubtitleTemplate>Depuis le @MinDate.ToFrench()</SubtitleTemplate>
+</PageHeader>
 
 <Spin Spinning="Loading">
+    <GridRow Gutter="(16, 16)" Justify="center">
+        <GridCol Xs="24" Lg="4">
+            <Card Title="Noeuds">
+                <Statistic Value="@NbNodes"/>
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Lg="4">
+            <Card Title="Noeuds actifs sur 1h">
+                <Statistic Value="@NbNodesLastHour" />
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="4">
+            <Card Title="Paquets aujourd'hui">
+                <Statistic Value="@NbPacketsSent"/>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="4">
+            <Card Title="Données aujourd'hui">
+                <Statistic Value="@SizePacketsSent" Suffix="Ko" />
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="4">
+            <Card Title="Utilisation canal sur 1h">
+                <Statistic Value="@AvgChannelUtilization" Suffix="%" Precision="2" />
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="4">
+            <Card Title="TX moyen sur 1h">
+                <Statistic Value="@AvgAirUtilTx" Suffix="%" Precision="2" />
+            </Card>
+        </GridCol>
+    </GridRow>
+    
+    <Divider></Divider>
+    
     <GridRow Gutter="(16, 16)" Justify="center">
         @* <GridCol Xs="24" Lg="12"> *@
         @*     <Card Title="Type de paquet (hors chiffrés)"> *@
@@ -29,31 +73,33 @@
         @*         </ChildContent> *@
         @*     </Card> *@
         @* </GridCol> *@
-        
-        <GridCol Xs="24" Lg="12">
-            <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
-                <ChildContent>
-                    <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
-                        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
-                            @context.MqttServer
-                        </PropertyColumn>
 
-                        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="Utils.RegionCodeFilters">
-                            @context.RegionCode
-                        </PropertyColumn>
-                        
-                        <PropertyColumn Property="c => c.NodeName" Title="Nœud" Filterable>
-                            <a href="/node/@context.NodeId" target="_blank" rel="nofollow">@context.NodeName</a>
-                        </PropertyColumn>
-                        
-                        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
-                            @(context.PortNum?.ToString() ?? "Chiffrées") 
-                        </PropertyColumn>
-                        
-                        <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable DefaultSortOrder="SortDirection.Descending">
-                            <a href="/node/@context.NodeId/packets" target="_blank" rel="nofollow">@context.Nb</a>
-                        </PropertyColumn>
-                    </Table>
+        <GridCol Xs="24" Lg="12">
+            <Card Title="Type de paquets envoyés aujourd'hui">
+                <ChildContent>
+                    @if (Loading)
+                    {
+                        <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Pie Data="DataPaquetsTypes" Config="_configPieType"/>
+                    }
+                </ChildContent>
+            </Card>
+        </GridCol>
+
+        <GridCol Xs="24" Lg="12">
+            <Card Title="Saut paramétré">
+                <ChildContent>
+                    @if (Loading)
+                    {
+                        <Skeleton></Skeleton>
+                    }
+                    else
+                    {
+                        <AntDesign.Charts.Pie Data="DataHops" Config="_configPieType"/>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>
@@ -63,7 +109,7 @@
                 <ChildContent>
                     @if (Loading)
                     {
-                    <Skeleton></Skeleton>
+                        <Skeleton></Skeleton>
                     }
                     else
                     {
@@ -78,7 +124,7 @@
                 <ChildContent>
                     @if (Loading)
                     {
-                    <Skeleton></Skeleton>
+                        <Skeleton></Skeleton>
                     }
                     else
                     {
@@ -93,11 +139,11 @@
                 <ChildContent>
                     @if (Loading)
                     {
-                    <Skeleton></Skeleton>
+                        <Skeleton></Skeleton>
                     }
                     else
                     {
-                    <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configPieType"/>
+                        <AntDesign.Charts.Pie Data="DataNodeTypes" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
@@ -108,23 +154,60 @@
                 <ChildContent>
                     @if (Loading)
                     {
-                    <Skeleton></Skeleton>
+                        <Skeleton></Skeleton>
                     }
                     else
                     {
-                    <AntDesign.Charts.Pie Data="DataFirmwareVersions" Config="_configPieType"/>
+                        <AntDesign.Charts.Pie Data="DataFirmwareVersions" Config="_configPieType"/>
                     }
                 </ChildContent>
             </Card>
         </GridCol>
     </GridRow>
+    
+    <Divider></Divider>
+
+    <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
+        <ChildContent>
+            <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
+                <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
+                    @context.MqttServer
+                </PropertyColumn>
+
+                <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="Utils.RegionCodeFilters">
+                    @context.RegionCode
+                </PropertyColumn>
+
+                <PropertyColumn Property="c => c.NodeName" Title="Nœud" Filterable>
+                    <a href="/node/@context.NodeId" target="_blank" rel="nofollow">@context.NodeName</a>
+                </PropertyColumn>
+
+                <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
+                    @(context.PortNum?.ToString() ?? "Chiffrées")
+                </PropertyColumn>
+
+                <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable DefaultSortOrder="SortDirection.Descending">
+                    <a href="/node/@context.NodeId/packets" target="_blank" rel="nofollow">@context.Nb</a>
+                </PropertyColumn>
+            </Table>
+        </ChildContent>
+    </Card>
 </Spin>
 
 @code
 {
+    private DateTime MinDate { get; set; } = DateTime.UtcNow;
     private bool Loading { get; set; } = true;
     private DataContext Context { get; set; } = null!;
+    private int NbNodes { get; set; }
+    private int NbNodesLastHour { get; set; }
+    private int NbPacketsSent { get; set; }
+    private int SizePacketsSent { get; set; }
+    private float? AvgAirUtilTx { get; set; }
+    private float? AvgChannelUtilization { get; set; }
     private List<ChartData<int>> DataProfileTypes { get; set; } = [];
+    private List<ChartData<int>> DataPaquetsTypes { get; set; } = [];
+    private List<ChartData<int>> DataHops { get; set; } = [];
     private List<ChartData<int>> DataHardwareTypes { get; set; } = [];
     private List<ChartData<int>> DataNodeTypes { get; set; } = [];
     private List<ChartData<int>> DataFirmwareVersions { get; set; } = [];
@@ -165,9 +248,49 @@
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
+        
+        var nbDaysPurge = Configuration.GetValue("PurgeDays", 3);
+        MinDate = DateTime.Today.ToUniversalTime().AddDays(-nbDaysPurge);
 
+        var today = DateTime.UtcNow.Date;
+        var yesterday = today.AddDays(-1);
+        var oneHour = DateTime.UtcNow.AddHours(-1);
+
+        NbNodes = await Context.Nodes
+            .Where(n => n.LastSeen > MinDate)
+            .AsNoTrackingWithIdentityResolution()
+            .CountAsync();
+
+        NbNodesLastHour = await Context.Nodes
+            .Where(n => n.LastSeen >= oneHour)
+            .AsNoTrackingWithIdentityResolution()
+            .CountAsync();
+
+        AvgAirUtilTx = await Context.Nodes
+            .Where(n => n.LastSeen >= oneHour)
+            .Include(n => n.Telemetries
+                .Where(t => t.AirUtilTx != null)
+                .OrderByDescending(t => t.UpdatedAt)
+                .Take(1)
+            )
+            .Where(n => n.Telemetries.Any())
+            .AsNoTrackingWithIdentityResolution()
+            .AverageAsync(n => n.Telemetries.First().AirUtilTx);
+
+        AvgChannelUtilization = await Context.Nodes
+            .Where(n => n.LastSeen >= oneHour)
+            .Include(n => n.Telemetries
+                .Where(t => t.ChannelUtilization != null)
+                .OrderByDescending(t => t.UpdatedAt)
+                .Take(1)
+            )
+            .Where(n => n.Telemetries.Any())
+            .AsNoTrackingWithIdentityResolution()
+            .AverageAsync(n => n.Telemetries.First().ChannelUtilization);
+        
         DataNodeTypes = await Context.Nodes
             .Where(a => a.Role.HasValue)
+            .Where(n => n.LastSeen > MinDate)
             .GroupBy(a => a.Role, (role, nodes) => new ChartData<int>
             {
                 type = role.ToString()!,
@@ -176,9 +299,23 @@
             .OrderByDescending(v => v.value)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
+
+        DataHops = await Context.Nodes
+            .Where(a => a.HopStart.HasValue)
+            .Where(n => n.LastSeen > MinDate)
+            .GroupBy(a => a.HopStart, (hops, nodes) => new ChartData<int>
+            {
+                type = $"{hops.ToString()!} sauts",
+                value = nodes.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .Take(10)
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
         
         DataHardwareTypes = await Context.Nodes
             .Where(a => a.HardwareModel.HasValue)
+            .Where(n => n.LastSeen > MinDate)
             .GroupBy(a => a.HardwareModel, (hardwareModel, nodes) => new ChartData<int>
             {
                 type = hardwareModel.ToString()!,
@@ -189,6 +326,7 @@
             .ToListAsync();
         
         DataProfileTypes = await Context.Nodes
+            .Where(n => n.LastSeen > MinDate)
             .Where(a => a.RegionCode.HasValue && a.ModemPreset.HasValue)
             .GroupBy(a => new
             {
@@ -204,6 +342,7 @@
             .ToListAsync();
         
         DataFirmwareVersions = await Context.Nodes
+            .Where(n => n.LastSeen > MinDate)
             .Where(a => !string.IsNullOrWhiteSpace(a.FirmwareVersion))
             .GroupBy(a => a.FirmwareVersion, (version, nodes) => new ChartData<int>
             {
@@ -214,7 +353,29 @@
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
 
-        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+        NbPacketsSent = await Context.Packets
+            .Where(n => n.CreatedAt >= today)
+            .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
+            .AsNoTrackingWithIdentityResolution()
+            .CountAsync();
+
+        SizePacketsSent = await Context.Packets
+            .Where(n => n.CreatedAt >= today)
+            .Where(n => n.PortNum != PortNum.MapReportApp && n.Payload != null && n.PacketDuplicatedId == null)
+            .AsNoTrackingWithIdentityResolution()
+            .SumAsync(n => n.Payload!.Length) / 1024;
+
+        DataPaquetsTypes = await Context.Packets
+            .Where(n => n.CreatedAt >= today)
+            .Where(a => a.PortNum != PortNum.MapReportApp && a.PacketDuplicatedId == null)
+            .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
+            {
+                type = portNum.ToString()!,
+                value = packets.Count()
+            })
+            .OrderByDescending(v => v.value)
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
         
         DataYesterdayNodePackets = await Context.Packets
             .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))

@@ -121,6 +121,7 @@
         Loading = true;
 
         Channels = await Context.Channels
+            .Where(a => a.UpdatedAt >= DateTime.UtcNow.AddDays(-7))
             .Where(a => a.TextMessages.Any(aa => aa.To!.NodeId == MeshtasticService.NodeBroadcast))
             .OrderBy(a => a.Name)
             .AsNoTrackingWithIdentityResolution()
