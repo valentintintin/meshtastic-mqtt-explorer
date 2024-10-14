@@ -115,11 +115,11 @@
         
         var query = Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.Distance > 0 && (a.DataSource == NeighborInfo.Source.Neighbor || a.DataSource == NeighborInfo.Source.Traceroute) && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance > 0 && a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && (a.DataSource == NeighborInfo.Source.Neighbor || a.DataSource == NeighborInfo.Source.Traceroute) && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance > 0 && a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt))

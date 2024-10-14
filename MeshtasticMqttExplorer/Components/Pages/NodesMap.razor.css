@@ -25,3 +25,10 @@
     margin-right: 10px;
     max-width: 75px;
 }
+
+.page-header-content {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}

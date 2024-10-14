@@ -24,19 +24,21 @@
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
     <PageHeaderContent>
-        <div>
-            <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)" />
-            <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)" />
-            <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)" />
-        </div>
+        <div class="page-header-content">
+            <div>
+                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
+                <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
+                <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
+            </div>
 
-        @* <div> *@
-        @*     <Switch @bind-Checked="ShowPaths" Disabled="@Loading" CheckedChildren="Afficher les liens" UnCheckedChildren="Cacher les liens" OnChange="FetchData" /> *@
-        @*     <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/> *@
-        @* </div> *@
+            <div>
+                <Switch @bind-Checked="ShowIndirectsPaths" Disabled="@Loading" CheckedChildren="Afficher les liens indirects" UnCheckedChildren="Cacher les liens indirects" OnChange="FetchData"/>
+                @*     <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/> *@
+            </div>
 
-        <div>
-            <NodeSearch></NodeSearch>
+            <div>
+                <NodeSearch></NodeSearch>
+            </div>
         </div>
     </PageHeaderContent>
 </PageHeader>
@@ -67,21 +69,23 @@
                 </GridCol>
     
                 <GridCol Xs="24" Md="12">
-                    @if (ShowPaths)
+                    <div class="legend">
+                        <span style="background-color: @Utils.Gold" class="legend-bar"></span>
+                        Lien radio direct
+                    </div>
+                    <div class="legend">
+                        <span style="background-color: @Utils.Blue" class="legend-bar"></span>
+                        Lien possiblement incorrect
+                    </div>
+
+                    @if (ShowIndirectsPaths)
                     {
                         <div class="legend">
-                            <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                            Lien radio direct
-                        </div>
-                        <div class="legend">
-                            <span style="background-color: @Utils.Blue" class="legend-bar"></span>
-                            Lien possiblement incorrect
-                        </div>
-                        <div class="legend">
                             <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                            Lien avec indirect
+                            Lien indirect
                         </div>
                     }
+                    
                     @if (ShowPois)
                     {
                         <div class="legend">
@@ -99,7 +103,7 @@
 {
     private bool Loading { get; set; }
     private bool HasRenderMapData { get; set; }
-    private bool ShowPaths { get; set; } = true;
+    private bool ShowIndirectsPaths { get; set; }
     private bool ShowPois { get; set; } = true;
     private int Total { get; set; }
     private int TotalAlive { get; set; }
@@ -136,10 +140,11 @@
             
             foreach (var node in Nodes)
             {
-                if (ShowPaths && node.MyNeighbors.Any())
+                if (node.MyNeighbors.Any() || node.NeighborsFor.Any())
                 {
                     lines.AddRange(
                         node.MyNeighbors
+                            .Where(n => ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
@@ -162,6 +167,7 @@
                     
                     lines.AddRange(
                         node.NeighborsFor
+                            .Where(n => ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>

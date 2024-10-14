@@ -526,6 +526,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Add(traceroute);
             
             await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute, packet, lastNode, node, hop == 0 ? packet.RxSnr ?? 0 : 0, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Traceroute, packet, node, lastNode, 0, node.Positions.FirstOrDefault(), lastNode.Positions.FirstOrDefault());
 
             lastNode = node;
             hop++;
