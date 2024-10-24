@@ -30,6 +30,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
             .Where(n => !n.Gateway.HasValue || packet.Gateway.NodeId == n.Gateway)
             .Where(n => !n.FromOrTo.HasValue || packet.From.NodeId == n.FromOrTo || packet.To.NodeId == n.FromOrTo)
+            .Where(n => string.IsNullOrWhiteSpace(n.MqttServer) || packet.MqttServer == n.MqttServer)
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .DistinctBy(n => n.Url)
             .ToList();
@@ -41,7 +42,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
                        
                        {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour : {packet.To.AllNames}" : "En broadcast")}
 
-                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}{(packet is { HopStart: not null, HopLimit: not null } && packet.HopLimit == packet.HopStart ? " reçu en direct": "")})" : "Via lui-même")}
+                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}, {packet.HopStart - packet.HopLimit} sauts, {(packet is { HopStart: not null, HopLimit: not null } && packet.HopLimit == packet.HopStart ? " reçu en direct": "")})" : "Via lui-même")}
 
                        > {(isText ? "" : $"{meshPacket.Decoded?.Portnum} :\n")} {meshPacket.GetPayload()}
                        """;

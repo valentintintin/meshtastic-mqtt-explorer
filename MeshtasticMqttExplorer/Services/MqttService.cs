@@ -117,14 +117,11 @@ public class MqttService : BackgroundService
 
     public async Task<string?> GetMqttServerForNode(Node node)
     {
-        var mqttPackets = await (await _contextFactory.CreateDbContextAsync()).Packets
+        return (await (await _contextFactory.CreateDbContextAsync()).Packets
             .Where(a => a.Gateway == node && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
-            .GroupBy(a => new { a.MqttServer, a.MqttTopic, PrimaryTopic = a.PortNum == PortNum.TextMessageApp })
-            .Select(a => new { a.Key.MqttServer, a.Key.MqttTopic, a.Key.PrimaryTopic, Count = a.Count() })
-            .OrderByDescending(a => a.Count)
-            .ToListAsync();
-        
-        return mqttPackets.FirstOrDefault()?.MqttServer;
+            .Where(a => (a.PortNum == PortNum.TextMessageApp && a.To.NodeId != MeshtasticService.NodeBroadcast) || a.PortNum == PortNum.TelemetryApp || a.PortNum == PortNum.NodeinfoApp || a.PortNum == PortNum.NeighborinfoApp || a.PortNum == PortNum.PositionApp)
+            .OrderByDescending(a => a.UpdatedAt)
+            .FirstOrDefaultAsync())?.MqttServer;
     }
 
     private async Task DoReceive(string topic, byte[]? data, MqttConfiguration mqttConfiguration)

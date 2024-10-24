@@ -20,6 +20,11 @@
         <SubtitleTemplate>
             @Total trames @(Node?.AllNames) depuis les @NbDaysPurge derniers jours
         </SubtitleTemplate>
+        <PageHeaderContent>
+            <div>
+                <Switch @bind-Checked="ShowDuplicated" CheckedChildren="Afficher les paquets dupliqués" UnCheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
+            </div>
+        </PageHeaderContent>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
         </PageHeaderExtra>
@@ -31,6 +36,11 @@ else
         <SubtitleTemplate>
             @Total trames
         </SubtitleTemplate>
+        <PageHeaderContent>
+            <div>
+                <Switch @bind-Checked="ShowDuplicated" CheckedChildren="Afficher les paquets dupliqués" UnCheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
+            </div>
+        </PageHeaderContent>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
         </PageHeaderExtra>
@@ -51,7 +61,7 @@ else
                 @if (context.PacketDuplicated != null)
                 {
                     <br/>
-                    <text>Doublon avec </text><a href="/packet/@context.PacketDuplicatedId" target="_blank" rel="nofollow">@context.PacketDuplicated.PacketId</a>
+                    <text>Doublon pour </text><a href="/packet/@context.PacketDuplicatedId" target="_blank" rel="nofollow">un autre</a>
                 }
             </div>
         </PropertyColumn>
@@ -71,20 +81,45 @@ else
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
-            <div style="width: 130px">
+            <div style="width: 80px">
                 <Date Value="context.CreatedAt"></Date>
             </div>
         </PropertyColumn>
-        @* TODO fix hop difference *@
-        <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="Sauts">
-            <div style="width: 30px">
-                <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
-                    @Math.Abs(context.HopStart - context.HopLimit ?? 0)
-                    @if (context.GatewayDistanceKm.HasValue)
-                    {
-                        @(" | " + Math.Round(context.GatewayDistanceKm.Value, 2) + " Km")
-                    }
-                </Tooltip>
+        <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="RX">
+            <div style="width: 70px">
+                @if (context.Gateway == context.From)
+                {
+                    <text>Via MQTT</text>
+                }
+                else
+                {
+                    <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
+                        @if (context.HopStart - context.HopLimit == 0)
+                        {
+                            <text>En direct</text>
+                        }
+                        else
+                        {
+                            @Math.Abs(context.HopStart - context.HopLimit ?? 0)
+                            <text> sauts</text>
+                        }
+
+                        @if (context.GatewayDistanceKm > 0)
+                        {
+                            <br/>
+                            @Math.Round(context.GatewayDistanceKm.Value, 2)
+                            <text> Km</text>
+                        }
+
+                        @if (context.RxSnr != 0)
+                        {
+                            <br/>
+                            <text>SNR @context.RxSnr</text>
+                            <br/>
+                            <text>RSSI @context.RxRssi</text>
+                        }
+                    </Tooltip>
+                }
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
@@ -127,6 +162,7 @@ else
     private DataContext Context { get; set; } = null!;
     private int NbDaysPurge { get; set; }
     private ShowType CurrentShowType { get; set; } = ShowType.From;
+    private bool ShowDuplicated { get; set; }
     
     private readonly List<SegmentedOption<ShowType>> ShowTypesOptions = [
         new(ShowType.From, "En tant qu'expéditeur"),
@@ -165,6 +201,7 @@ else
                 .Include(a => a.From)
                 .Include(a => a.To)
                 .Include(a => a.PacketDuplicated)
+                .Where(a => ShowDuplicated || a.PacketDuplicated == null)
                 .AsNoTrackingWithIdentityResolution();
 
         IQueryable<Packet> totalQueryable = Context.Packets;
@@ -217,6 +254,12 @@ else
     private void OnBack()
     {
         NavigationManager.NavigateTo($"/node/{Id}");
+    }
+
+    private void SetShowDuplicated(bool value)
+    {
+        ShowDuplicated = value;
+        FetchData();
     }
     
     private enum ShowType

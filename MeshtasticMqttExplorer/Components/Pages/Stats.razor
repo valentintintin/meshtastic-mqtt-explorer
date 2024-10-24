@@ -19,7 +19,7 @@
 
 <Spin Spinning="Loading">
     <GridRow Gutter="(16, 16)" Justify="center">
-        <GridCol Xs="24" Lg="4">
+        <GridCol Xs="24" Lg="2">
             <Card Title="Noeuds">
                 <Statistic Value="@NbNodes"/>
             </Card>
@@ -37,9 +37,9 @@
             </Card>
         </GridCol>
 
-        <GridCol Xs="24" Lg="4">
-            <Card Title="Données aujourd'hui">
-                <Statistic Value="@SizePacketsSent" Suffix="Ko" />
+        <GridCol Xs="24" Lg="3">
+            <Card Title="Paquets / minutes">
+                <Statistic Value="@NbPacketsSentMinutes" Precision="1" />
             </Card>
         </GridCol>
 
@@ -49,7 +49,7 @@
             </Card>
         </GridCol>
 
-        <GridCol Xs="24" Lg="4">
+        <GridCol Xs="24" Lg="3">
             <Card Title="TX moyen sur 1h">
                 <Statistic Value="@AvgAirUtilTx" Suffix="%" Precision="2" />
             </Card>
@@ -202,7 +202,7 @@
     private int NbNodes { get; set; }
     private int NbNodesLastHour { get; set; }
     private int NbPacketsSent { get; set; }
-    private int SizePacketsSent { get; set; }
+    private double NbPacketsSentMinutes { get; set; }
     private float? AvgAirUtilTx { get; set; }
     private float? AvgChannelUtilization { get; set; }
     private List<ChartData<int>> DataProfileTypes { get; set; } = [];
@@ -359,11 +359,7 @@
             .AsNoTrackingWithIdentityResolution()
             .CountAsync();
 
-        SizePacketsSent = await Context.Packets
-            .Where(n => n.CreatedAt >= today)
-            .Where(n => n.PortNum != PortNum.MapReportApp && n.Payload != null && n.PacketDuplicatedId == null)
-            .AsNoTrackingWithIdentityResolution()
-            .SumAsync(n => n.Payload!.Length) / 1024;
+        NbPacketsSentMinutes = NbPacketsSent / (DateTime.UtcNow - today).TotalMinutes;
 
         DataPaquetsTypes = await Context.Packets
             .Where(n => n.CreatedAt >= today)
@@ -378,7 +374,7 @@
             .ToListAsync();
         
         DataYesterdayNodePackets = await Context.Packets
-            .Where(a => a.PortNum != PortNum.MapReportApp && !string.IsNullOrWhiteSpace(a.PayloadJson))
+            .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
             .GroupBy(a => new
             {

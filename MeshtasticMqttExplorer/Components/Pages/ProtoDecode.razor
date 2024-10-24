@@ -2,13 +2,16 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Json
+@using System.Text.Json.Serialization
 @using Google.Protobuf
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Extensions
+@using MeshtasticMqttExplorer.Services
 @using Position = Meshtastic.Protobufs.Position
 @using Telemetry = Meshtastic.Protobufs.Telemetry
 
 @inject IMessageService MessageService
+@inject MeshtasticService MeshtasticService
 
 <PageTitle>Décodage ProtoBuf</PageTitle>
 
@@ -24,6 +27,15 @@
       WrapperColSpan="16">
     <FormItem Label="Base64 du ProtoBuf">
         <Input @bind-Value="@context.Data" />
+    </FormItem>
+    <FormItem Label="Base64 d'une clé (optionnelle)">
+        <Input @bind-Value="@context.Key" />
+    </FormItem>
+    <FormItem Label="ID de la trame (optionnel)">
+        <Input @bind-Value="@context.PacketId" />
+    </FormItem>
+    <FormItem Label="ID du noeud (optionnel)">
+        <Input @bind-Value="@context.NodeId" />
     </FormItem>
     <FormItem WrapperColOffset="8" WrapperColSpan="16">
         <Button Type="@ButtonType.Primary" HtmlType="submit">
@@ -51,6 +63,19 @@
                     <b>TextMessage</b>
                     <pre>@Encoding.UTF8.GetString(_data)</pre>
                 </div>
+                
+                @if (_nonce != null)
+                {
+                    <div>
+                        <b>Nonce base64</b>
+                        <pre>@Convert.ToBase64String(_nonce)</pre>
+                    </div>
+                    
+                    <div>
+                        <b>Decoded base64</b>
+                        <pre>@Convert.ToBase64String(_data)</pre>
+                    </div>
+                }
             </div>
         </ChildContent>
     </Card>
@@ -81,27 +106,47 @@
     private readonly List<IMessage> _messages = [];
     private readonly Model _model = new();
     private byte[]? _data;
+    private byte[]? _nonce;
     
     private static readonly JsonSerializerOptions JsonSerializerOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
     };
     
     private async Task OnFinish(EditContext editContext)
     {
+        _data = null;
+        _nonce = null;
+        
         if (string.IsNullOrWhiteSpace(_model.Data))
         {
             return;
         }
-
-        try
+        
+        var dataToDecode = _model.Data;
+        
+        if (!string.IsNullOrWhiteSpace(_model.Key) && _model is { PacketId: not null, NodeId: not null })
         {
-            _data = Convert.FromBase64String(_model.Data);
+            _nonce = MeshtasticService.CreateNonce(_model.PacketId.Value, _model.NodeId.Value);
+            _data = MeshtasticService.Decrypt(Convert.FromBase64String(_model.Data), _model.Key, _model.PacketId.Value, _model.NodeId.Value).ToByteArray();
+            
+            if (_data == null) 
+            {
+                await MessageService.Error("Erreur durant le déchiffrement");
+            }
         }
-        catch (Exception)
+        else
         {
-            await MessageService.Error("Erreur durant la conversion de la base64");
-            return;
+            try
+            {
+                _data = Convert.FromBase64String(dataToDecode);
+            }
+            catch (Exception)
+            {
+                await MessageService.Error("Erreur durant la conversion de la base64");
+                return;
+            }
         }
 
         _messages.Clear();
@@ -127,7 +172,10 @@
 
     private class Model
     {
-        [Required]
-        public string? Data { get; set; }
+        [Required] public string? Data { get; set; }
+
+        public string? Key { get; set; } = "1PG7OiApB1nwvP+rz05pAQ==";
+        public ulong? PacketId { get; set; }
+        public uint? NodeId { get; set; }
     }
 }

@@ -6,7 +6,7 @@
     flex-wrap: wrap;
 }
 
-.ant-page-header-heading-title, {
+.ant-page-header-heading-title,
 .ant-page-header-heading-sub-title {
     white-space: normal;
 }
@@ -22,7 +22,7 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 8px;
 }
 
 .ant-tag {
@@ -31,6 +31,7 @@
 
 .ant-segmented-item-label {
     white-space: normal;
+    text-overflow: unset;
 }
 
 .leaflet-container a {

@@ -35,6 +35,9 @@
             <text>@Total messages dans @Channel.Name</text>
         }
     </SubtitleTemplate>
+    <PageHeaderContent>
+        <Segmented Disabled="Loading" Options="@MqttServers" Value="CurrentMqttServer" TValue="string?" OnChange="value => SetMqttServer(value)" />
+    </PageHeaderContent>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
@@ -69,7 +72,7 @@
                     </Comment>
                 }
                 
-                <Pagination Total="Total" OnChange="ChangePagination"></Pagination>
+                <Pagination Total="Total" OnChange="ChangePagination" DefaultPageSize="20" PageSize="PageSize"></Pagination>
             }
             else if (Channels.Count > 0)
             {
@@ -89,9 +92,17 @@
     public long? ChannelId { get; set; }
     
     private bool Loading { get; set; } = true;
+    private List<SegmentedOption<string?>> MqttServers { get; } = new List<SegmentedOption<string?>> { new("", "Tous") }
+        .Concat(
+            Utils.MqttServerFilters
+            .Select(a => new SegmentedOption<string?>(a.Value, a.Text))
+        )
+        .ToList();
+    private string? CurrentMqttServer { get; set; }
     private int PageIndex { get; set; }
-    private int PageSize { get; set; } = 10;
+    private int PageSize { get; set; } = 20;
     private int Total { get; set; }
+    private bool RenderFinished { get; set; }
     private Dictionary<long, int> Totals { get; set; } = new();
     private List<Channel> Channels { get; set; } = [];
     private List<TextMessage> TextMessages { get; set; } = [];
@@ -102,6 +113,12 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
         await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        RenderFinished = !firstRender;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -129,6 +146,7 @@
 
         Totals = await Context.TextMessages
             .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
+            .Where(a => CurrentMqttServer == "" || a.To!.MqttServer == CurrentMqttServer)
             .GroupBy(t => t.ChannelId)
             .AsNoTrackingWithIdentityResolution()
             .ToDictionaryAsync(a => a.Key, messages => messages.Count());
@@ -146,6 +164,7 @@
                     .ThenInclude(a => a.Gateway)
                     .Where(a => a.Channel == Channel)
                     .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
+                    .Where(a => CurrentMqttServer == "" || a.To!.MqttServer == CurrentMqttServer || (a.Packet != null && a.Packet.MqttServer == CurrentMqttServer))
                     .OrderByDescending(a => a.CreatedAt)
                     .Skip(PageIndex * PageSize).Take(PageSize)
                     .AsNoTrackingWithIdentityResolution()
@@ -167,6 +186,16 @@
         PageSize = paginationArgs.PageSize;
 
         await FetchData();
+    }
+
+    public async Task SetMqttServer(string? mqttServer)
+    {
+        CurrentMqttServer = mqttServer;
+
+        if (RenderFinished)
+        {
+            await FetchData();
+        }
     }
 
     public async ValueTask DisposeAsync()

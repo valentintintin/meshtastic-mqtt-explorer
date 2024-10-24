@@ -1,3 +1,6 @@
+@using MeshtasticMqttExplorer.Extensions
+@implements IAsyncDisposable
+
 @inject IJSRuntime JSRuntime
 
 <div style="position: relative">
@@ -9,24 +12,41 @@
 {
     [Parameter] 
     public string Height { get; set; } = "500px";
-    
-    [Parameter]
-    public double Latitude { get; set; }
-    
-    [Parameter]
-    public double Longitude { get; set; }
 
     [Parameter]
-    public int Zoom { get; set; } = 13;
+    public double Latitude { get; set; } = 46.199144;
+
+    [Parameter]
+    public double Longitude { get; set; } = 2.321139;
+
+    [Parameter]
+    public int Zoom { get; set; } = 5;
 
     [Parameter]
     public Marker? OneMarker { get; set; }
+    
+    [Parameter]
+    public EventCallback<LatitudeLongitudeZoom> MoveZoomChanged { get; set; }
+    
+    private bool MapInitialized { get; set; }
+    private TaskCompletionSource<bool> _mapInitializedTask = new();
+    private MapChangeEventInterop? MapChangeInterop { get; set; }
 
-    private TaskCompletionSource<bool> _mapInitialized = new();
+    public async Task SetLatitudeLongitudeZoom(LatitudeLongitudeZoom data)
+    {
+        await _mapInitializedTask.Task;
+        
+        await JSRuntime.InvokeVoidAsync("setLatitudeLongitudeZoomToMap", data);
+    }
+
+    public async Task<LatitudeLongitudeZoom> GetLatitudeLongitudeZoom()
+    {
+        return await JSRuntime.InvokeAsync<LatitudeLongitudeZoom>("getLatitudeLongitudeZoomFromMap");
+    }
     
     public async Task AddMarker(Marker marker)
     {
-        await _mapInitialized.Task;
+        await _mapInitializedTask.Task;
         
         await JSRuntime.InvokeVoidAsync("addMarkerToMap", marker);
     }
@@ -38,28 +58,28 @@
             return;
         }
         
-        await _mapInitialized.Task;
+        await _mapInitializedTask.Task;
 
         await JSRuntime.InvokeVoidAsync("addMarkersToMap", markers);
     }
 
     public async Task AddPolyline(Line line)
     {
-        await _mapInitialized.Task;
+        await _mapInitializedTask.Task;
 
         await JSRuntime.InvokeVoidAsync("addPolylineToMap", line);
     }
 
     public async Task AddPolylines(List<Line> lines)
     {
-        await _mapInitialized.Task;
+        await _mapInitializedTask.Task;
 
         await JSRuntime.InvokeVoidAsync("addPolylinesToMap", lines);
     }
 
     public async Task ClearMarkers()
     {
-        await _mapInitialized.Task;
+        await _mapInitializedTask.Task;
 
         await JSRuntime.InvokeVoidAsync("clearMarkersMap");
     }
@@ -70,20 +90,54 @@
         await Init();
     }
 
+    private async Task HandleMapChangeEvent(LatitudeLongitudeZoom args)
+    {
+        await MoveZoomChanged.InvokeAsync(args);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await Init();
+            
+            MapChangeInterop = new MapChangeEventInterop(JSRuntime);
+            await MapChangeInterop.SetupMapChangeEventCallback(HandleMapChangeEvent);
         }
 
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        if (MapInitialized)
+        {
+            var current = await GetLatitudeLongitudeZoom();
+
+            if (!current.Latitude.AreEqual(Latitude) || !current.Longitude.AreEqual(Longitude) || current.Zoom != Zoom)
+            {
+                await SetLatitudeLongitudeZoom(new LatitudeLongitudeZoom
+                {
+                    Latitude = Latitude,
+                    Longitude = Longitude,
+                    Zoom = Zoom
+                });
+            }
+        }
+
+        await base.OnParametersSetAsync();
+    }
+
     private async Task Init()
     {
-        await JSRuntime.InvokeVoidAsync("initializeLeafletMap", new[] { Latitude, Longitude }, Zoom);
-        _mapInitialized.SetResult(true);
+        await JSRuntime.InvokeVoidAsync("initializeLeafletMap", new
+        {
+            Latitude,
+            Longitude,
+            Zoom
+        });
+        MapInitialized = true;
+        _mapInitializedTask.SetResult(true);
 
         if (OneMarker != null)
         {
@@ -103,7 +157,8 @@
         }
         finally
         {
-            _mapInitialized = new TaskCompletionSource<bool>();
+            _mapInitializedTask = new TaskCompletionSource<bool>();
+            MapInitialized = false;
         }
     }
 
@@ -140,5 +195,41 @@
         Classic,
         Circle,
         Square,
+    }
+    
+    public class LatitudeLongitudeZoom
+    {
+        public required double Latitude { get; set; }
+        public required double Longitude { get; set; }
+        public required int Zoom { get; set; }
+    }
+    
+    public class MapChangeEventHelper
+    {
+        private readonly Func<LatitudeLongitudeZoom, Task> _callback;
+
+        public MapChangeEventHelper(Func<LatitudeLongitudeZoom, Task> callback)
+        {
+            _callback = callback;
+        }
+
+        [JSInvokable]
+        public Task OnMapChangeEvent(LatitudeLongitudeZoom args) => _callback(args);
+    }
+    
+    public class MapChangeEventInterop(IJSRuntime jsRuntime) : IDisposable
+    {
+        private DotNetObjectReference<MapChangeEventHelper>? _reference;
+
+        public ValueTask<LatitudeLongitudeZoom> SetupMapChangeEventCallback(Func<LatitudeLongitudeZoom, Task> callback)
+        {
+            _reference = DotNetObjectReference.Create(new MapChangeEventHelper(callback));
+            return jsRuntime.InvokeAsync<LatitudeLongitudeZoom>("addMapChangeEventListener", _reference);
+        }
+
+        public void Dispose()
+        {
+            _reference?.Dispose();
+        }
     }
 }

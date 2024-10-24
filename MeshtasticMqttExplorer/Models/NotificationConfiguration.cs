@@ -16,5 +16,6 @@ public class NotificationConfiguration
     public uint? To { get; set; }
     public uint? Gateway { get; set; }
     public uint? FromOrTo { get; set; }
+    public string? MqttServer { get; set; }
     public string? Channel { get; set; }
 }

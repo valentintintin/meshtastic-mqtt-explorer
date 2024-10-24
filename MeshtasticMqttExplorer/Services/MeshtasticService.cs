@@ -277,11 +277,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         if (packet.HopLimit == packet.HopStart)
         {
-            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway, packet, packet.From, packet.Gateway, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
+            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
         }
         else
         {
-            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Unknown, packet, packet.From, packet.Gateway, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
+            await SetNeighbor(MeshtasticMqttExplorer.Context.Entities.NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
         }
     }
 
@@ -803,7 +803,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
     }
     
-    private byte[] CreateNonce(ulong packetId, uint fromNode)
+    public byte[] CreateNonce(ulong packetId, uint fromNode)
     {
         var nonce = new byte[16];
 

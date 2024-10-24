@@ -11,4 +11,4 @@ dotnet publish --no-restore --no-self-contained --nologo --output ../published/
 
 rsync -e "ssh -p $port" -r --info=progress2 ../published/ $server:/home/valentin/docker/meshtastic_mqtt_explorer/
 
-ssh $server -t -p $port "cd /home/valentin/docker/meshtastic_mqtt_explorer/ && docker restart web-meshtastic_mqtt_explorer-1 && docker logs -f --tail 10 web-meshtastic_mqtt_explorer-1"
+ssh $server -t -p $port "cd /home/valentin/docker/meshtastic_mqtt_explorer/ && docker restart meshtastic-meshtastic_mqtt_explorer-1 && docker logs -f --tail 10 meshtastic-meshtastic_mqtt_explorer-1"

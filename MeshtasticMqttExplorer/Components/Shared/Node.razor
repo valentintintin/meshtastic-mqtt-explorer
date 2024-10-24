@@ -90,6 +90,10 @@
                     <DescriptionsItem Title="ID décimal" ContentStyle="font-weight: bold">
                         @NodeInfo?.NodeId
                     </DescriptionsItem>
+                    
+                    <DescriptionsItem Title="Ajouté le" ContentStyle="font-weight: bold">
+                        <Date Value="NodeInfo.CreatedAt" Fallback="-"></Date>
+                    </DescriptionsItem>
                 </Descriptions>
             </ChildContent>
         </Card>
@@ -183,19 +187,19 @@
         <GridCol Xs="24" Md="8">
             <Card Title="Voisins">
                 <ChildContent>
-                    @if (NodeInfo?.NeighborsFor.Any() == true)
+                    @if (NodeInfo?.MyNeighbors.Any() == true)
                     {
-                        <b>A entendu</b>
+                        <b>À entendu</b>
 
-                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
+                        <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
                                     <ListItemMeta>
                                         <AvatarTemplate>
-                                            <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
+                                            <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
+                                            <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
                                             @if (neighbor.PacketId.HasValue)
                                             {
                                                 <br/>
@@ -217,19 +221,19 @@
                         </AntList>
                     }
 
-                    @if (NodeInfo?.MyNeighbors.Any() == true)
+                    @if (NodeInfo?.NeighborsFor.Any() == true)
                     {
                         <b>Entendu par</b>
 
-                        <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
+                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
                             <ChildContent Context="neighbor">
                                 <ListItem>
                                     <ListItemMeta>
                                         <AvatarTemplate>
-                                            <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
+                                            <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
                                         </AvatarTemplate>
                                         <TitleTemplate>
-                                            <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
+                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
                                             @if (neighbor.PacketId.HasValue)
                                             {
                                                 <br/>
@@ -266,7 +270,7 @@
                                       packetId = traceroutes.First().PacketId,
                                       date = traceroutes.First().CreatedAt,
                                       to = traceroutes.Last().To
-                                  }).Take(10))
+                                  }).GroupBy(t => t.to, (node, list) => list.OrderByDescending(t => t.date).First()))
                         {
                             <p>
                                 @traceroutes.date.ToFrench()
@@ -524,7 +528,7 @@
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
-                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
                 }
@@ -562,7 +566,7 @@
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
-                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
                 }

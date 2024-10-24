@@ -1,4 +1,4 @@
-window.initializeLeafletMap = (center, zoom) => {
+window.initializeLeafletMap = (where) => {
     window.leafletMarkers = [];
 
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -27,11 +27,14 @@ window.initializeLeafletMap = (center, zoom) => {
         url: 'mymap.pmtiles',
         theme: "light"
     });
-
+    
     window.leafletMap = L.map('map', {
         preferCanvas: true,
         layers: [osm, topo, satellite, courbeNiveau, proto],
-    }).setView(center, zoom);
+    }).setView({
+        lat: where.latitude,
+        lng: where.longitude
+    }, where.zoom);
 
     const layerSwitcher = L.geoportalControl.LayerSwitcher({
         layers : [
@@ -90,6 +93,35 @@ window.initializeLeafletMap = (center, zoom) => {
     window.leafletMap.addControl(mousePosition);
     
     console.debug('Map created');
+};
+
+window.addMapChangeEventListener = (dotNetObjectRef) => {
+    console.log('event initialized');
+    window.leafletMap.on('zoomend', (event) => {
+        dotNetObjectRef.invokeMethodAsync('OnMapChangeEvent', window.getLatitudeLongitudeZoomFromMap())
+    });
+    
+    window.leafletMap.on('moveend', (event) => {
+        dotNetObjectRef.invokeMethodAsync('OnMapChangeEvent', window.getLatitudeLongitudeZoomFromMap())
+    });
+};
+
+window.setLatitudeLongitudeZoomToMap = (data) => {
+    console.debug('Set', data);
+    
+    window.leafletMap.setView({
+        lat: data.latitude,
+        lng: data.longitude
+    }, data.zoom);
+};
+
+window.getLatitudeLongitudeZoomFromMap = () => {
+    const center = window.leafletMap.getCenter();
+    return {
+        latitude: center.lat,
+        longitude: center.lng,
+        zoom: window.leafletMap.getZoom()
+    };
 };
 
 window.addMarkersToMap = (markers) => {

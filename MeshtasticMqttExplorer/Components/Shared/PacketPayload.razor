@@ -23,6 +23,7 @@
                 @if (ShowJson)
                 {
                     <b>Décodé</b>
+                    <br />
                 }
 
                 @switch (Packet.PortNum)
@@ -187,8 +188,8 @@
                         break;
                     case PortNum.NeighborinfoApp:
                         <Descriptions Column="1">
-                            <DescriptionsItem Title="Dernier envoi par">
-                                !@NeighborInfo?.LastSentById.ToString("X").ToLower()
+                            <DescriptionsItem Title="Dernier entendu">
+                                <a href="/node/by-nodeid/@NeighborInfo?.LastSentById.ToHexString()" target="_blank" rel="nofollow">@NeighborInfo?.LastSentById.ToHexString()</a>
                             </DescriptionsItem>
                             <DescriptionsItem Title="Interval">
                                 <TimeElapsed Value="@(TimeSpan.FromSeconds(NeighborInfo?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
@@ -369,8 +370,12 @@
                 <Button OnClick="() => CopyTextToClipboard(PayloadJson)">Données JSON</Button>
             </Popover>
 
-            <Popover ContentTemplate="@ContentRaw" Title="Paquet JSON">
+            <Popover ContentTemplate="@ContentRawJson" Title="Paquet JSON">
                 <Button OnClick="() => CopyTextToClipboard(RawJson)">Paquet JSON</Button>
+            </Popover>
+
+            <Popover ContentTemplate="@ContentRawBase64" Title="Paquet base64">
+                <Button OnClick="() => CopyTextToClipboard(RawBase64)">Paquet base64</Button>
             </Popover>
 
             @if (ShowJson)
@@ -389,7 +394,8 @@
     [Parameter]
     public bool ShowJson { get; set; }
 
-    private RenderFragment ContentRaw => @<div>@RawJson</div>;
+    private RenderFragment ContentRawJson => @<div>@RawJson</div>;
+    private RenderFragment ContentRawBase64 => @<div>@RawBase64</div>;
     private RenderFragment ContentPayloadRaw => @<div>@PayloadJson</div>;
     
     private Telemetry? Telemetry { get; set; }
@@ -403,6 +409,7 @@
     private Waypoint? Waypoint { get; set; }
     private string? TextMessage { get; set; }
     private string? RawJson { get; set; }
+    private string? RawBase64 { get; set; }
     private string? PayloadJson { get; set; }
     
     private Osm.Marker? Marker { get; set; }
@@ -411,7 +418,8 @@
     {
         var packetData = new MeshPacket();
         packetData.MergeFrom(Packet.Payload);
-        
+
+        RawBase64 = Convert.ToBase64String(Packet.Payload);
         RawJson = JsonSerializer.Serialize(packetData, MeshtasticService.JsonSerializerOptions);
         PayloadJson = JsonSerializer.Serialize(packetData.GetPayload(), MeshtasticService.JsonSerializerOptions);
         

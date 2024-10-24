@@ -13,6 +13,7 @@
 
 @inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
 <PageTitle>Carte des nœuds</PageTitle>
 
@@ -26,14 +27,13 @@
     <PageHeaderContent>
         <div class="page-header-content">
             <div>
-                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
-                <Segmented Disabled="Loading" Options="@ModemsPresets" Value="CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
-                <Segmented Disabled="Loading" Options="@Frequencies" Value="CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
+                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="Settings.CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
+                <Segmented Disabled="Loading" Options="@ModemsPresets" Value="Settings.CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
+                <Segmented Disabled="Loading" Options="@Frequencies" Value="Settings.CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
             </div>
 
             <div>
-                <Switch @bind-Checked="ShowIndirectsPaths" Disabled="@Loading" CheckedChildren="Afficher les liens indirects" UnCheckedChildren="Cacher les liens indirects" OnChange="FetchData"/>
-                @*     <Switch @bind-Checked="ShowPois" Disabled="@Loading" CheckedChildren="Afficher les points d'intérêts" UnCheckedChildren="Cacher les points d'intérêts" OnChange="FetchData"/> *@
+                <Switch @bind-Checked="Settings.ShowIndirectsPaths" Disabled="@Loading" CheckedChildren="Afficher les liens indirects" UnCheckedChildren="Cacher les liens indirects" OnChange="value => SetShowIndirectsPaths(value)"/>
             </div>
 
             <div>
@@ -44,7 +44,8 @@
 </PageHeader>
 
 <Spin Spinning="Loading">
-    <Osm Height="calc(100vh - 270px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+    <Osm Height="calc(100vh - 270px)" @ref="Map" MoveZoomChanged="args => MoveZoomChanged(args)" 
+         Latitude="Settings.Latitude" Longitude="Settings.Longitude" Zoom="Settings.Zoom"></Osm>
     
     <Card Title="Légende" Size="small" Bordered="true">
         <ChildContent>
@@ -78,7 +79,7 @@
                         Lien possiblement incorrect
                     </div>
 
-                    @if (ShowIndirectsPaths)
+                    @if (Settings.ShowIndirectsPaths)
                     {
                         <div class="legend">
                             <span style="background-color: @Utils.Red" class="legend-bar"></span>
@@ -86,7 +87,7 @@
                         </div>
                     }
                     
-                    @if (ShowPois)
+                    @if (Settings.ShowPois)
                     {
                         <div class="legend">
                             <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
@@ -103,8 +104,17 @@
 {
     private bool Loading { get; set; }
     private bool HasRenderMapData { get; set; }
-    private bool ShowIndirectsPaths { get; set; }
-    private bool ShowPois { get; set; } = true;
+    private bool RenderFinished { get; set; }
+    private NodeMapSettings Settings { get; set; } = new()
+    {
+        Latitude = 46.199144,
+        Longitude = 2.321139,
+        Zoom = 5,
+        ShowIndirectsPaths = false,
+        ShowPois = true,
+        CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868,
+        CurrentModemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate
+    };
     private int Total { get; set; }
     private int TotalAlive { get; set; }
     private int NbDaysPurge { get; set; }
@@ -112,9 +122,6 @@
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
-    private Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; } = Config.Types.LoRaConfig.Types.RegionCode.Eu868;
-    private Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; } = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate;
-    private string[]? CurrentFrequencies { get; set; }
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> RegionsCodes { get; } = Utils.RegionCodeFilters.Take(2)
         .Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(a.Value, a.Text))
         .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(null, "Tous")])
@@ -131,6 +138,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            var settings = await LocalStorage.GetItemAsync<NodeMapSettings>("nodeMapSettings");
+            if (settings != null)
+            {
+                Settings = settings;
+            }
+            
+            await FetchData();
+        }
+
         if (!firstRender && Map != null && !HasRenderMapData)
         {
             await Map.ClearMarkers();
@@ -144,7 +162,7 @@
                 {
                     lines.AddRange(
                         node.MyNeighbors
-                            .Where(n => ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
+                            .Where(n => Settings.ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
@@ -167,7 +185,7 @@
                     
                     lines.AddRange(
                         node.NeighborsFor
-                            .Where(n => ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
+                            .Where(n => Settings.ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
@@ -189,7 +207,7 @@
                     );
                 }
 
-                if (ShowPois && node.Waypoints.Any())
+                if (Settings.ShowPois && node.Waypoints.Any())
                 {
                     lines.AddRange(
                         node.Waypoints
@@ -225,8 +243,9 @@
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
 
             HasRenderMapData = true;
+            RenderFinished = !firstRender;
         }
-
+        
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -237,14 +256,13 @@
         
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {
-            CurrentRegionCode = null;
-            CurrentModemPreset = null;
+            Settings.CurrentRegionCode = null;
+            Settings.CurrentModemPreset = null;
+            Settings.CurrentFrequencies = null;
         }
         
         Context = await ContextFactory.CreateDbContextAsync();
-
-        await FetchData();
-
+        
         await base.OnInitializedAsync();
     }
 
@@ -275,9 +293,9 @@
             .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => CurrentRegionCode == null|| n.RegionCode == CurrentRegionCode)
-            .Where(n => CurrentModemPreset == null || n.ModemPreset == CurrentModemPreset || n.ModemPreset == null)
-            .Where(n => CurrentFrequencies == null || n.LongName != null && CurrentFrequencies.Any(c => n.LongName.Contains(c)))
+            .Where(n => Settings.CurrentRegionCode == null|| n.RegionCode == Settings.CurrentRegionCode)
+            .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
+            .Where(n => Settings.CurrentFrequencies == null || n.LongName != null && Settings.CurrentFrequencies.Any(c => n.LongName.Contains(c)))
             .AsSplitQuery()
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
@@ -287,6 +305,8 @@
         
         Loading = false;
         HasRenderMapData = false;
+        
+        StateHasChanged();
     }
 
     private Osm.Marker GetMarker(Node node)
@@ -314,23 +334,56 @@
 
     private async Task SetRegionCode(Config.Types.LoRaConfig.Types.RegionCode? regionCode)
     {
-        CurrentRegionCode = regionCode;
+        Settings.CurrentRegionCode = regionCode;
 
-        await FetchData();
+        if (RenderFinished)
+        {
+            await SaveMapPosition();
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            await FetchData();
+        }
     }
 
     private async Task SetModemPreset(Config.Types.LoRaConfig.Types.ModemPreset? modemPreset)
     {
-        CurrentModemPreset = modemPreset;
-        
-        await FetchData();
+        Settings.CurrentModemPreset = modemPreset;
+
+        if (RenderFinished)
+        {
+            await SaveMapPosition();
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            await FetchData();
+        }
     }
 
     private async Task SetFrequency(string[]? frequency)
     {
-        CurrentFrequencies = frequency;
+        Settings.CurrentFrequencies = frequency;
+
+        if (RenderFinished)
+        {
+            await SaveMapPosition();
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            await FetchData();
+        }
+    }
+
+    private async Task SetShowIndirectsPaths(bool showIndirectsPaths)
+    {
+        Settings.ShowIndirectsPaths = showIndirectsPaths;
+        await SaveMapPosition();
         
+        await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
         await FetchData();
+    }
+
+    private async Task MoveZoomChanged(Osm.LatitudeLongitudeZoom args)
+    {
+        Settings.Latitude = args.Latitude;
+        Settings.Longitude = args.Longitude;
+        Settings.Zoom = args.Zoom;
+        
+        await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
     }
     
     private string FormatKm(int value)
@@ -345,6 +398,46 @@
 
     public async ValueTask DisposeAsync()
     {
+        try
+        {
+            await SaveMapPosition();
+        }
+        catch (Exception)
+        {
+            // Ignored
+        }
+
         await Context.DisposeAsync();
+    }
+
+    private async Task SaveMapPosition()
+    {
+        if (Map != null)
+        {
+            var latitudeLongitudeZoom = await Map.GetLatitudeLongitudeZoom();
+            Settings.Latitude = latitudeLongitudeZoom.Latitude;
+            Settings.Longitude = latitudeLongitudeZoom.Longitude;
+            Settings.Zoom = latitudeLongitudeZoom.Zoom;
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+        }
+    }
+
+    public class NodeMapSettings
+    {
+        public bool ShowIndirectsPaths { get; set; }
+        
+        public bool ShowPois { get; set; }
+        
+        public double Latitude { get; set; }
+        
+        public double Longitude { get; set; }
+        
+        public int Zoom { get; set; }
+        
+        public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; } = Config.Types.LoRaConfig.Types.RegionCode.Eu868;
+        
+        public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; } = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate;
+        
+        public string[]? CurrentFrequencies { get; set; }
     }
 }
