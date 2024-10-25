@@ -61,6 +61,9 @@ public class GraphDto
     
     public class LinkDto
     {
+        [JsonPropertyName("neighborId")]
+        public long NeighborId { get; set; }
+        
         [JsonPropertyName("source")]
         public uint NodeSourceId { get; set; }
         

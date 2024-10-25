@@ -21,45 +21,21 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
         
         var context = await contextFactory.CreateDbContextAsync();
 
-        var minDate = DateTime.UtcNow.Date.AddDays(-1);
+        var links = await context.NeighborInfos
+            .Include(a => a.Node)
+            .ThenInclude(a => a.Telemetries.OrderByDescending(t => t.UpdatedAt).Take(10))
+            .Include(a => a.Neighbor)
+            .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
+            .Where(n => !MeshtasticService.NodesIgnored.Contains(n.Node.NodeId) && !MeshtasticService.NodesIgnored.Contains(n.Neighbor.NodeId))
+            .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed)
+            .OrderByDescending(n => n.UpdatedAt)
+            .ToListAsync()
+            ;
 
-        var query = context.Nodes
-            .Where(n => !MeshtasticService.NodesIgnored.Contains(n.NodeId))
-            .Include(n => n.MyNeighbors
-                .OrderByDescending(t => t.UpdatedAt)
-                .Where(t => t.UpdatedAt >= minDate)
-                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed)
-                .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
-            )
-            .ThenInclude(nn => nn.Neighbor);
-
-        var links = await query
-            .Where(n => n.LastSeen >= minDate)
-            .Where(n => n.MyNeighbors.Count > 0)
-            .Where(n => n.RegionCode == Config.Types.LoRaConfig.Types.RegionCode.Eu868 && n.ModemPreset == Config.Types.LoRaConfig.Types.ModemPreset.LongModerate)
-            .OrderByDescending(n => n.LastSeen)
-            .SelectMany(n => n.MyNeighbors
-                .Select(nn => new GraphDto.LinkDto
-            {
-                NodeSourceId = n.NodeId,
-                NodeTargetId = nn.Neighbor.NodeId,
-                Date = nn.UpdatedAt,
-                Snr = nn.Snr
-            }))
-            .GroupBy(a => new
-            {
-                a.NodeSourceId,
-                a.NodeTargetId
-            }, (_, links) => links.OrderByDescending(a => a.Date).First())
-            .ToListAsync();
-        
-        var nodeIds = links.Select(l => l.NodeSourceId).Concat(links.Select(l => l.NodeTargetId)).Distinct().ToList();
-        
         return new GraphDto
         {
-            Nodes = await query
-                .Include(a => a.Telemetries.OrderByDescending(aa => aa.UpdatedAt).Take(10))
-                .Where(n => nodeIds.Contains(n.NodeId))
+            Nodes = links
+                .GroupBy(n => n.Node, (key, values) => key)
                 .Select(n => new GraphDto.NodeDto
                 {
                     NodeId = n.NodeId,
@@ -77,9 +53,39 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
                     Humidity = n.Telemetries.Any(a => a.RelativeHumidity != null) ? n.Telemetries.First(a => a.RelativeHumidity != null).RelativeHumidity : null,
                     Pressure = n.Telemetries.Any(a => a.BarometricPressure != null) ? n.Telemetries.First(a => a.BarometricPressure != null).BarometricPressure : null,
                 })
+                .Union(
+                    links
+                        .GroupBy(n => n.Neighbor, (key, values) => key)
+                        .Select(n => new GraphDto.NodeDto
+                        {
+                            NodeId = n.NodeId,
+                            LongName = n.LongName,
+                            ShortName = n.ShortName,
+                            UpdatedAt = n.LastSeen.HasValue ? new DateTimeOffset(n.LastSeen.Value).ToUnixTimeSeconds() : null,
+                            NeighboursUpdatedAt = n.MyNeighbors.Count > 0 ? new DateTimeOffset(n.MyNeighbors.First().UpdatedAt).ToUnixTimeSeconds() : 0,
+                            Role = n.Role,
+                            HardwareModel = n.HardwareModel,
+                            BatteryLevel = n.Telemetries.Any(a => a.BatteryLevel != null) ? n.Telemetries.First(a => a.BatteryLevel != null).BatteryLevel : null,
+                            Voltage = n.Telemetries.Any(a => a.Voltage != null) ? n.Telemetries.First(a => a.Voltage != null).Voltage : null,
+                            AirUtilTx = n.Telemetries.Any(a => a.AirUtilTx != null) ? n.Telemetries.First(a => a.AirUtilTx != null).AirUtilTx : null,
+                            ChannelUtilization = n.Telemetries.Any(a => a.ChannelUtilization != null) ? n.Telemetries.First(a => a.BatteryLevel != null).ChannelUtilization : null,
+                            Temperature = n.Telemetries.Any(a => a.Temperature != null) ? n.Telemetries.First(a => a.Temperature != null).Temperature : null,
+                            Humidity = n.Telemetries.Any(a => a.RelativeHumidity != null) ? n.Telemetries.First(a => a.RelativeHumidity != null).RelativeHumidity : null,
+                            Pressure = n.Telemetries.Any(a => a.BarometricPressure != null) ? n.Telemetries.First(a => a.BarometricPressure != null).BarometricPressure : null,
+                        })
+                        .OrderBy(n => n.LongName)
+                )
+                .DistinctBy(n => n.NodeId)
                 .OrderBy(n => n.LongName)
-                .ToListAsync(),
-            Links = links
+                .ToList(),
+            Links = links.Select(l => new GraphDto.LinkDto
+            {
+                NeighborId = l.Id,
+                NodeSourceId = l.Node.NodeId,
+                NodeTargetId = l.Neighbor.NodeId,
+                Date = l.UpdatedAt,
+                Snr = l.Snr
+            }).ToList()
         };
     }
 }

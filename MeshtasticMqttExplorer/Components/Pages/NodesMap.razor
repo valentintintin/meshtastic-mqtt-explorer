@@ -162,7 +162,7 @@
                 {
                     lines.AddRange(
                         node.MyNeighbors
-                            .Where(n => Settings.ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
+                            .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
@@ -185,7 +185,7 @@
                     
                     lines.AddRange(
                         node.NeighborsFor
-                            .Where(n => Settings.ShowIndirectsPaths || n.DataSource != NeighborInfo.Source.Unknown)
+                            .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
                             .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
@@ -205,6 +205,55 @@
                                 };
                             })
                     );
+
+                    if (Settings.ShowIndirectsPaths)
+                    {
+                        lines.AddRange(
+                            node.MyNeighbors
+                                .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
+                                .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
+                                .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                                .Select(n =>
+                                {
+                                    markers.Add(GetMarker(n.Neighbor));
+                                
+                                    return new Osm.Line
+                                    {
+                                        Id = $"node(neighbor)-{n.Neighbor.Id}->node-{node.Id}",
+                                        Points =
+                                        [
+                                            [node.Latitude!.Value, node.Longitude!.Value],
+                                            [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
+                                        ],
+                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                        Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                    };
+                                })
+                        );
+                        
+                        lines.AddRange(
+                            node.NeighborsFor
+                                .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
+                                .Where(n => n.Node is { Latitude: not null, Longitude: not null })
+                                .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                                .Select(n =>
+                                {
+                                    markers.Add(GetMarker(n.Node));
+
+                                    return new Osm.Line
+                                    {
+                                        Id = $"node(neighbor-for)-{n.Node.Id}->node-{node.Id}",
+                                        Points =
+                                        [
+                                            [node.Latitude!.Value, node.Longitude!.Value],
+                                            [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
+                                        ],
+                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                        Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                    };
+                                })
+                        );
+                    }
                 }
 
                 if (Settings.ShowPois && node.Waypoints.Any())

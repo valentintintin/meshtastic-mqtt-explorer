@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 
 @inject IJSRuntime JSRuntime
+@inject ILogger<Osm> Logger
 
 <div style="position: relative">
     <div id="map" style="@("height: " + Height)"></div>
@@ -113,15 +114,22 @@
         if (MapInitialized)
         {
             var current = await GetLatitudeLongitudeZoom();
-
+            
             if (!current.Latitude.AreEqual(Latitude) || !current.Longitude.AreEqual(Longitude) || current.Zoom != Zoom)
             {
-                await SetLatitudeLongitudeZoom(new LatitudeLongitudeZoom
+                try
                 {
-                    Latitude = Latitude,
-                    Longitude = Longitude,
-                    Zoom = Zoom
-                });
+                    await SetLatitudeLongitudeZoom(new LatitudeLongitudeZoom
+                    {
+                        Latitude = Latitude,
+                        Longitude = Longitude,
+                        Zoom = Zoom
+                    });
+                }
+                catch (Exception e)
+                {
+                    Logger.LogError(e, "Error during set map location {latitude}, {longitude} and zoom {zoom}", Latitude, Longitude, Zoom);
+                }
             }
         }
 

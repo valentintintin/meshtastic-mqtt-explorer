@@ -31,8 +31,8 @@
         await Task.Delay(250);
 
         var node = await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().TrimStart('!') == SearchValue.ToLower().TrimStart('!'))
-            ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.LongName != null && a.LongName.ToLower() == SearchValue.ToLower())
             ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.ShortName != null && a.ShortName.ToLower() == SearchValue.ToLower())
+            ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.LongName != null && a.LongName.ToLower() == SearchValue.ToLower())
             ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().EndsWith(SearchValue.ToLower()));
         
         if (node != null) {
