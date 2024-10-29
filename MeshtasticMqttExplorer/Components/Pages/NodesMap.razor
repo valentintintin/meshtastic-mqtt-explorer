@@ -14,6 +14,7 @@
 @inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject ILogger<Osm> Logger
 
 <PageTitle>Carte des nœuds</PageTitle>
 
@@ -27,13 +28,16 @@
     <PageHeaderContent>
         <div class="page-header-content">
             <div>
-                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="Settings.CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
                 <Segmented Disabled="Loading" Options="@ModemsPresets" Value="Settings.CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
-                <Segmented Disabled="Loading" Options="@Frequencies" Value="Settings.CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
+                <Segmented Disabled="Loading" Options="@RegionsCodes" Value="Settings.CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
+                @if (Settings.CurrentRegionCode == Config.Types.LoRaConfig.Types.RegionCode.Eu868)
+                {
+                    <Segmented Disabled="Loading" Options="@Frequencies" Value="Settings.CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
+                }
             </div>
 
             <div>
-                <Switch @bind-Checked="Settings.ShowIndirectsPaths" Disabled="@Loading" CheckedChildren="Afficher les liens indirects" UnCheckedChildren="Cacher les liens indirects" OnChange="value => SetShowIndirectsPaths(value)"/>
+                <Switch @bind-Checked="Settings.ShowIndirectsPaths" Disabled="@Loading" UnCheckedChildren="Afficher les liens indirects" CheckedChildren="Cacher les liens indirects" OnChange="value => SetShowIndirectsPaths(value)"/>
             </div>
 
             <div>
@@ -112,8 +116,7 @@
         Zoom = 5,
         ShowIndirectsPaths = false,
         ShowPois = true,
-        CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868,
-        CurrentModemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate
+        CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868
     };
     private int Total { get; set; }
     private int TotalAlive { get; set; }
@@ -122,13 +125,11 @@
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
-    private List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> RegionsCodes { get; } = Utils.RegionCodeFilters.Take(2)
-        .Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(a.Value, a.Text))
-        .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(null, "Tous")])
+    private List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> RegionsCodes { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> { new(null, "Tous") }
+        .Concat(Utils.RegionCodeFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(a.Value, a.Text)))
         .ToList();
-    private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = Utils.ModemPresetFilters.Take(2)
-        .Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text))
-        .Concat([new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(null, "Tous")])
+    private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> { new(null, "Tous") } 
+        .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
     private List<SegmentedOption<string[]>> Frequencies { get; } = [ 
         new([""], "Tous"),
@@ -463,11 +464,18 @@
     {
         if (Map != null)
         {
-            var latitudeLongitudeZoom = await Map.GetLatitudeLongitudeZoom();
-            Settings.Latitude = latitudeLongitudeZoom.Latitude;
-            Settings.Longitude = latitudeLongitudeZoom.Longitude;
-            Settings.Zoom = latitudeLongitudeZoom.Zoom;
-            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            try
+            {
+                var latitudeLongitudeZoom = await Map.GetLatitudeLongitudeZoom();
+                Settings.Latitude = latitudeLongitudeZoom.Latitude;
+                Settings.Longitude = latitudeLongitudeZoom.Longitude;
+                Settings.Zoom = latitudeLongitudeZoom.Zoom;
+                await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Error during set save map position");
+            }
         }
     }
 
@@ -483,9 +491,9 @@
         
         public int Zoom { get; set; }
         
-        public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; } = Config.Types.LoRaConfig.Types.RegionCode.Eu868;
+        public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; }
         
-        public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; } = Config.Types.LoRaConfig.Types.ModemPreset.LongModerate;
+        public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; }
         
         public string[]? CurrentFrequencies { get; set; }
     }

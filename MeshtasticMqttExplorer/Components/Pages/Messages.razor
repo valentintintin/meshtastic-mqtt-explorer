@@ -169,7 +169,7 @@
                     .Skip(PageIndex * PageSize).Take(PageSize)
                     .AsNoTrackingWithIdentityResolution()
                     .ToListAsync();
-                Total = Totals[Channel.Id];
+                Total = Totals.TryGetValue(Channel.Id, out var total) ? total : 0;
             }
         }
         else

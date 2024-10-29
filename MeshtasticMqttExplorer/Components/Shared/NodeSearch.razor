@@ -22,14 +22,6 @@
     
     private async Task OnSearch()
     {
-        if (SearchValue.TrimStart('!').Length < 4)
-        {
-            await Message.Warning("Il faut minimum 4 caractères");
-            return;
-        }
-
-        await Task.Delay(250);
-
         var node = await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().TrimStart('!') == SearchValue.ToLower().TrimStart('!'))
             ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.ShortName != null && a.ShortName.ToLower() == SearchValue.ToLower())
             ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.LongName != null && a.LongName.ToLower() == SearchValue.ToLower())

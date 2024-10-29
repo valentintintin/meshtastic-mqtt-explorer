@@ -22,7 +22,7 @@
         </SubtitleTemplate>
         <PageHeaderContent>
             <div>
-                <Switch @bind-Checked="ShowDuplicated" CheckedChildren="Afficher les paquets dupliqués" UnCheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
+                <Switch @bind-Checked="ShowDuplicated" UnCheckedChildren="Afficher les paquets dupliqués" CheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
             </div>
         </PageHeaderContent>
         <PageHeaderExtra>
@@ -38,7 +38,7 @@ else
         </SubtitleTemplate>
         <PageHeaderContent>
             <div>
-                <Switch @bind-Checked="ShowDuplicated" CheckedChildren="Afficher les paquets dupliqués" UnCheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
+                <Switch @bind-Checked="ShowDuplicated" UnCheckedChildren="Afficher les paquets dupliqués" CheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
             </div>
         </PageHeaderContent>
         <PageHeaderExtra>
