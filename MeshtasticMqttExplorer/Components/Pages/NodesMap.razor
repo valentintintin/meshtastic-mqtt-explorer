@@ -48,60 +48,73 @@
 </PageHeader>
 
 <Spin Spinning="Loading">
-    <Osm Height="calc(100vh - 270px)" @ref="Map" MoveZoomChanged="args => MoveZoomChanged(args)" 
+    <Osm Height="calc(100vh - 250px)" @ref="Map" MoveZoomChanged="args => MoveZoomChanged(args)" 
          Latitude="Settings.Latitude" Longitude="Settings.Longitude" Zoom="Settings.Zoom"></Osm>
-    
-    <Card Title="Légende" Size="small" Bordered="true">
-        <ChildContent>
-            <GridRow Gutter="(16, 16)" Justify="center">
-                <GridCol Xs="24" Md="12">
-                    <div class="legend">
-                        <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
-                        En ligne | Passerelle MQTT
-                    </div>
-                    <div class="legend">
-                        <span style="@GetIconStyleCss(Utils.Blue)" class="legend-circle"></span>
-                        En ligne
-                    </div>
-                    <div class="legend">
-                        <span style="@GetIconStyleCss(Utils.Red)" class="legend-circle"></span>
-                        Hors ligne depuis plus de 24h
-                    </div>
-                    <div class="legend">
-                        <span style="@GetIconStyleCss(Utils.Gray)" class="legend-circle"></span>
-                        Bande et profil de modulation inconnu
-                    </div>
-                </GridCol>
-    
-                <GridCol Xs="24" Md="12">
-                    <div class="legend">
-                        <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                        Lien radio direct
-                    </div>
-                    <div class="legend">
-                        <span style="background-color: @Utils.Blue" class="legend-bar"></span>
-                        Lien possiblement incorrect
-                    </div>
 
-                    @if (Settings.ShowIndirectsPaths)
-                    {
+    @if (!Settings.ShowLegend)
+    {
+        <Switch @bind-Checked="Settings.ShowLegend" UnCheckedChildren="Afficher la légende" CheckedChildren="Cacher la légende" OnChange="value => SetShowLegend(value)"/>
+    }
+    
+    @if (Settings.ShowLegend)
+    {
+        <Card Title="Légende" Size="small" Bordered="true">
+            <TitleTemplate>
+                Légende
+                &nbsp;
+                <Switch @bind-Checked="Settings.ShowLegend" UnCheckedChildren="Afficher la légende" CheckedChildren="Cacher la légende" OnChange="value => SetShowLegend(value)"/>
+            </TitleTemplate>
+            <ChildContent>
+                <GridRow Gutter="(16, 16)" Justify="center">
+                    <GridCol Xs="24" Md="12">
                         <div class="legend">
-                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                            Lien indirect
+                            <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
+                            En ligne | Passerelle MQTT
                         </div>
-                    }
-                    
-                    @if (Settings.ShowPois)
-                    {
                         <div class="legend">
-                            <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
-                            Point d'intétêt
+                            <span style="@GetIconStyleCss(Utils.Blue)" class="legend-circle"></span>
+                            En ligne
                         </div>
-                    }
-                </GridCol>
-            </GridRow>
-        </ChildContent>
-    </Card>
+                        <div class="legend">
+                            <span style="@GetIconStyleCss(Utils.Red)" class="legend-circle"></span>
+                            Hors ligne depuis plus de 24h
+                        </div>
+                        <div class="legend">
+                            <span style="@GetIconStyleCss(Utils.Gray)" class="legend-circle"></span>
+                            Bande et profil de modulation inconnu
+                        </div>
+                    </GridCol>
+
+                    <GridCol Xs="24" Md="12">
+                        <div class="legend">
+                            <span style="background-color: @Utils.Gold" class="legend-bar"></span>
+                            Lien radio direct
+                        </div>
+                        <div class="legend">
+                            <span style="background-color: @Utils.Blue" class="legend-bar"></span>
+                            Lien possiblement incorrect
+                        </div>
+
+                        @if (Settings.ShowIndirectsPaths)
+                        {
+                            <div class="legend">
+                                <span style="background-color: @Utils.Red" class="legend-bar"></span>
+                                Lien indirect
+                            </div>
+                        }
+
+                        @if (Settings.ShowPois)
+                        {
+                            <div class="legend">
+                                <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
+                                Point d'intétêt
+                            </div>
+                        }
+                    </GridCol>
+                </GridRow>
+            </ChildContent>
+        </Card>
+    }
 </Spin>
 
 @code
@@ -114,6 +127,7 @@
         Latitude = 46.199144,
         Longitude = 2.321139,
         Zoom = 5,
+        ShowLegend = true,
         ShowIndirectsPaths = false,
         ShowPois = true,
         CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868
@@ -427,6 +441,14 @@
         await FetchData();
     }
 
+    private async Task SetShowLegend(bool showLegend)
+    {
+        Settings.ShowLegend = showLegend;
+        await SaveMapPosition();
+        
+        await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+    }
+
     private async Task MoveZoomChanged(Osm.LatitudeLongitudeZoom args)
     {
         Settings.Latitude = args.Latitude;
@@ -481,6 +503,8 @@
 
     public class NodeMapSettings
     {
+        public bool ShowLegend { get; set; }
+        
         public bool ShowIndirectsPaths { get; set; }
         
         public bool ShowPois { get; set; }
