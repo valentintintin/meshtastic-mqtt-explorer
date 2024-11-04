@@ -519,6 +519,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 Packet = packet,
                 Node = node,
                 Hop = hop,
+                // Snr = 
                 CreatedAt = packet.CreatedAt,
                 UpdatedAt = packet.UpdatedAt
             };

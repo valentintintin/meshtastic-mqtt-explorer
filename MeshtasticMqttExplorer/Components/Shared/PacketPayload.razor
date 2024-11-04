@@ -261,6 +261,43 @@
                                     <text>Aucune</text>
                                 }
                             </DescriptionsItem>
+                            @if (TraceRoute?.RouteBack?.Any() == true)
+                            {
+                                <DescriptionsItem Title="Route retour">
+                                    @if (TraceRoute?.RouteBack?.Any() == true)
+                                    {
+                                        <Timeline>
+                                            <TimelineItem Color="red">
+                                                <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
+                                            </TimelineItem>
+
+                                            @for (var i = 0; i < (TraceRoute?.RouteBack?.Count ?? 0); i++)
+                                            {
+                                                var nodeId = TraceRoute!.RouteBack![i];
+                                                var snr = i > 0 && TraceRoute!.SnrBack?.Count > i ? TraceRoute!.SnrBack[i] / 4.0 : 0;
+
+                                                <TimelineItem Color="green">
+                                                    <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>
+                                                    <br/>SNR : @snr
+                                                </TimelineItem>
+                                            }
+                                            
+                                            @{
+                                                var snrFinal = (TraceRoute!.SnrBack?.LastOrDefault() ?? 0) / 4.0;
+
+                                                <TimelineItem Color="blue">
+                                                    <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
+                                                    <br/>SNR : @snrFinal
+                                                </TimelineItem>
+                                            }
+                                        </Timeline>
+                                    }
+                                    else
+                                    {
+                                        <text>Aucune</text>
+                                    }
+                                </DescriptionsItem>
+                            }
                         </Descriptions>
                         break;
                     case PortNum.RoutingApp:

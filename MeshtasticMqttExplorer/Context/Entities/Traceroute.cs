@@ -16,6 +16,7 @@ public class Traceroute : IEntity
     public virtual Node Node { get; set; } = null!;
     
     public required int Hop { get; set; }
+    // public double? Snr { get; set; }
     
     public long? PacketId { get; set; }
     public virtual Packet? Packet { get; set; }
