@@ -16,6 +16,7 @@ using Waypoint = Meshtastic.Protobufs.Waypoint;
 using MQTTnet;
 using MQTTnet.Client;
 using MQTTnet.Protocol;
+using KeyNotFoundException = System.Collections.Generic.KeyNotFoundException;
 
 namespace MeshtasticMqttExplorer.Services;
 

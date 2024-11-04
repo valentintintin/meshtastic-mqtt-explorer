@@ -3,11 +3,15 @@ using System.Text.Json.Serialization;
 using AntDesign;
 using Blazored.LocalStorage;
 using Google.Protobuf;
+using HotChocolate.Data.Filters;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Context;
 using MeshtasticMqttExplorer.Extensions;
+using MeshtasticMqttExplorer.GraphQl;
+using MeshtasticMqttExplorer.GraphQl.Filters;
+using MeshtasticMqttExplorer.GraphQl.Types;
 using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +19,7 @@ using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using NodeType = MeshtasticMqttExplorer.GraphQl.Types.NodeType;
 using NotificationService = MeshtasticMqttExplorer.Services.NotificationService;
 
 Console.WriteLine("Starting");
@@ -25,6 +30,15 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    builder.Services.AddCors(option =>
+    {
+        option.AddDefaultPolicy(corsPolicyBuilder => corsPolicyBuilder
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+        );
+    });
+    
     builder.Logging.ClearProviders().SetMinimumLevel(LogLevel.Trace);
     builder.Host.UseNLog();
 
@@ -36,6 +50,34 @@ try
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
+    builder.Services
+        .AddHttpContextAccessor()
+        .AddGraphQLServer()
+        .AddInMemorySubscriptions()
+        .RegisterDbContextFactory<DataContext>()
+        .AddErrorFilter<ErrorFilter>()
+        .AddQueryType<Query>()
+        .AddType<NodeType>()
+        .AddType<UIntOperationFilterInputType>()
+        .AddType<ULongOperationFilterInputType>()
+        .BindRuntimeType<uint?, UIntType>()
+        .BindRuntimeType<uint, UIntType>()
+        .BindRuntimeType<ulong?, ULongType>()
+        .BindRuntimeType<ulong, ULongType>()
+        .BindRuntimeType<ReadOnlyMemory<byte>, ByteArrayType>()
+        .BindRuntimeType<IEnumerator<byte>, ByteArrayType>()
+        .AddProjections()
+        .AddConvention<IFilterConvention, CustomFilterConvention>()
+        .AddFiltering()
+        .AddSorting()
+        .ModifyPagingOptions(config =>
+        {
+            config.IncludeTotalCount = true;
+            config.DefaultPageSize = 10;
+            config.MaxPageSize = 100;
+        })
+        .InitializeOnStartup();
+    
     builder.Services.AddResponseCompression();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
@@ -77,6 +119,11 @@ try
     {
         app.UseExceptionHandler("/error", createScopeForErrors: true);
     }
+    
+    app.UseForwardedHeaders();
+
+    app.UseRouting();
+    app.UseCors();
 
     app.UseMiddleware<PerformanceAndCultureMiddleware>();
 
@@ -87,6 +134,8 @@ try
     app.UseAntiforgery();
 
     app.MapControllers();
+    app.MapGraphQL();
+    app.MapGraphQLAltair("/altair");
 
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
