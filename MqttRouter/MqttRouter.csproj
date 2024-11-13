@@ -67,6 +67,10 @@
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
       <None Remove="Properties\**" />
+      <None Remove="Dockerfile" />
+      <Content Include="Dockerfile">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>

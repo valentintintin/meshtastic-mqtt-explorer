@@ -3,18 +3,18 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Recorder.Models;
+using Recorder.Services;
 
 namespace Recorder.Controllers;
 
 [ApiController]
 [Route("mqtt")]
-public class MqttController(ILogger<AController> logger, IConfiguration configuration) : AController(logger)
+public class MqttController(ILogger<AController> logger) : AController(logger)
 {
     [HttpGet("list")]
     public IEnumerable<MqttConfiguration> List()
     {
-        return (configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
-            .Where(a => a.Enabled);
+        return MqttService.MqttClientAndConfigurations.Select(c => c.Configuration);
     }
 
     [HttpPost("send/{server}")]
