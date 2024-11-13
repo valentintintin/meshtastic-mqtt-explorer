@@ -1,11 +1,12 @@
 @using System.Globalization
 @using System.Text.Json
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Models
+@using Common.Services
 @using Google.Protobuf
 @using Meshtastic.Extensions
 @using Meshtastic.Protobufs
-@using MeshtasticMqttExplorer.Context.Entities
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Services
 @using NeighborInfo = Meshtastic.Protobufs.NeighborInfo
 @using Position = Meshtastic.Protobufs.Position
 @using Telemetry = Meshtastic.Protobufs.Telemetry
@@ -213,6 +214,10 @@
                                             <Tag>
                                                 <a href="/node/by-nodeid/@neighbor.NodeId.ToHexString()" target="_blank" rel="nofollow">@neighbor.NodeId.ToHexString()</a>
                                                 (SNR : @neighbor.Snr)
+                                                @if (neighbor.LastRxTime > 0)
+                                                {
+                                                    <text>- Entendu la dernière fois @neighbor.LastRxTime</text>     
+                                                }
                                             </Tag>
                                         }
                                     </div>
@@ -236,58 +241,45 @@
                                     <text>Réponse du traceroute (retour)</text>
                                 }
                             </DescriptionsItem>
-                            <DescriptionsItem Title="Route">
-                                @if (TraceRoute?.Route?.Any() == true)
-                                {
-                                    <Timeline>
-                                        <TimelineItem Color="blue">
-                                            <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
-                                        </TimelineItem>
-
-                                        @foreach (var nodeId in TraceRoute?.Route ?? [])
-                                        {
-                                            <TimelineItem Color="green">
-                                                <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>
-                                            </TimelineItem>
-                                        }
-
-                                        <TimelineItem Color="red">
-                                            <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
-                                        </TimelineItem>
-                                    </Timeline>
-                                }
-                                else
-                                {
-                                    <text>Aucune</text>
-                                }
-                            </DescriptionsItem>
-                            @if (TraceRoute?.RouteBack?.Any() == true)
+                            @if (Packet.RequestId > 0)
                             {
-                                <DescriptionsItem Title="Route retour">
-                                    @if (TraceRoute?.RouteBack?.Any() == true)
+                                <DescriptionsItem Title="Route aller">
+                                    @if (TracerouteInfo?.routes.Any() == true)
                                     {
                                         <Timeline>
-                                            <TimelineItem Color="red">
-                                                <a href="/node/@Packet.From.Id" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
-                                            </TimelineItem>
-
-                                            @for (var i = 0; i < (TraceRoute?.RouteBack?.Count ?? 0); i++)
+                                            @foreach (var route in TracerouteInfo!.Value.routes)
                                             {
-                                                var nodeId = TraceRoute!.RouteBack![i];
-                                                var snr = i > 0 && TraceRoute!.SnrBack?.Count > i ? TraceRoute!.SnrBack[i] / 4.0 : 0;
-
-                                                <TimelineItem Color="green">
-                                                    <a href="/node/by-nodeid/@nodeId.ToHexString()" target="_blank" rel="nofollow">@nodeId.ToHexString()</a>
-                                                    <br/>SNR : @snr
+                                                <TimelineItem Color="@(route.Hop == 0 ? "red" : route.Hop == TraceRoute!.Route.Count + 1 ? "blue" : "green")">
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                    @if (route.Snr != null)
+                                                    {
+                                                        <br/>
+                                                        <text>SNR : </text>
+                                                        @route.Snr
+                                                    }
                                                 </TimelineItem>
                                             }
-                                            
-                                            @{
-                                                var snrFinal = (TraceRoute!.SnrBack?.LastOrDefault() ?? 0) / 4.0;
-
-                                                <TimelineItem Color="blue">
-                                                    <a href="/node/@Packet.To.Id" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
-                                                    <br/>SNR : @snrFinal
+                                        </Timeline>
+                                    }
+                                    else
+                                    {
+                                        <text>Aucune</text>
+                                    }
+                                </DescriptionsItem>
+                                <DescriptionsItem Title="Route retour">
+                                    @if (TracerouteInfo?.routesBack.Any() == true)
+                                    {
+                                        <Timeline>
+                                            @foreach (var route in TracerouteInfo!.Value.routesBack)
+                                            {
+                                                <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.Route.Count + 1 ? "red" : "green")">
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                    @if (route.Snr != null)
+                                                    {
+                                                        <br/>
+                                                        <text>SNR : </text>
+                                                        @route.Snr
+                                                    }
                                                 </TimelineItem>
                                             }
                                         </Timeline>
@@ -424,11 +416,6 @@
             <Popover ContentTemplate="@ContentRawBase64" Title="Paquet base64">
                 <Button OnClick="() => CopyTextToClipboard(RawBase64)">Paquet base64</Button>
             </Popover>
-
-            @if (ShowJson)
-            {
-                <Button OnClick="() => ComputeAgain()">Traiter la trame</Button>
-            }
         </div>
     }
 </div>
@@ -459,6 +446,7 @@
     private string? RawJson { get; set; }
     private string? RawBase64 { get; set; }
     private string? PayloadJson { get; set; }
+    private (List<TracerouteNodeRoute> routes, List<TracerouteNodeRoute> routesBack)? TracerouteInfo { get; set; } 
     
     private Osm.Marker? Marker { get; set; }
 
@@ -520,6 +508,7 @@
                     break;
                 case PortNum.TracerouteApp:
                     TraceRoute = packetData.GetPayload<RouteDiscovery>();
+                    TracerouteInfo = MeshtasticService.GetTracerouteInfo(packetData.From, packetData.To, TraceRoute);
                     break;
                 case PortNum.RoutingApp:
                     Routing = packetData.GetPayload<Routing>();
@@ -564,11 +553,5 @@
         {
             await Message.Error("Impossible d'accéder au presse-papier");
         }
-    }
-
-    private async Task ComputeAgain()
-    {
-        await MeshtasticService.DoReceive(Packet);
-        await Message.Info("Trame traitée !");
     }
 }

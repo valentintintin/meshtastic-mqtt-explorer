@@ -1,10 +1,9 @@
 @page "/stats"
 @implements IAsyncDisposable
 
+@using Common.Context
+@using Common.Extensions
 @using Meshtastic.Protobufs
-@using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Context.Entities
-@using MeshtasticMqttExplorer.Extensions
 @using MeshtasticMqttExplorer.Models
 @using Microsoft.EntityFrameworkCore
 
@@ -249,8 +248,7 @@
     {
         Context = await ContextFactory.CreateDbContextAsync();
         
-        var nbDaysPurge = Configuration.GetValue("PurgeDays", 3);
-        MinDate = DateTime.Today.ToUniversalTime().AddDays(-nbDaysPurge);
+        MinDate = DateTime.Today.ToUniversalTime().AddDays(-7);
 
         var today = DateTime.UtcNow.Date;
         var yesterday = today.AddDays(-1);

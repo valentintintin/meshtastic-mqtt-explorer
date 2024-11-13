@@ -4,13 +4,17 @@
 @implements IAsyncDisposable
 
 @using System.Globalization
-@using MeshtasticMqttExplorer.Context
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Extensions.Entities
+@using Common.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Extensions.Entities
 
 @inject IDbContextFactory<DataContext> ContextFactory
+@inject IMessageService Message
+@inject MeshtasticService MeshtasticService
 
 <PageTitle>Détail du packet @Packet?.PacketId</PageTitle>
 
@@ -27,7 +31,9 @@
             <TimelineItem Color="green">
                 <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames (Passerelle)</a>
                 <br />
-                Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - SNR <b>@Packet.RxSnr</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts
+                Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts 
+                <br />
+                SNR : <b>@Packet.RxSnr</b> - RSSI : <b>@Packet.RxRssi</b> 
             </TimelineItem>
             <TimelineItem Color="red">
                 <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames (Destinataire)</a>
@@ -41,7 +47,23 @@
             </p>
         }
         
+        @if (Packet.RequestId > 0)
+        {
+            <p>
+                <text>Réponse à la requête </text><a href="/packet/by-packetid/@Packet.RequestId" target="_blank" rel="nofollow">#@Packet.RequestId</a>
+            </p>
+        }
+        
+        @if (Packet.ReplyId > 0)
+        {
+            <p>
+                <text>Réponse au paquet </text><a href="/packet/by-packetid/@Packet.ReplyId" target="_blank" rel="nofollow">#@Packet.ReplyId</a>
+            </p>
+        }
+        
         <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
+        
+        <Button OnClick="() => ComputeAgain()">Traiter la trame</Button>
     }
     else if (Loading)
     {
@@ -62,7 +84,7 @@
     public long? PacketId { get; set; }
 
     private bool Loading { get; set; } = true;
-    private Context.Entities.Packet? Packet { get; set; }
+    private Packet? Packet { get; set; }
     private DataContext Context { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
@@ -102,6 +124,12 @@
         }
         
         Loading = false;
+    }
+
+    private async Task ComputeAgain()
+    {
+        await MeshtasticService.DoReceive(Packet);
+        await Message.Info("Trame traitée !");
     }
 
     public async ValueTask DisposeAsync()

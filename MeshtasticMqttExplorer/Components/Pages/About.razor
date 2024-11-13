@@ -1,11 +1,11 @@
 ﻿@page "/about"
 @page "/a-propos"
 
-@using System.Diagnostics
-@using MeshtasticMqttExplorer.Extensions
+@using Common.Extensions
+@using Common.Models
 @using MeshtasticMqttExplorer.Services
 
-@inject IConfiguration Configuration
+@inject RecorderService RecorderService
 
 <PageTitle>Meshtastic Mqtt Explorer</PageTitle>
 
@@ -16,14 +16,6 @@
                 <p>
                     Ce site est un outil pour le projet <a href="https://meshtastic.org/" target="_blank">Meshtastic</a>.
                 </p>
-
-                <p>
-                    Les trames sont sauvegardés pendants <b>@NbDaysPurge jours</b>.
-                </p>
-
-                <p>
-                    RAM : <b>@(Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024) Mb</b> depuis @(Process.GetCurrentProcess().StartTime.ToUniversalTime().ToFrench())
-                </p>
             </ChildContent>
         </Card>
     
@@ -32,6 +24,8 @@
                 <ul>
                     <li><a href="https://meshmap.net/" rel="nofollow" target="_blank">MeshMap</a></li>
                     <li><a href="https://meshtastic.liamcottle.net/" rel="nofollow" target="_blank">Liam Cottle</a></li>
+                    <li><a href="https://www.serveurperso.com/" rel="nofollow" target="_blank">Pascal de ServeurPerso</a></li>
+                    <li><a href="http://gaulix.fr/" rel="nofollow" target="_blank">Le réseau Gaulix</a></li>
                     <li><a href="https://wiki.fr-emcom.com/gaulix_reseau_meshtastic_-_france:1:start" target="_blank">Le Wiki du réseau Gaulix</a></li>
                     <li><a href="https://meshtastic.discourse.group/t/france-public-channel/10230" target="_blank">Le Forum Meshtastic France</a></li>
                 </ul>
@@ -42,15 +36,14 @@
     <GridCol Xs="24" Lg="12">
         <Card Title="Serveurs MQTT utilisés">
             <ChildContent>
-                @foreach (var mqtt in MqttService.MqttClientAndConfigurations)
+                @foreach (var mqtt in MqttConfigurations)
                 {
                     <Descriptions Bordered Column="1">
-                        <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Configuration.Name</DescriptionsItem>
-                        <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Configuration.Host</DescriptionsItem>
-                        <DescriptionsItem Title="Connecté" ContentStyle="font-weight: bold">@mqtt.Client.IsConnected</DescriptionsItem>
+                        <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Name</DescriptionsItem>
+                        <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Host</DescriptionsItem>
                         <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @mqtt.LastPacketDate?.ToFrench()</DescriptionsItem>
                         <DescriptionsItem Title="Topics">
-                            @foreach (var topic in mqtt.Configuration.Topics)
+                            @foreach (var topic in mqtt.Topics)
                             {
                                 <Tag>@topic</Tag>
                             }
@@ -65,12 +58,12 @@
 
 @code
 {
-    private int NbDaysPurge { get; set; }
+    private IEnumerable<MqttConfiguration> MqttConfigurations { get; set; } = [];
         
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
+        MqttConfigurations = await RecorderService.GetMqttConfigurations();
 
-        base.OnInitialized();
+        await base.OnInitializedAsync();
     }
 }

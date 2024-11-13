@@ -1,4 +1,6 @@
-﻿@inject IMessageService MessageService;
+﻿@using MeshtasticMqttExplorer.Services
+@inject IMessageService MessageService;
+@inject RecorderService RecorderService;
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -57,16 +59,24 @@
 
 @code {
     private string? Version { get; set; }
-    
-    protected override void OnInitialized()
+
+    protected override async Task OnInitializedAsync()
     {
         Version = GetType().Assembly.GetName().Version?.ToString();
-        
-        MessageService.Config(new MessageGlobalConfig {
+
+        MessageService.Config(new MessageGlobalConfig
+        {
             Duration = 2000
         });
-        
-        base.OnInitialized();
+
+        if (Utils.MqttServerFilters.Count == 0)
+        {
+            Utils.MqttServerFilters.AddRange(
+                (await RecorderService.GetMqttConfigurations()).Select(c => new TableFilter<string?> { Text = c.Name, Value = c.Name })
+            );
+        }
+
+        await base.OnInitializedAsync();
     }
 
 }

@@ -2,6 +2,12 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MeshtasticMqttExplorer", "MeshtasticMqttExplorer\MeshtasticMqttExplorer.csproj", "{13B968A5-CF14-456A-B2A9-AB2FCCAA60B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{007409B0-BCDE-4E86-A30F-DB9F9CD2CABA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Recorder", "Recorder\Recorder.csproj", "{B3991ABF-69E3-4A4E-A3B6-91EF62DFF794}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttRouter", "MqttRouter\MqttRouter.csproj", "{7EE570BC-7010-4EFE-94E5-90829E5903B6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +18,17 @@ Global
 		{13B968A5-CF14-456A-B2A9-AB2FCCAA60B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{13B968A5-CF14-456A-B2A9-AB2FCCAA60B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{13B968A5-CF14-456A-B2A9-AB2FCCAA60B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{007409B0-BCDE-4E86-A30F-DB9F9CD2CABA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{007409B0-BCDE-4E86-A30F-DB9F9CD2CABA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{007409B0-BCDE-4E86-A30F-DB9F9CD2CABA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{007409B0-BCDE-4E86-A30F-DB9F9CD2CABA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3991ABF-69E3-4A4E-A3B6-91EF62DFF794}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3991ABF-69E3-4A4E-A3B6-91EF62DFF794}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3991ABF-69E3-4A4E-A3B6-91EF62DFF794}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3991ABF-69E3-4A4E-A3B6-91EF62DFF794}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

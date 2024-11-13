@@ -3,13 +3,14 @@
 
 @implements IAsyncDisposable
 
+@using Common
+@using Common.Context
+@using Common.Extensions.Entities
+@using Common.Services
 @using Meshtastic.Protobufs
-@using MeshtasticMqttExplorer.Context
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Extensions.Entities
-@using MeshtasticMqttExplorer.Services
-@using NeighborInfo = MeshtasticMqttExplorer.Context.Entities.NeighborInfo
+@using NeighborInfo = Common.Context.Entities.NeighborInfo
 
 @inject IDbContextFactory<DataContext> ContextFactory
 
@@ -86,7 +87,7 @@
 
     private bool Loading { get; set; } = true;
     private bool Alive { get; set; }
-    private Context.Entities.Node? Node { get; set; }
+    private Common.Context.Entities.Node? Node { get; set; }
     private Node.PacketsStats PacketsStats { get; } = new();
     private DataContext Context { get; set; } = null!;
 
@@ -115,11 +116,11 @@
         
         var query = Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.Distance > 0 && a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt))
@@ -139,7 +140,7 @@
             Node = await query.FindByNodeIdStringAsync(NodeId);
         }
 
-        if (Node == null || Node.NodeId == MeshtasticService.NodeBroadcast)
+        if (Node == null || MeshtasticService.NodesIgnored.Contains(Node.NodeId))
         {
             Loading = false;
             Node = null;

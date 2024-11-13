@@ -6,4 +6,5 @@ riderModule.iml
 published/
 .idea
 MeshtasticMqttExplorer/appsettings.Production.json
+Recorder/appsettings.Production.json
 MeshtasticMqttExplorer/wwwroot/mymap.pmtiles

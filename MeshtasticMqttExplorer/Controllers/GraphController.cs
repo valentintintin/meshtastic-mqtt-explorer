@@ -1,12 +1,11 @@
-using Meshtastic.Protobufs;
-using MeshtasticMqttExplorer.Components;
-using MeshtasticMqttExplorer.Context;
+using Common;
+using Common.Context;
+using Common.Services;
 using MeshtasticMqttExplorer.Models;
-using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using DateTimeOffset = System.DateTimeOffset;
-using NeighborInfo = MeshtasticMqttExplorer.Context.Entities.NeighborInfo;
+using NeighborInfo = Common.Context.Entities.NeighborInfo;
 
 namespace MeshtasticMqttExplorer.Controllers;
 
@@ -27,7 +26,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
             .Include(a => a.Neighbor)
             .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
             .Where(n => !MeshtasticService.NodesIgnored.Contains(n.Node.NodeId) && !MeshtasticService.NodesIgnored.Contains(n.Neighbor.NodeId))
-            .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed)
+            .Where(a => a.Distance > 0 && a.Distance < MeshtasticUtils.DefaultDistanceAllowed)
             .OrderByDescending(n => n.UpdatedAt)
             .ToListAsync()
             ;

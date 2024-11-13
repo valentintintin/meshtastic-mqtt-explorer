@@ -4,13 +4,14 @@
 @implements IAsyncDisposable
 @using System.Globalization
 @using System.Text.Json
+@using Common.Context
+@using Common.Extensions
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Extensions
 @using Microsoft.EntityFrameworkCore
-@using NeighborInfo = MeshtasticMqttExplorer.Context.Entities.NeighborInfo
-@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+@using NeighborInfo = Common.Context.Entities.NeighborInfo
+@using Node = Common.Context.Entities.Node
+@using Common;
 
 @inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
@@ -21,7 +22,7 @@
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position dont @TotalAlive en ligne depuis le @MinDate.ToFrench().ToString("d")
+        @Total nœuds avec position dont @TotalAlive en ligne
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -91,10 +92,6 @@
                             <span style="background-color: @Utils.Gold" class="legend-bar"></span>
                             Lien radio direct
                         </div>
-                        <div class="legend">
-                            <span style="background-color: @Utils.Blue" class="legend-bar"></span>
-                            Lien possiblement incorrect
-                        </div>
 
                         @if (Settings.ShowIndirectsPaths)
                         {
@@ -135,7 +132,6 @@
     };
     private int Total { get; set; }
     private int TotalAlive { get; set; }
-    private int NbDaysPurge { get; set; }
     private DateTime MinDate { get; set; } = DateTime.MinValue;
     private List<Node> Nodes { get; set; } = [];
     private DataContext Context { get; set; } = null!;
@@ -159,7 +155,13 @@
             var settings = await LocalStorage.GetItemAsync<NodeMapSettings>("nodeMapSettings");
             if (settings != null)
             {
-                // Settings = settings;
+                Settings.Latitude = settings.Latitude;
+                Settings.Longitude = settings.Longitude;
+                Settings.Zoom = settings.Zoom;
+                Settings.ShowLegend = settings.ShowLegend;
+                Settings.ShowPois = settings.ShowPois;
+                Settings.ShowIndirectsPaths = settings.ShowIndirectsPaths;
+                // Settings = settings; // Semble bugger sur le modem preset, region et frequence
                 Logger.LogDebug("Utilisation de settings : {settings}", JsonSerializer.Serialize(settings));
             }
             
@@ -181,7 +183,7 @@
                         node.MyNeighbors
                             .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
                             {
                                 markers.Add(GetMarker(n.Neighbor));
@@ -194,7 +196,7 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                     ],
-                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                     Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                 };
                             })
@@ -204,7 +206,7 @@
                         node.NeighborsFor
                             .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n =>
                             {
                                 markers.Add(GetMarker(n.Node));
@@ -217,7 +219,7 @@
                                         [node.Latitude!.Value, node.Longitude!.Value],
                                         [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                     ],
-                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                     Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                 };
                             })
@@ -229,7 +231,7 @@
                             node.MyNeighbors
                                 .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
                                 .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                                .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                                .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                                 .Select(n =>
                                 {
                                     markers.Add(GetMarker(n.Neighbor));
@@ -242,7 +244,7 @@
                                             [node.Latitude!.Value, node.Longitude!.Value],
                                             [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                         ],
-                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                         Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                     };
                                 })
@@ -252,7 +254,7 @@
                             node.NeighborsFor
                                 .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
                                 .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                                .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                                .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                                 .Select(n =>
                                 {
                                     markers.Add(GetMarker(n.Node));
@@ -265,7 +267,7 @@
                                             [node.Latitude!.Value, node.Longitude!.Value],
                                             [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                         ],
-                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                         Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                                     };
                                 })
@@ -285,7 +287,7 @@
                                     [n.Latitude, n.Longitude]
                                 ],
                                 Color = Utils.Orange,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {Utils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
+                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
                             })
                     );
                     
@@ -317,8 +319,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
-        MinDate = DateTime.Today.ToUniversalTime().AddDays(-NbDaysPurge);
+        MinDate = DateTime.Today.ToUniversalTime().AddDays(-7);
         
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {
@@ -343,13 +344,13 @@
         
         Nodes = await Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .Where(a => !a.Neighbor.Ignored)
                 .Where(a => a.Neighbor.LastSeen.HasValue && a.Neighbor.LastSeen >= MinDate)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.Distance > 0 && a.Distance < Utils.DefaultDistanceAllowed && a.Node.Latitude.HasValue && a.Node.Longitude.HasValue)
+                .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.Node.Latitude.HasValue && a.Node.Longitude.HasValue)
                 .Where(a => !a.Node.Ignored)
                 .Where(a => a.Node.LastSeen.HasValue && a.Node.LastSeen >= MinDate)
                 .OrderBy(t => t.UpdatedAt))
@@ -486,7 +487,7 @@
 
     private async Task SaveMapPosition()
     {
-        if (Map != null)
+        if (Map != null && HasRenderMapData)
         {
             try
             {

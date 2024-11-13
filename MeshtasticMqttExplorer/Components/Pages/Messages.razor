@@ -3,13 +3,12 @@
 @implements IAsyncDisposable
 
 @using System.Globalization
-@using System.Reactive.Linq
-@using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Context.Entities
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Services
 @using Microsoft.EntityFrameworkCore
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Services
-@using Channel = MeshtasticMqttExplorer.Context.Entities.Channel
+@using Channel = Common.Context.Entities.Channel
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 

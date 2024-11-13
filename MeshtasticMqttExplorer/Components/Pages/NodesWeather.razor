@@ -1,12 +1,12 @@
 @page "/weather"
 @implements IAsyncDisposable
 
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Extensions.Entities
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Context.Entities
 @using Microsoft.EntityFrameworkCore
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Extensions.Entities
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 

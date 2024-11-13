@@ -1,11 +1,10 @@
 @page "/nodes"
 @implements IAsyncDisposable
-
-@using MeshtasticMqttExplorer.Context
+@using Common.Context
+@using Common.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Services
-@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+@using Node = Common.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory
 

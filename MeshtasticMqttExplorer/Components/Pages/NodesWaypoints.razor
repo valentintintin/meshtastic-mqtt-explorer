@@ -1,13 +1,11 @@
 @page "/waypoints"
 @implements IAsyncDisposable
 
+@using Common.Context
+@using Common.Context.Entities
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Context
-@using MeshtasticMqttExplorer.Context.Entities
 @using Microsoft.EntityFrameworkCore
-@using MeshtasticMqttExplorer.Extensions
-@using MeshtasticMqttExplorer.Extensions.Entities
-@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+@using Node = Common.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 

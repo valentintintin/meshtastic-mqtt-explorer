@@ -1,12 +1,11 @@
 ﻿@page "/packets"
 @page "/node/{id:long}/packets"
 @implements IAsyncDisposable
-
-@using MeshtasticMqttExplorer.Context
+@using Common.Context
+@using Common.Context.Entities
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
-@using MeshtasticMqttExplorer.Context.Entities
-@using Node = MeshtasticMqttExplorer.Context.Entities.Node
+@using Node = Common.Context.Entities.Node
 
 @inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
@@ -18,7 +17,7 @@
 {
     <PageHeader Title="Trames" OnBack="OnBack">
         <SubtitleTemplate>
-            @Total trames @(Node?.AllNames) depuis les @NbDaysPurge derniers jours
+            @Total trames @(Node?.AllNames) enregistrées
         </SubtitleTemplate>
         <PageHeaderContent>
             <div>
@@ -90,6 +89,8 @@ else
                 @if (context.Gateway == context.From)
                 {
                     <text>Via MQTT</text>
+                    <br />
+                    <text>Max @context.HopLimit sauts</text>
                 }
                 else
                 {
@@ -124,17 +125,13 @@ else
         </PropertyColumn>
         <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
             <div style="width: 100px">
-                @context.MqttServer<br />@context.MqttTopic
+                @context.MqttServer<br />@context.MqttTopic?.Split("/").LastOrDefault()
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
-                        Class="@(context.Encrypted ? "red" : "")">
-            <div style="width: 70px">
-                @(context.PortNum?.ToString() ?? "Chiffrée")
-                @if (context.Encrypted && context.PortNum != null)
-                {
-                    <div>mais chiffrée avec AQ==</div>
-                }
+                        Class="@(context is { Encrypted: true, PortNum: null } ? "red" : "")">
+            <div style="width: 80px">
+                @(context.PortNum?.ToString()?.Replace("App", string.Empty) ?? "Chiffrée")
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PayloadJson" Title="Contenu">
@@ -160,7 +157,6 @@ else
     private IQueryable<Packet> PacketsQueryable { get; set; } = null!;
     private int Total { get; set; }
     private DataContext Context { get; set; } = null!;
-    private int NbDaysPurge { get; set; }
     private ShowType CurrentShowType { get; set; } = ShowType.From;
     private bool ShowDuplicated { get; set; }
     
@@ -174,8 +170,6 @@ else
     
     protected override async Task OnInitializedAsync()
     {
-        NbDaysPurge = Configuration.GetValue("PurgeDays", 3);
-        
         Context = await ContextFactory.CreateDbContextAsync();
         
         await base.OnInitializedAsync();

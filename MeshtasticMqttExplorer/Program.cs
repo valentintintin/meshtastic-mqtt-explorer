@@ -2,12 +2,10 @@ using System.Globalization;
 using System.Text.Json.Serialization;
 using AntDesign;
 using Blazored.LocalStorage;
-using Google.Protobuf;
-using Meshtastic.Protobufs;
+using Common.Context;
+using Common.Services;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
-using MeshtasticMqttExplorer.Context;
-using MeshtasticMqttExplorer.Extensions;
 using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +13,6 @@ using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using NotificationService = MeshtasticMqttExplorer.Services.NotificationService;
 
 Console.WriteLine("Starting");
 
@@ -41,11 +38,6 @@ try
     builder.Services.AddNetDaemonScheduler();
     builder.Services.AddBlazoredLocalStorage();
 
-    builder.Services.Configure<HostOptions>(hostOptions =>
-    {
-        hostOptions.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
-    });
-
     builder.Services.AddDbContextFactory<DataContext>(option =>
     {
         option.UseNpgsql(
@@ -58,10 +50,9 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
+    builder.Services.AddScoped<RecorderService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<NotificationService>();
-    builder.Services.AddSingleton<MqttService>();
-    builder.Services.AddHostedService(p => p.GetRequiredService<MqttService>());
 
     if (!builder.Environment.IsDevelopment())
     {
@@ -104,50 +95,6 @@ try
 
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
     await context.Database.MigrateAsync();
-
-    MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>().GetSection("NodesIgnored").Get<List<uint>>() ?? []);
-    Console.WriteLine($"Nodes ignored : {MeshtasticService.NodesIgnored.Select(a => a.ToHexString()).JoinString()}");
-    
-    if (false && app.Environment.IsDevelopment())
-    {
-        var n1 = context.Nodes.Find(2090);
-        var n2 = context.Nodes.Find(2807);
-        var meshtasticService = app.Services.CreateScope().ServiceProvider.GetRequiredService<MeshtasticService>();
-        meshtasticService.SimplifyNeighborForNode(n1, n2);
-        return;
-    
-        var i = 0;
-
-        var packets = context.Packets
-            .Include(a => a.From)
-            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .Include(a => a.To)
-            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .Include(a => a.Gateway)
-            .ThenInclude(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .Where(a => a.PacketDuplicated == null)
-            .Where(a => a.PortNum == PortNum.TracerouteApp && a.RequestId > 0)
-            .ToList();
-
-        foreach (var packet in packets)
-        {
-            try
-            {
-                await meshtasticService.DoReceive(packet);
-
-                i++;
-
-                if (i % 10 == 0)
-                {
-                    Console.WriteLine($"\n\n{i} #{packet.Id}\n\n");
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Erreur sur paquet #{packet.Id} : {e}");
-            }
-        }
-    }
 
     Console.WriteLine("Started");
 

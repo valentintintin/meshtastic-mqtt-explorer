@@ -1,8 +1,9 @@
 @using System.Globalization
-@using MeshtasticMqttExplorer.Context.Entities
-@using MeshtasticMqttExplorer.Extensions
+@using Common.Context.Entities
+@using Common.Extensions
 @using MeshtasticMqttExplorer.Models
-@using Telemetry = MeshtasticMqttExplorer.Context.Entities.Telemetry
+@using Telemetry = Common.Context.Entities.Telemetry
+@using Common;
 
 @if (NodeInfo != null)
 {
@@ -259,46 +260,6 @@
         </GridCol>
     }
 
-    @if (NodeInfo?.TraceroutesFrom.Any() == true)
-    {
-        <GridCol Xs="24" Md="8">
-            <Card Title="Traceroutes">
-                <ChildContent>
-                        @foreach (var traceroutes in NodeInfo.TraceroutesFrom.GroupBy(t => t.PacketId, (_, traceroutes) => new
-                                  {
-                                      traceroutes = traceroutes.OrderBy(t => t.Hop).ToList(),
-                                      packetId = traceroutes.First().PacketId,
-                                      date = traceroutes.First().CreatedAt,
-                                      to = traceroutes.Last().To
-                                  }).GroupBy(t => t.to, (node, list) => list.OrderByDescending(t => t.date).First()))
-                        {
-                            <p>
-                                @traceroutes.date.ToFrench()
-                                @if (traceroutes.packetId.HasValue)
-                                {
-                                    <br/>
-                                    <a href="/packet/@traceroutes.packetId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
-                                }
-                            </p>
-                            
-                            <Timeline>
-                                <TimelineItem Color="blue">
-                                    <a href="/node/@NodeInfo.Id" target="_blank" rel="nofollow">@NodeInfo.AllNames</a>
-                                </TimelineItem>
-                                
-                                @foreach (var traceroute in traceroutes.traceroutes)
-                                {
-                                    <TimelineItem Color="@(traceroute.Node == traceroutes.to ? "red": "green")">
-                                        <a href="/node/@traceroute.NodeId" target="_blank" rel="nofollow">@traceroute.Node.AllNames</a>
-                                    </TimelineItem>
-                                }
-                            </Timeline>
-                        }
-                </ChildContent>
-            </Card>
-        </GridCol>
-    }
-
     @if (NodeInfo?.Waypoints.Any() == true)
     {
         <GridCol Xs="24" Md="8">
@@ -317,7 +278,7 @@
                                     <DescriptionTemplate>
                                         @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
                                         {
-                                            @(Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, waypoint.Latitude, waypoint.Longitude) + " Km")
+                                            @(MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, waypoint.Latitude, waypoint.Longitude) + " Km")
                                         }
                                         @if (!string.IsNullOrWhiteSpace(waypoint.Description))
                                         {
@@ -411,7 +372,7 @@
 @code
 {
     [Parameter]
-    public required Context.Entities.Node? NodeInfo { get; set; }
+    public required Common.Context.Entities.Node? NodeInfo { get; set; }
     
     [Parameter]
     public PacketsStats? PacketsInfo { get; set; }
@@ -518,7 +479,7 @@
                     lines.AddRange(
                         NodeInfo.MyNeighbors
                             .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Neighbor.Id}->node-{NodeInfo.Id}",
@@ -527,7 +488,7 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
-                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                 Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
@@ -556,7 +517,7 @@
                     lines.AddRange(
                         NodeInfo.NeighborsFor
                             .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < Utils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
                                 Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
@@ -565,7 +526,7 @@
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
-                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : n.Snr == 0 ? Utils.Blue : Utils.Gold,
+                                Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                 Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
                             })
                     );
@@ -603,7 +564,7 @@
                                     [n.Latitude, n.Longitude]
                                 ],
                                 Color = Utils.Orange,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {Utils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
+                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
                             })
                     );
                 }
