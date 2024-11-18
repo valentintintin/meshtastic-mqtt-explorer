@@ -3,7 +3,7 @@ obj/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
-published/
+published*/
 .idea
 MeshtasticMqttExplorer/appsettings.Production.json
 Recorder/appsettings.Production.json

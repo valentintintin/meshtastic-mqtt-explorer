@@ -608,6 +608,7 @@
             }
 
             await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
+            await Task.Delay(TimeSpan.FromMilliseconds(150)); // Marker devant les lignes
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
 
             HasRenderMapData = true;

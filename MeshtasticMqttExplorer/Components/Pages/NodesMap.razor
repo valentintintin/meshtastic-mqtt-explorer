@@ -308,8 +308,8 @@
             }
 
             await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
+            await Task.Delay(TimeSpan.FromMilliseconds(150)); // Marker devant les lignes
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
-
             HasRenderMapData = true;
             RenderFinished = !firstRender;
         }
@@ -356,7 +356,6 @@
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
-            .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
             .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
