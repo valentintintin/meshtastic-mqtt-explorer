@@ -69,13 +69,6 @@
             Duration = 2000
         });
 
-        if (Utils.MqttServerFilters.Count == 0)
-        {
-            Utils.MqttServerFilters.AddRange(
-                (await RecorderService.GetMqttConfigurations()).Select(c => new TableFilter<string?> { Text = c.Name, Value = c.Name })
-            );
-        }
-
         await base.OnInitializedAsync();
     }
 

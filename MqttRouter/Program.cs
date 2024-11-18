@@ -8,6 +8,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MqttRouter.Context;
+using MqttRouter.Services;
 using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
@@ -39,11 +41,20 @@ try
             builder.Configuration.GetConnectionString("Default")
         );
     });
+    
+    // builder.Services.AddDbContextFactory<DataRouterContext>(option =>
+    // {
+    //     option.UseNpgsql(
+    //         builder.Configuration.GetConnectionString("Default")
+    //     );
+    // });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
+
+    builder.Services.AddScoped<RoutingService>();
     
     builder.Services.AddScoped<MeshtasticService>();
     

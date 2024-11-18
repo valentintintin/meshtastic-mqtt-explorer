@@ -22,7 +22,7 @@
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position dont @TotalAlive en ligne
+        @Total nœuds avec position dont @TotalAlive en ligne depuis le @MinDate.ToFrench()
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -197,7 +197,7 @@
                                         [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                     ],
                                     Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                    Popup = Utils.GetNeighborLinePopupHtml(node, n)
                                 };
                             })
                     );
@@ -220,7 +220,7 @@
                                         [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                     ],
                                     Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                    Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                    Popup = Utils.GetNeighborLinePopupHtml(node, n)
                                 };
                             })
                     );
@@ -245,7 +245,7 @@
                                             [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                         ],
                                         Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                        Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                        Popup = Utils.GetNeighborLinePopupHtml(node, n)
                                     };
                                 })
                         );
@@ -268,7 +268,7 @@
                                             [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                         ],
                                         Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                        Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                        Popup = Utils.GetNeighborLinePopupHtml(node, n)
                                     };
                                 })
                         );
@@ -287,7 +287,7 @@
                                     [n.Latitude, n.Longitude]
                                 ],
                                 Color = Utils.Orange,
-                                Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
+                                Popup = Utils.GetWaypointLinePopupHtml(node, n)
                             })
                     );
                     
@@ -319,7 +319,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        MinDate = DateTime.Today.ToUniversalTime().AddDays(-7);
+        MinDate = DateTime.Today.ToUniversalTime().AddDays(-3);
         
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {

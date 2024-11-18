@@ -6,9 +6,9 @@ port=22
 set -e
 set -x
 
-rm -Rf ../published/*
-dotnet publish --no-restore --no-self-contained --nologo --output ../published/
+rm -Rf ../published-Router/*
+dotnet publish --no-restore --no-self-contained --nologo --output ../published-Router/
 
-rsync -e "ssh -p $port" -r --info=progress2 ../published/ $server:/home/valentin/docker/meshtastic_mqtt_explorer/MqttRouter
+rsync -e "ssh -p $port" -r --info=progress2 ../published-Router/ $server:/home/valentin/docker/meshtastic_mqtt_explorer/MqttRouter
 
-ssh $server -t -p $port "cd /home/valentin/docker/meshtastic_mqtt_explorer/ && docker restart meshtastic-meshtastic_mqtt_explorer_router-1 && docker logs -f --tail 10 meshtastic-meshtastic_mqtt_explorer_router-1"
+ssh $server -t -p $port "docker restart meshtastic-meshtastic_mqtt_explorer_router-1 && docker logs -f --tail 10 meshtastic-meshtastic_mqtt_explorer_router-1"

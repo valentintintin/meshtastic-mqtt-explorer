@@ -116,17 +116,15 @@
         
         var query = Context.Nodes
             .Include(n => n.MyNeighbors
-                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Neighbor)
             .Include(n => n.NeighborsFor
-                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
+                .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.Node)
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.OrderBy(a => a.CreatedAt))
-            .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.Node)
-            .Include(n => n.TraceroutesFrom.OrderByDescending(a => a.CreatedAt)).ThenInclude(n => n.To)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
             .AsNoTrackingWithIdentityResolution()
             .AsSplitQuery();

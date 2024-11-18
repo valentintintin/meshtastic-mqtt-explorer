@@ -272,7 +272,7 @@
                                         <Timeline>
                                             @foreach (var route in TracerouteInfo!.Value.routesBack)
                                             {
-                                                <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.Route.Count + 1 ? "red" : "green")">
+                                                <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.RouteBack.Count ? "red" : "green")">
                                                     <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
                                                     @if (route.Snr != null)
                                                     {
@@ -508,7 +508,7 @@
                     break;
                 case PortNum.TracerouteApp:
                     TraceRoute = packetData.GetPayload<RouteDiscovery>();
-                    TracerouteInfo = MeshtasticService.GetTracerouteInfo(packetData.From, packetData.To, TraceRoute);
+                    TracerouteInfo = MeshtasticService.GetTracerouteInfo(packetData.From, packetData.To, Packet.Gateway.NodeId, TraceRoute);
                     break;
                 case PortNum.RoutingApp:
                     Routing = packetData.GetPayload<Routing>();

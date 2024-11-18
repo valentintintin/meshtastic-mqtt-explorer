@@ -49,9 +49,6 @@ public class Node : IEntity
     public virtual ICollection<NeighborInfo> NeighborsFor { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesFrom { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesTo { get; set; } = [];
-    public virtual ICollection<Traceroute> TraceroutesFrom { get; set; } = [];
-    public virtual ICollection<Traceroute> TraceroutesTo { get; set; } = [];
-    public virtual ICollection<Traceroute> TraceroutesPart { get; set; } = [];
 
     public string NodeIdAsString() => NodeId.ToHexString();
     public string Name() => LongName != null && ShortName != null ? $"{LongName} | {ShortName}" : NodeIdAsString();

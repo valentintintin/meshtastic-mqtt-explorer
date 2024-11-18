@@ -14,7 +14,7 @@
 
 <PageHeader Title="Météo">
     <SubtitleTemplate>
-        @Telemetries.Count données depuis les dernières 12h
+        @Telemetries.Count données depuis les dernières 2h
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -22,7 +22,7 @@
 </PageHeader>
 
 <Spin Spinning="Loading">
-    <Osm Height="calc(100vh - 270px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+    <Osm Height="calc(100vh - 250px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
 </Spin>
 
 @code
@@ -64,7 +64,7 @@
             await Map.ClearMarkers();
         }
         
-        var twelveHours = DateTime.UtcNow.AddHours(-12);
+        var twelveHours = DateTime.UtcNow.AddHours(-2);
 
         Telemetries = await Context.Telemetries
             .Include(n => n.Node)

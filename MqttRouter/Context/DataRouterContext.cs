@@ -3,25 +3,11 @@ using Common.Context.Configurations;
 using Common.Context.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Channel = Common.Context.Entities.Channel;
-using NeighborInfo = Common.Context.Entities.NeighborInfo;
-using Position = Common.Context.Entities.Position;
-using Telemetry = Common.Context.Entities.Telemetry;
-using Waypoint = Common.Context.Entities.Waypoint;
 
-namespace Common.Context;
+namespace MqttRouter.Context;
 
-public class DataContext(DbContextOptions<DataContext> options, ILogger<DataContext> logger) : DbContext(options)
+public class DataRouterContext(DbContextOptions<DataRouterContext> options, ILogger<DataRouterContext> logger) : DbContext(options)
 {
-    public required DbSet<Packet> Packets { get; set; }
-    public required DbSet<Node> Nodes { get; set; }
-    public required DbSet<Position> Positions { get; set; }
-    public required DbSet<Telemetry> Telemetries { get; set; }
-    public required DbSet<NeighborInfo> NeighborInfos { get; set; }
-    public required DbSet<Channel> Channels { get; set; }
-    public required DbSet<TextMessage> TextMessages { get; set; }
-    public required DbSet<Waypoint> Waypoints { get; set; }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -48,27 +34,6 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     {
         foreach (var entityEntry in ChangeTracker.Entries())
         {
-            if (entityEntry.Entity is Node node)
-            {
-                try
-                {
-                    node.NodeIdString = node.NodeIdAsString();
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Error while saving nodeIdString in SaveChanges for node #{node}", node.Id);
-                }
-
-                try 
-                {
-                    node.AllNames = node.FullName();
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Error while saving allNames in SaveChanges for node #{node}", node.Id);
-                }
-            }
-            
             if (entityEntry.Entity is IEntity entity)
             {
                 switch (entityEntry.State)

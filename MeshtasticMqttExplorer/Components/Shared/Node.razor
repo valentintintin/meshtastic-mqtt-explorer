@@ -8,364 +8,425 @@
 @if (NodeInfo != null)
 {
     <GridRow Gutter="(16, 16)" Justify="center">
-
-    <GridCol Xs="24" Md="16">
-        <Card Style="width:100%;" Title="Position">
-            @if (NodeInfo?.Latitude.HasValue == true && NodeInfo?.Longitude.HasValue == true)
-            {
-                <p>
-                    Latitude : <b>@(NodeInfo.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
-                    <br />
-                    Longitude : <b>@(NodeInfo.Longitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
-                    <br />
-                    Altitude : <b>@(NodeInfo.Altitude?.ToString() ?? "-")m</b>
-                </p>
-
-                <Osm Latitude="NodeInfo.Latitude!.Value" Longitude="NodeInfo.Longitude!.Value" Zoom="13" @ref="Map"></Osm>
-            }
-            else
-            {
-                <Empty></Empty>
-            }
-        </Card>
-    </GridCol>
-    
-    <GridCol Xs="24" Md="8">
-        <Card Title="Informations">
-            <ChildContent>
-                <Descriptions Bordered="true" Column="1">
-                    <DescriptionsItem Title="Vu pour la dernière fois" ContentStyle="font-weight: bold">
-                        <Date Value="NodeInfo.LastSeen" Fallback="-"></Date>
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Vu il y a" ContentStyle="font-weight: bold">
-                        <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
-                    </DescriptionsItem>
-                    
-                    <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                        @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)/@(PacketsInfo?.Total ?? 0)
-                        <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
-                    </DescriptionsItem>
-                    
-                    <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
-                    </DescriptionsItem>
-                    
-                    @if (!string.IsNullOrWhiteSpace(NodeInfo.MqttServer))
-                    {
-                        <DescriptionsItem Title="Serveur MQTT" ContentStyle="font-weight: bold">
-                            @NodeInfo.MqttServer
-                        </DescriptionsItem>
-                    }
-                    
-                    @if (PacketsInfo?.MqttTopics.Any() == true)
-                    {
-                        <DescriptionsItem Title="Topics MQTT" ContentStyle="font-weight: bold">
-                            @foreach (var topic in PacketsInfo.MqttTopics)
-                            {
-                                <text>@topic</text>
-                                <br />
-                            }
-                        </DescriptionsItem>
-                    }
-                    
-                    <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
-                        @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
-                        @if (!string.IsNullOrWhiteSpace(NodeInfo?.PrimaryChannel))
-                        {
-                            <text> (@NodeInfo?.PrimaryChannel)</text>
-                        }
-                    </DescriptionsItem>
-                    
-                    @if (NodeInfo?.HopStart.HasValue == true)
-                    {
-                        <DescriptionsItem Title="Nombre de sauts paramétré" ContentStyle="font-weight: bold">
-                            @NodeInfo?.HopStart
-                        </DescriptionsItem>
-                    }
-
-                    @* <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold"> *@
-                    @*     @(NodeInfo?.NumOnlineLocalNodes ?? 0) *@
-                    @* </DescriptionsItem> *@
-
-                    <DescriptionsItem Title="ID décimal" ContentStyle="font-weight: bold">
-                        @NodeInfo?.NodeId
-                    </DescriptionsItem>
-                    
-                    <DescriptionsItem Title="Ajouté le" ContentStyle="font-weight: bold">
-                        <Date Value="NodeInfo.CreatedAt" Fallback="-"></Date>
-                    </DescriptionsItem>
-                </Descriptions>
-            </ChildContent>
-        </Card>
-    </GridCol>
-
-    <GridCol Xs="24" Md="8">
-        <Card Title="Télémétrie">
-            <ChildContent>
-                <Descriptions Bordered="true" Column="1">
-                    <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
-                        <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
-                        @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
-                    </DescriptionsItem>
-
-                    @if (LastTelemetryDevice?.BatteryLevel.HasValue == true)
-                    {
-                        <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
-                            @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
-                        </DescriptionsItem>
-                    }
-                    
-                    @if (LastTelemetryEnvironment?.Temperature.HasValue == true)
-                    {
-                        <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
-                            @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
-                        </DescriptionsItem>
-                    }
-                    
-                    @if (LastTelemetryEnvironment?.RelativeHumidity.HasValue == true)
-                    {
-                        <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
-                            @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
-                        </DescriptionsItem>
-                    }
-                    
-                    @if (LastTelemetryEnvironment?.BarometricPressure.HasValue == true)
-                    {
-                        <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
-                            @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
-                        </DescriptionsItem>
-                    }
-                </Descriptions>
-            </ChildContent>
-        </Card>
-    </GridCol>
-
-    <GridCol Xs="24" Md="8">
-        <Card Title="Configuration">
-            <ChildContent>
-                <Descriptions Bordered="true" Column="1">
-                    <DescriptionsItem Title="Bande" ContentStyle="font-weight: bold">
-                        @(NodeInfo.RegionCode?.ToString() ?? "-")
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Profil de modulation" ContentStyle="font-weight: bold">
-                        @(NodeInfo.ModemPreset?.ToString() ?? "-")
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Rôle" ContentStyle="font-weight: bold">
-                        @(NodeInfo.Role?.ToString() ?? "-")
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Carte" ContentStyle="font-weight: bold">
-                        @(NodeInfo.HardwareModel?.ToString() ?? "-")
-                    </DescriptionsItem>
-
-                    <DescriptionsItem Title="Version du Firmware" ContentStyle="font-weight: bold">
-                        @(!string.IsNullOrWhiteSpace(NodeInfo.FirmwareVersion) ? NodeInfo.FirmwareVersion : "-")
-                    </DescriptionsItem>
-                </Descriptions>
-                    
-                @if (NodeInfo?.HardwareModel != null && NodeInfo?.HardwareModel.GetImageUrl() != "images/hardwares/gray.jpg")
+        <GridCol Xs="24" Md="16">
+            <Card Style="width:100%;" Title="Position">
+                @if (NodeInfo?.Latitude.HasValue == true && NodeInfo?.Longitude.HasValue == true)
                 {
-                    <div style="text-align: center">
-                        <img height="150px" src="@NodeInfo?.HardwareModel.GetImageUrl()" alt="@NodeInfo?.HardwareModel" title="@NodeInfo?.HardwareModel" />
-                    </div>
-                }
-            </ChildContent>
-        </Card>
-    </GridCol>
+                    <p>
+                        Latitude : <b>@(NodeInfo.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
+                        <br />
+                        Longitude : <b>@(NodeInfo.Longitude?.ToString(CultureInfo.InvariantCulture) ?? "-")</b>
+                        <br />
+                        Altitude : <b>@(NodeInfo.Altitude?.ToString() ?? "-")m</b>
+                    </p>
 
-    @if (NodeInfo?.MyNeighbors.Any() == true || NodeInfo?.NeighborsFor.Any() == true)
-    {
-        <GridCol Xs="24" Md="8">
-            <Card Title="Voisins">
-                <ChildContent>
-                    @if (NodeInfo?.MyNeighbors.Any() == true)
-                    {
-                        <b>À entendu</b>
-
-                        <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
-                            <ChildContent Context="neighbor">
-                                <ListItem>
-                                    <ListItemMeta>
-                                        <AvatarTemplate>
-                                            <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
-                                        </AvatarTemplate>
-                                        <TitleTemplate>
-                                            <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
-                                            @if (neighbor.PacketId.HasValue)
-                                            {
-                                                <br/>
-                                                <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
-                                            }
-                                        </TitleTemplate>
-                                        <DescriptionTemplate>
-                                            @if (neighbor.Distance.HasValue)
-                                            {
-                                                <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
-                                            }
-                                            <span>SNR : @neighbor.Snr</span>
-                                            <span> | </span>
-                                            <Date Value="neighbor.UpdatedAt"></Date>
-                                        </DescriptionTemplate>
-                                    </ListItemMeta>
-                                </ListItem>
-                            </ChildContent>
-                        </AntList>
-                    }
-
-                    @if (NodeInfo?.NeighborsFor.Any() == true)
-                    {
-                        <b>Entendu par</b>
-
-                        <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
-                            <ChildContent Context="neighbor">
-                                <ListItem>
-                                    <ListItemMeta>
-                                        <AvatarTemplate>
-                                            <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
-                                        </AvatarTemplate>
-                                        <TitleTemplate>
-                                            <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
-                                            @if (neighbor.PacketId.HasValue)
-                                            {
-                                                <br/>
-                                                <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
-                                            }
-                                        </TitleTemplate>
-                                        <DescriptionTemplate>
-                                            @if (neighbor.Distance.HasValue)
-                                            {
-                                                <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
-                                            }
-                                            <span>SNR : @neighbor.Snr</span>
-                                            <span> | </span>
-                                            <Date Value="neighbor.UpdatedAt"></Date>
-                                        </DescriptionTemplate>
-                                    </ListItemMeta>
-                                </ListItem>
-                            </ChildContent>
-                        </AntList>
-                    }
-                </ChildContent>
-            </Card>
-        </GridCol>
-    }
-
-    @if (NodeInfo?.Waypoints.Any() == true)
-    {
-        <GridCol Xs="24" Md="8">
-            <Card Title="Points d'intérêts">
-                <ChildContent>
-                    <AntList DataSource="@NodeInfo.Waypoints" TItem="Waypoint">
-                        <ChildContent Context="waypoint">
-                            <ListItem>
-                                <ListItemMeta>
-                                    <AvatarTemplate>
-                                        <Avatar Src="@waypoint.Node.HardwareModel.GetImageUrl()"></Avatar>
-                                    </AvatarTemplate>
-                                    <TitleTemplate>
-                                        @waypoint.Name @waypoint.Icon
-                                    </TitleTemplate>
-                                    <DescriptionTemplate>
-                                        @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
-                                        {
-                                            @(MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, waypoint.Latitude, waypoint.Longitude) + " Km")
-                                        }
-                                        @if (!string.IsNullOrWhiteSpace(waypoint.Description))
-                                        {
-                                            <span> | </span>
-                                            @waypoint.Description
-                                        }
-                                        <span> | </span>
-                                        <Date Value="waypoint.ExpiresAt"></Date>
-                                    </DescriptionTemplate>
-                                </ListItemMeta>
-                            </ListItem>
-                        </ChildContent>
-                    </AntList>
-                </ChildContent>
-            </Card>
-        </GridCol>
-    }
-    
-    <GridCol Xs="24" Md="12">
-        <Card Title="Courbe d'utilisation sur l'air">
-            <ChildContent>
-                @if (DataAirUtil?.Any() == true)
-                {
-                    <AntDesign.Charts.Line Data="DataAirUtil" Config="_configAirUtilPercentage"/>
+                    <Osm Latitude="NodeInfo.Latitude!.Value" Longitude="NodeInfo.Longitude!.Value" Zoom="13" @ref="Map"></Osm>
                 }
                 else
                 {
                     <Empty></Empty>
                 }
-            </ChildContent>
-        </Card>
-    </GridCol>
-
-    @if (DataVoltageBattery?.Any() == true)
-    {
-        <GridCol Xs="24" Md="12">
-            <Card Title="Courbe de la batterie">
+            </Card>
+        </GridCol>
+        
+        <GridCol Xs="24" Md="8">
+            <Card Title="Informations">
                 <ChildContent>
-                    <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery"/>
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Vu pour la dernière fois" ContentStyle="font-weight: bold">
+                            <Date Value="NodeInfo.LastSeen" Fallback="-"></Date>
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Vu il y a" ContentStyle="font-weight: bold">
+                            <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
+                        </DescriptionsItem>
+                        
+                        <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                            @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)/@(PacketsInfo?.Total ?? 0)
+                            <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
+                        </DescriptionsItem>
+                        
+                        <DescriptionsItem Title="Passerelle MQTT ?" ContentStyle="font-weight: bold">
+                            @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
+                        </DescriptionsItem>
+                        
+                        @if (!string.IsNullOrWhiteSpace(NodeInfo.MqttServer))
+                        {
+                            <DescriptionsItem Title="Serveur MQTT" ContentStyle="font-weight: bold">
+                                @NodeInfo.MqttServer
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (PacketsInfo?.MqttTopics.Any() == true)
+                        {
+                            <DescriptionsItem Title="Topics MQTT" ContentStyle="font-weight: bold">
+                                @foreach (var topic in PacketsInfo.MqttTopics)
+                                {
+                                    <text>@topic</text>
+                                    <br />
+                                }
+                            </DescriptionsItem>
+                        }
+                        
+                        <DescriptionsItem Title="Canal par défaut ?" ContentStyle="font-weight: bold">
+                            @(NodeInfo?.HasDefaultChannel == true ? "Oui" : "Non")
+                            @if (!string.IsNullOrWhiteSpace(NodeInfo?.PrimaryChannel))
+                            {
+                                <text> (@NodeInfo?.PrimaryChannel)</text>
+                            }
+                        </DescriptionsItem>
+                        
+                        @if (NodeInfo?.HopStart.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Nombre de sauts paramétré" ContentStyle="font-weight: bold">
+                                @NodeInfo?.HopStart
+                            </DescriptionsItem>
+                        }
+
+                        @* <DescriptionsItem Title="Nombre de nœuds locaux entendus" ContentStyle="font-weight: bold"> *@
+                        @*     @(NodeInfo?.NumOnlineLocalNodes ?? 0) *@
+                        @* </DescriptionsItem> *@
+
+                        <DescriptionsItem Title="ID décimal" ContentStyle="font-weight: bold">
+                            @NodeInfo?.NodeId
+                        </DescriptionsItem>
+                        
+                        <DescriptionsItem Title="Ajouté le" ContentStyle="font-weight: bold">
+                            <Date Value="NodeInfo.CreatedAt" Fallback="-"></Date>
+                        </DescriptionsItem>
+                    </Descriptions>
                 </ChildContent>
             </Card>
         </GridCol>
-    }
 
-    @if (DataWeather?.Any() == true)
-    {
-        <GridCol Xs="24" Md="12">
-            <Card Title="Courbe de température et humidité">
+        <GridCol Xs="24" Md="8">
+            <Card Title="Télémétrie">
                 <ChildContent>
-                    <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature"/>
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
+                            <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
+                            @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
+                        </DescriptionsItem>
+
+                        @if (LastTelemetryDevice?.BatteryLevel.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Batterie" ContentStyle="font-weight: bold">
+                                @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryEnvironment?.Temperature.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
+                                @(LastTelemetryEnvironment?.Temperature?.ToString() ?? "-")°C
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryEnvironment?.RelativeHumidity.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Humidité" ContentStyle="font-weight: bold">
+                                @(LastTelemetryEnvironment?.RelativeHumidity?.ToString() ?? "-")%
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryEnvironment?.BarometricPressure.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
+                                @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
+                            </DescriptionsItem>
+                        }
+                    </Descriptions>
                 </ChildContent>
             </Card>
         </GridCol>
-    }
 
-    @if (DataWeatherPressure?.Any() == true)
-    {
-        <GridCol Xs="24" Md="12">
-            <Card Title="Courbe de pression atmosphérique">
+        <GridCol Xs="24" Md="8">
+            <Card Title="Configuration">
                 <ChildContent>
-                    <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure"/>
+                    <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Bande" ContentStyle="font-weight: bold">
+                            @(NodeInfo.RegionCode?.ToString() ?? "-")
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Profil de modulation" ContentStyle="font-weight: bold">
+                            @(NodeInfo.ModemPreset?.ToString() ?? "-")
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Rôle" ContentStyle="font-weight: bold">
+                            @(NodeInfo.Role?.ToString() ?? "-")
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Carte" ContentStyle="font-weight: bold">
+                            @(NodeInfo.HardwareModel?.ToString() ?? "-")
+                        </DescriptionsItem>
+
+                        <DescriptionsItem Title="Version du Firmware" ContentStyle="font-weight: bold">
+                            @(!string.IsNullOrWhiteSpace(NodeInfo.FirmwareVersion) ? NodeInfo.FirmwareVersion : "-")
+                        </DescriptionsItem>
+                    </Descriptions>
+                        
+                    @if (NodeInfo?.HardwareModel != null && NodeInfo?.HardwareModel.GetImageUrl() != "images/hardwares/gray.jpg")
+                    {
+                        <div style="text-align: center">
+                            <img height="150px" src="@NodeInfo?.HardwareModel.GetImageUrl()" alt="@NodeInfo?.HardwareModel" title="@NodeInfo?.HardwareModel" />
+                        </div>
+                    }
                 </ChildContent>
             </Card>
         </GridCol>
-    }
 
-    @if (DataPowerMetricsVoltage?.Any() == true)
-    {
-        <GridCol Xs="24" Md="12">
-            <Card Title="Courbe de tension">
-                <ChildContent>
-                    <AntDesign.Charts.Line Data="DataPowerMetricsVoltage" Config="_configVoltage"/>
-                </ChildContent>
-            </Card>
-        </GridCol>
-    }
+        @if (NodeInfo?.MyNeighbors.Any() == true || NodeInfo?.NeighborsFor.Any() == true)
+        {
+            <GridCol Xs="24" Md="8">
+                <Card Title="Voisins">
+                    <ChildContent>
+                        @if (NodeInfo?.MyNeighbors.Any() == true)
+                        {
+                            <b>À entendu</b>
 
-    @if (DataPowerMetricsCurrent?.Any() == true)
-    {
-        <GridCol Xs="24" Md="12">
-            <Card Title="Courbe d'intensité">
-                <ChildContent>
-                    <AntDesign.Charts.Line Data="DataPowerMetricsCurrent" Config="_configCurrent"/>
-                </ChildContent>
-            </Card>
-        </GridCol>
-    }
+                            <AntList DataSource="@NodeInfo.MyNeighbors.Reverse()" TItem="NeighborInfo">
+                                <ChildContent Context="neighbor">
+                                    <ListItem>
+                                        <ListItemMeta>
+                                            <AvatarTemplate>
+                                                <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
+                                            </AvatarTemplate>
+                                            <TitleTemplate>
+                                                <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
+                                                @if (neighbor.PacketId.HasValue)
+                                                {
+                                                    <br/>
+                                                    <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                                }
+                                            </TitleTemplate>
+                                            <DescriptionTemplate>
+                                                @if (neighbor.Distance.HasValue)
+                                                {
+                                                    <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
+                                                }
+                                                <span>SNR : @neighbor.Snr</span>
+                                                <span> | </span>
+                                                <Date Value="neighbor.UpdatedAt"></Date>
+                                            </DescriptionTemplate>
+                                        </ListItemMeta>
+                                    </ListItem>
+                                </ChildContent>
+                            </AntList>
+                        }
+
+                        @if (NodeInfo?.NeighborsFor.Any() == true)
+                        {
+                            <b>Entendu par</b>
+
+                            <AntList DataSource="@NodeInfo.NeighborsFor.Reverse()" TItem="NeighborInfo">
+                                <ChildContent Context="neighbor">
+                                    <ListItem>
+                                        <ListItemMeta>
+                                            <AvatarTemplate>
+                                                <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
+                                            </AvatarTemplate>
+                                            <TitleTemplate>
+                                                <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
+                                                @if (neighbor.PacketId.HasValue)
+                                                {
+                                                    <br/>
+                                                    <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                                }
+                                            </TitleTemplate>
+                                            <DescriptionTemplate>
+                                                @if (neighbor.Distance.HasValue)
+                                                {
+                                                    <span>@(Math.Round(neighbor.Distance.Value, 2)) Km | </span>
+                                                }
+                                                <span>SNR : @neighbor.Snr</span>
+                                                <span> | </span>
+                                                <Date Value="neighbor.UpdatedAt"></Date>
+                                            </DescriptionTemplate>
+                                        </ListItemMeta>
+                                    </ListItem>
+                                </ChildContent>
+                            </AntList>
+                        }
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (NodeInfo?.Waypoints.Any() == true)
+        {
+            <GridCol Xs="24" Md="8">
+                <Card Title="Points d'intérêts">
+                    <ChildContent>
+                        <AntList DataSource="@NodeInfo.Waypoints" TItem="Waypoint">
+                            <ChildContent Context="waypoint">
+                                <ListItem>
+                                    <ListItemMeta>
+                                        <AvatarTemplate>
+                                            <Avatar Src="@waypoint.Node.HardwareModel.GetImageUrl()"></Avatar>
+                                        </AvatarTemplate>
+                                        <TitleTemplate>
+                                            @waypoint.Name @waypoint.Icon
+                                        </TitleTemplate>
+                                        <DescriptionTemplate>
+                                            @if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
+                                            {
+                                                @(MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, waypoint.Latitude, waypoint.Longitude) + " Km")
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(waypoint.Description))
+                                            {
+                                                <span> | </span>
+                                                @waypoint.Description
+                                            }
+                                            <span> | </span>
+                                            <Date Value="waypoint.ExpiresAt"></Date>
+                                        </DescriptionTemplate>
+                                    </ListItemMeta>
+                                </ListItem>
+                            </ChildContent>
+                        </AntList>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+        
+        @if (DataAirUtil?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Utilisation sur l'air">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataAirUtil" Config="_configPercentage"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+            
+        @if (DataChannelUtil?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Utilisation du canal">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataChannelUtil" Config="_configPercentage"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataVoltageBattery?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Batterie">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataWeatherTemperature?.Any() == true)
+        {
+                <GridCol Xs="24" Md="12">
+                <Card Title="Température">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataWeatherTemperature" Config="_configTemperature"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+        
+        @if (DataWeatherHumidity?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Humidité">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataWeatherHumidity" Config="_configHumidity"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataWeatherPressure?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Pression atmosphérique">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsVoltage1?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Tension canal 1">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsVoltage1" Config="_configVoltage"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsCurrent1?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Intensité canal 1">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsCurrent1" Config="_configCurrent"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsVoltage1?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Tension canal 1">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsVoltage1" Config="_configVoltage"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsCurrent2?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Intensité canal 2">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsCurrent2" Config="_configCurrent"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsVoltage3?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Tension canal 3">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsVoltage3" Config="_configVoltage"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPowerMetricsCurrent3?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Intensité canal 3">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsCurrent3" Config="_configCurrent"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
     </GridRow>
 }
 
@@ -381,20 +442,27 @@
     private Telemetry? LastTelemetryEnvironment { get; set; }
     
     private List<DateChartData<float>>? DataAirUtil { get; set; }
+    private List<DateChartData<float>>? DataChannelUtil { get; set; }
     private List<DateChartData<float>>? DataVoltageBattery { get; set; }
-    private List<DateChartData<float>>? DataWeather { get; set; }
+    private List<DateChartData<float>>? DataWeatherTemperature { get; set; }
+    private List<DateChartData<float>>? DataWeatherHumidity { get; set; }
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
-    private List<DateChartData<float>>? DataPowerMetricsVoltage { get; set; }
-    private List<DateChartData<float>>? DataPowerMetricsCurrent { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsVoltage1 { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsCurrent1 { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsVoltage2 { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsCurrent2 { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsVoltage3 { get; set; }
+    private List<DateChartData<float>>? DataPowerMetricsCurrent3 { get; set; }
     private bool HasRenderMapData { get; set; }
     private Osm? Map { get; set; }
 
-    private readonly LineConfig _configAirUtilPercentage = Utils.GetLineConfig("Pourcentage (%)", 0, 100);
-    private readonly LineConfig _configVoltageBattery = Utils.GetLineConfig("Tension (V)", 0);
-    private readonly LineConfig _configTemperature = Utils.GetLineConfig("Température (°C) / Humidité (%)", -10, 100);
-    private readonly LineConfig _configPressure = Utils.GetLineConfig("Pression atmosphérique (hPa)", 950, 1050);
-    private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)", 0);
-    private readonly LineConfig _configCurrent = Utils.GetLineConfig("Intensité (mA)", 0);
+    private readonly LineConfig _configPercentage = Utils.GetLineConfig("Pourcentage (%)");
+    private readonly LineConfig _configVoltageBattery = Utils.GetLineConfig("Tension (V)");
+    private readonly LineConfig _configTemperature = Utils.GetLineConfig("Température (°C)");
+    private readonly LineConfig _configHumidity = Utils.GetLineConfig("Humidité (%)");
+    private readonly LineConfig _configPressure = Utils.GetLineConfig("Pression atmosphérique (hPa)", 900);
+    private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)");
+    private readonly LineConfig _configCurrent = Utils.GetLineConfig("Intensité (mA)");
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -428,51 +496,6 @@
                 });
             }
 
-            if (NodeInfo.PacketsFrom.Any())
-            {
-                var gateways = NodeInfo.PacketsFrom
-                    .Where(p => p is { GatewayPosition: not null, Position: not null })
-                    .GroupBy(p => p.GatewayPosition, (position, packets) => new
-                    {
-                        GatewayPosition = position,
-                        packets.First().Gateway,
-                        Packets = packets
-                    })
-                    .ToList();
-                
-                markers.AddRange(
-                    gateways
-                        .Select(p =>
-                        {
-                            var marker = new Osm.Marker
-                            {
-                                Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}",
-                                Latitude = p.GatewayPosition.Latitude,
-                                Longitude = p.GatewayPosition.Longitude,
-                                Color = "green",
-                                Label = $"Passerelle MQTT : {p.Gateway.AllNames} - Position le {p.GatewayPosition.UpdatedAt.ToFrench()}",
-                                PopupOnHover = true,
-                                Popup = $"<p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{p.Gateway.AllNames}</b></a></p><p>Position le {p.GatewayPosition.UpdatedAt.ToFrench()}</p>",
-                                LinesOnHover = p.Packets.OrderBy(ppp => ppp.CreatedAt).Select(pp => new Osm.Line
-                                {
-                                    Id = $"node(gateway)-{p.Gateway.Id}-position-{p.GatewayPosition!.Id}->node-{NodeInfo.Id}",
-                                    Points =
-                                    [
-                                        [pp.Position!.Latitude, pp.Position.Longitude],
-                                        [pp.GatewayPosition!.Latitude, pp.GatewayPosition.Longitude]
-                                    ],
-                                    Color = Utils.Green,
-                                    Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Passerelle MQTT : <a href=\"/node/{p.Gateway.Id}\" target=\"_blank\"><b>{p.Gateway.AllNames}</b></a></p><p>Distance : {(pp.GatewayDistanceKm.HasValue ? Math.Round(pp.GatewayDistanceKm.Value, 2) : "-")} Km</p><p>SNR : {pp.RxSnr}</p>"
-                                }).ToList()
-                            };
-                            
-                            lines.Add(marker.LinesOnHover.Last());
-                            
-                            return marker;
-                        })
-                );
-            }
-
             if (NodeInfo.MyNeighbors.Any()) {
                 if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
                 {
@@ -489,7 +512,7 @@
                                     [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Neighbor.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Neighbor.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                Popup = Utils.GetNeighborLinePopupHtml(NodeInfo, n)
                             })
                     );
                 }
@@ -527,7 +550,7 @@
                                     [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                Popup = $"<p>Voisin ({n.DataSource}) : <a href=\"/node/{n.Node.Id}\" target=\"_blank\" role=\"nofollow\"><b>{n.Node.AllNames}</b></a></p><p>Distance : {(n.Distance.HasValue ? Math.Round(n.Distance.Value, 2) : "-")} Km</p><p>SNR : {n.Snr}</p><p><a href=\"/packet/{n.PacketId}\" target=\"_blank\" rel=\"nofollow\"><i>Voir la trame</i></a></p>"
+                                Popup = Utils.GetNeighborLinePopupHtml(NodeInfo, n)
                             })
                     );
                 }
@@ -564,7 +587,7 @@
                                     [n.Latitude, n.Longitude]
                                 ],
                                 Color = Utils.Orange,
-                                Popup = $"<p><a href=\"/node/{NodeInfo.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{NodeInfo.AllNames}</b></a></p><p>Point d'intérêt : <b>{n.Name}</b></p><p>{n.Description}</p><p>Distance : {MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Latitude, n.Longitude)} Km</p>"
+                                Popup = Utils.GetWaypointLinePopupHtml(NodeInfo, n)
                             })
                     );
                 }
@@ -599,21 +622,21 @@
         LastTelemetryEnvironment = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics).MaxBy(a => a.CreatedAt);
         
         DataAirUtil = NodeInfo?.Telemetries
-            .Where(a => a.AirUtilTx > 0 || a.ChannelUtilization > 0)
-            .SelectMany(a => new List<DateChartData<float>>
+            .Where(a => a.AirUtilTx > 0)
+            .Select(a => new DateChartData<float>
             {
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Utilisation du canal",
-                    value = a.ChannelUtilization ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Emission sur l'air",
-                    value = a.AirUtilTx ?? 0
-                }
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Emission sur l'air",
+                value = a.AirUtilTx ?? 0
+            }).ToList();
+        
+        DataChannelUtil = NodeInfo?.Telemetries
+            .Where(a => a.ChannelUtilization > 0)
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Utilisation du canal",
+                value = a.ChannelUtilization ?? 0
             }).ToList();
         
         DataVoltageBattery = NodeInfo?.Telemetries
@@ -625,22 +648,22 @@
                 value = a.Voltage ?? 0
             }).ToList();
         
-        DataWeather = NodeInfo?.Telemetries
-            .Where(a => a.Temperature > 0 || a.RelativeHumidity > 0)
-            .SelectMany(a => new List<DateChartData<float>>
+        DataWeatherTemperature = NodeInfo?.Telemetries
+            .Where(a => a.Temperature > 0)
+            .Select(a => new DateChartData<float>
             {
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Humidité",
-                    value = a.RelativeHumidity ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Température",
-                    value = a.Temperature ?? 0
-                }
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Température",
+                value = a.Temperature ?? 0
+            }).ToList();
+        
+        DataWeatherHumidity = NodeInfo?.Telemetries
+            .Where(a => a.RelativeHumidity > 0)
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Humidité",
+                value = a.RelativeHumidity ?? 0
             }).ToList();
         
         DataWeatherPressure = NodeInfo?.Telemetries
@@ -652,50 +675,52 @@
                 value = a.BarometricPressure ?? 0
             }).ToList();
         
-        DataPowerMetricsVoltage = NodeInfo?.Telemetries
-            .Where(a => a.Channel1Voltage > 0 || a.Channel2Voltage > 0 || a.Channel3Voltage > 0)
-            .SelectMany(a => new List<DateChartData<float>> {
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Voltage canal 1",
-                    value = a.Channel1Voltage ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Voltage canal 2",
-                    value = a.Channel2Voltage ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Voltage canal 3",
-                    value = a.Channel3Voltage ?? 0
-                }
+        DataPowerMetricsVoltage1 = NodeInfo?.Telemetries
+            .Where(a => a.Channel1Voltage > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Voltage",
+                value = a.Channel1Voltage ?? 0
             }).ToList();
         
-        DataPowerMetricsCurrent = NodeInfo?.Telemetries
-            .Where(a => a.Channel1Current > 0 || a.Channel2Current > 0 || a.Channel3Current > 0)
-            .SelectMany(a => new List<DateChartData<float>> {
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Intensité canal 1",
-                    value = a.Channel1Current ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Intensité canal 2",
-                    value = a.Channel2Current ?? 0
-                },
-                new()
-                {
-                    date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
-                    type = "Intensité canal 3",
-                    value = a.Channel3Current ?? 0
-                }
+        DataPowerMetricsCurrent1 = NodeInfo?.Telemetries
+            .Where(a => a.Channel1Current > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Intensité",
+                value = a.Channel1Current ?? 0
+            }).ToList();
+        
+        DataPowerMetricsVoltage2 = NodeInfo?.Telemetries
+            .Where(a => a.Channel2Voltage > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Voltage",
+                value = a.Channel2Voltage ?? 0
+            }).ToList();
+        
+        DataPowerMetricsCurrent2 = NodeInfo?.Telemetries
+            .Where(a => a.Channel2Current > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Intensité",
+                value = a.Channel2Current ?? 0
+            }).ToList();
+        
+        DataPowerMetricsVoltage3 = NodeInfo?.Telemetries
+            .Where(a => a.Channel3Voltage > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Voltage",
+                value = a.Channel3Voltage ?? 0
+            }).ToList();
+        
+        DataPowerMetricsCurrent3 = NodeInfo?.Telemetries
+            .Where(a => a.Channel3Current > 0)
+            .Select(a => new DateChartData<float> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Intensité",
+                value = a.Channel3Current ?? 0
             }).ToList();
 
         base.OnParametersSet();

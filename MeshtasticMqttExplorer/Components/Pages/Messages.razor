@@ -91,12 +91,7 @@
     public long? ChannelId { get; set; }
     
     private bool Loading { get; set; } = true;
-    private List<SegmentedOption<string?>> MqttServers { get; } = new List<SegmentedOption<string?>> { new("", "Tous") }
-        .Concat(
-            Utils.MqttServerFilters
-            .Select(a => new SegmentedOption<string?>(a.Value, a.Text))
-        )
-        .ToList();
+    private List<SegmentedOption<string?>> MqttServers { get; } = [new("", "Tous")];
     private string? CurrentMqttServer { get; set; }
     private int PageIndex { get; set; }
     private int PageSize { get; set; } = 20;
@@ -111,6 +106,12 @@
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
+        
+        MqttServers.AddRange(
+            Utils.MqttServerFilters
+                .Select(a => new SegmentedOption<string?>(a.Value, a.Text))
+        );
+        
         await base.OnInitializedAsync();
     }
 
@@ -127,28 +128,28 @@
             Channel = null;
         }
         
-        await FetchData();
+        FetchData();
         
         await base.OnParametersSetAsync();
     }
 
-    private async Task FetchData()
+    private void FetchData()
     {
         Loading = true;
 
-        Channels = await Context.Channels
+        Channels = Context.Channels
             .Where(a => a.UpdatedAt >= DateTime.UtcNow.AddDays(-7))
             .Where(a => a.TextMessages.Any(aa => aa.To!.NodeId == MeshtasticService.NodeBroadcast))
             .OrderBy(a => a.Name)
             .AsNoTrackingWithIdentityResolution()
-            .ToListAsync();
+            .ToList();
 
-        Totals = await Context.TextMessages
+        Totals = Context.TextMessages
             .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
             .Where(a => CurrentMqttServer == "" || a.To!.MqttServer == CurrentMqttServer)
             .GroupBy(t => t.ChannelId)
             .AsNoTrackingWithIdentityResolution()
-            .ToDictionaryAsync(a => a.Key, messages => messages.Count());
+            .ToDictionary(a => a.Key, messages => messages.Count());
         
         if (ChannelId.HasValue)
         {
@@ -156,7 +157,7 @@
 
             if (Channel != null)
             {
-                TextMessages = await Context.TextMessages
+                TextMessages = Context.TextMessages
                     .Include(a => a.From)
                     .Include(a => a.To)
                     .Include(a => a.Packet)
@@ -167,7 +168,7 @@
                     .OrderByDescending(a => a.CreatedAt)
                     .Skip(PageIndex * PageSize).Take(PageSize)
                     .AsNoTrackingWithIdentityResolution()
-                    .ToListAsync();
+                    .ToList();
                 Total = Totals.TryGetValue(Channel.Id, out var total) ? total : 0;
             }
         }
@@ -179,21 +180,21 @@
         Loading = false;
     }
 
-    public async Task ChangePagination(PaginationEventArgs paginationArgs)
+    public void ChangePagination(PaginationEventArgs paginationArgs)
     {
         PageIndex = paginationArgs.Page - 1;
         PageSize = paginationArgs.PageSize;
 
-        await FetchData();
+        FetchData();
     }
 
-    public async Task SetMqttServer(string? mqttServer)
+    public void SetMqttServer(string? mqttServer)
     {
         CurrentMqttServer = mqttServer;
 
         if (RenderFinished)
         {
-            await FetchData();
+            FetchData();
         }
     }
 

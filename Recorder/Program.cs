@@ -15,6 +15,7 @@ using NLog;
 using NLog.Web;
 using Recorder.Services;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using NeighborInfo = Common.Context.Entities.NeighborInfo;
 
 Console.WriteLine("Starting");
 
@@ -80,41 +81,43 @@ try
 
     if (false && app.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
     {
-        var n1 = context.Nodes.Find(2090);
-        var n2 = context.Nodes.Find(2807);
         using var scope = app.Services.CreateScope();
         var meshtasticService = scope.ServiceProvider.GetRequiredService<MeshtasticService>();
-        meshtasticService.SimplifyNeighborForNode(n1, n2);
 
-        var packets = context.Packets
-            .Include(a => a.From)
-            .ThenInclude(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
-            .Include(a => a.To)
-            .ThenInclude(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
-            .Include(a => a.Gateway)
-            .ThenInclude(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
-            .Where(a => a.PacketDuplicated == null)
-            .Where(a => a.PortNum == PortNum.TracerouteApp && a.RequestId > 0)
+        var allDatas = context.NeighborInfos
+            .Include(a => a.Packet)
+            .ThenInclude(a => a.Gateway)
+            .Include(a => a.Packet)
+            .ThenInclude(a => a.From)
+            .Where(a => a.DataSource == NeighborInfo.Source.Gateway)
+            .Where(a => a.Packet != null)
             .ToList();
 
         int i = 0;
-        foreach (var packet in packets)
+        foreach (var data in allDatas)
         {
             try
             {
-                await meshtasticService.DoReceive(packet);
+                data.Node = data.Packet!.Gateway;
+                data.Neighbor = data.Packet.From;
+                context.Update(data);
                 i++;
 
                 if (i % 10 == 0)
                 {
-                    Console.WriteLine($"\n\nProcessed packet {i} with ID #{packet.Id}\n\n");
+                    Console.WriteLine($"Processed data {i} with ID #{data.Id}");
+                    await context.SaveChangesAsync();
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Error processing packet #{packet.Id}: {e}");
+                Console.WriteLine($"Error processing data #{data.Id}: {e}");
             }
         }
+        
+        await context.SaveChangesAsync();
+        Console.WriteLine("Ended");
+        return;
     }
 
     Console.WriteLine("Started");

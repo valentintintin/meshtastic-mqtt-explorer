@@ -50,9 +50,8 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
-    builder.Services.AddScoped<RecorderService>();
+    builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddScoped<MeshtasticService>();
-    builder.Services.AddScoped<NotificationService>();
 
     if (!builder.Environment.IsDevelopment())
     {
@@ -95,6 +94,10 @@ try
 
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
     await context.Database.MigrateAsync();
+    
+    Utils.MqttServerFilters.AddRange(
+        (await app.Services.GetRequiredService<RecorderService>().GetMqttConfigurations()).Select(c => new TableFilter<string?> { Text = c.Name, Value = c.Name })
+    );
 
     Console.WriteLine("Started");
 

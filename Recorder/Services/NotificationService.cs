@@ -35,6 +35,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => !n.FromOrTo.HasValue || packet.From.NodeId == n.FromOrTo || packet.To.NodeId == n.FromOrTo)
             .Where(n => string.IsNullOrWhiteSpace(n.MqttServer) || packet.MqttServer == n.MqttServer)
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
+            .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
             .DistinctBy(n => n.Url)
             .ToList();
 

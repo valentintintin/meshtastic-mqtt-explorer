@@ -2,9 +2,10 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVersion>default</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -74,19 +75,23 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.0.11" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.0.11" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.0.11" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-      <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+      <PackageReference Include="MQTTnet" Version="5.0.0.1214-RC" />
       <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.43.0" />
       <PackageReference Include="NLog" Version="5.3.4" />
       <PackageReference Include="NLog.Extensions.Logging" Version="5.3.14" />
-      <PackageReference Include="NLog.Targets.Seq" Version="4.0.1" />
+      <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.14" />
-      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
-      <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+      <PackageReference Include="Seq.Extensions.Logging" Version="8.0.1-dev-00124" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>
 
@@ -99,8 +104,8 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Models\" />
-      <Folder Include="Services\" />
+      <Folder Include="Context\Configurations\" />
+      <Folder Include="Context\Entities\" />
     </ItemGroup>
 
 </Project>

@@ -13,7 +13,6 @@ using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using QuickGraph;
 using Entities_NeighborInfo = Common.Context.Entities.NeighborInfo;
 using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
 using Position = Common.Context.Entities.Position;
@@ -151,7 +150,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Update(nodeFrom);
             await Context.SaveChangesAsync();
         }
-            
+        
         var payload = meshPacket.GetPayload();
 
         var packet = new Packet
@@ -182,7 +181,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             MqttTopic = topics?.Take(topics.Length - 1).JoinString("/"),
             PacketDuplicated = await Context.Packets.OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom/* && (DateTime.UtcNow - a.CreatedAt).TotalDays < 1*/)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo/* && (DateTime.UtcNow - a.CreatedAt).TotalDays < 1*/)
         };
 
         Context.Add(packet);
@@ -204,57 +203,88 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         
         var nodeFromPosition = packet.From.Positions.FirstOrDefault();
+        var shouldCompute = true;
         
         if (packet.PacketDuplicated != null)
         {
-            await SetPositionAndUpdateNeighborForPacket(packet, nodeFromPosition);
-            
-            Logger.LogWarning("Packet #{packetId} from {from} to {to} by {gateway} duplicated with #{packetDuplicated}, saved but ignored", meshPacket.Id, packet.From, packet.To, packet.Gateway, packet.PacketDuplicated.Id);
+            shouldCompute = packet.PortNum == PortNum.TracerouteApp; // Interresant pour avoir le dernier noeud du chemin retour d'un traceroute 
 
-            return (packet, meshPacket);
+            if (packet.To == packet.Gateway)
+            {
+                Logger.LogInformation("Packet #{packetId} from {from} to {to} by {gateway} duplicated but it's the real one for #{packetDuplicated}, saved as original and set others as duplicated", meshPacket.Id, packet.From, packet.To, packet.Gateway, packet.PacketDuplicated.Id);
+
+                // Tous les doublons sauf celui en cours
+                var packetsDuplicated = await Context.Packets
+                    .Where(a => a.Id != packet.Id)
+                    .Where(a => a.PacketId == packet.PacketId && a.From == packet.From && a.To == packet.To)
+                    .ToListAsync();
+                
+                foreach (var packetDuplicated in packetsDuplicated)
+                {
+                    packetDuplicated.PacketDuplicated = packet;
+                    Context.Update(packetDuplicated);
+                }
+
+                packet.PacketDuplicated = null;
+                Context.Update(packet);
+
+                await Context.SaveChangesAsync();
+            }
+            else
+            {
+                Logger.LogInformation("Packet #{packetId} from {from} to {to} by {gateway} duplicated with #{packetDuplicated}", 
+                    meshPacket.Id, packet.From, packet.To, packet.Gateway, packet.PacketDuplicated.Id);
+            }
         }
-        
-        switch (meshPacket.Decoded?.Portnum)
+
+        if (shouldCompute)
         {
-            case PortNum.MapReportApp:
-                Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                nodeFromPosition = await DoMapReportingPacket(packet.From, meshPacket.GetPayload<MapReport>()) ?? nodeFromPosition;
-                break;
-            case PortNum.NodeinfoApp:
-                await DoNodeInfoPacket(packet.From, meshPacket.GetPayload<User>());
-                break;
-            case PortNum.PositionApp:
-                Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                nodeFromPosition = await DoPositionPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Position>()) ?? nodeFromPosition;
-                break;
-            case PortNum.TelemetryApp:
-                Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                await DoTelemetryPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
-                break;
-            case PortNum.NeighborinfoApp:
-                Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                await DoNeighborInfoPacket(packet.From, packet, meshPacket.GetPayload<NeighborInfo>());
-                break;
-            case PortNum.TextMessageApp:
-                Context.RemoveRange(Context.TextMessages.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                await DoTextMessagePacket(packet.From, packet.To, packet, meshPacket.GetPayload<string>());
-                break;
-            case PortNum.WaypointApp:
-                Context.RemoveRange(Context.Waypoints.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                await DoWaypointPacket(packet.From, packet, meshPacket.GetPayload<Waypoint>());
-                break;
-            case PortNum.TracerouteApp:
-                Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
-                Context.RemoveRange(Context.Traceroutes.Where(p => p.Packet == packet));
-                await Context.SaveChangesAsync();
-                await DoTraceroutePacket(packet.From, packet.To, packet, meshPacket.GetPayload<RouteDiscovery>());
-                break;
+            switch (meshPacket.Decoded?.Portnum)
+            {
+                case PortNum.MapReportApp:
+                    Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    nodeFromPosition = await DoMapReportingPacket(packet.From, meshPacket.GetPayload<MapReport>()) ?? nodeFromPosition;
+                    break;
+                case PortNum.NodeinfoApp:
+                    await DoNodeInfoPacket(packet.From, meshPacket.GetPayload<User>());
+                    break;
+                case PortNum.PositionApp:
+                    Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    nodeFromPosition = await DoPositionPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Position>()) ?? nodeFromPosition;
+                    break;
+                case PortNum.TelemetryApp:
+                    Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    await DoTelemetryPacket(packet.From, packet,
+                        meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
+                    break;
+                case PortNum.NeighborinfoApp:
+                    Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    await DoNeighborInfoPacket(packet.From, packet, meshPacket.GetPayload<NeighborInfo>());
+                    break;
+                case PortNum.TextMessageApp:
+                    Context.RemoveRange(Context.TextMessages.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    await DoTextMessagePacket(packet.From, packet.To, packet, meshPacket.GetPayload<string>());
+                    break;
+                case PortNum.WaypointApp:
+                    Context.RemoveRange(Context.Waypoints.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    await DoWaypointPacket(packet.From, packet, meshPacket.GetPayload<Waypoint>());
+                    break;
+                case PortNum.TracerouteApp:
+                    Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
+                    await Context.SaveChangesAsync();
+                    await DoTraceroutePacket(packet.From, packet.To, packet, meshPacket.GetPayload<RouteDiscovery>());
+                    break;
+            }
+        }
+        else
+        {
+            Logger.LogTrace("Packet #{packetId} don't need to compute again", meshPacket.Id);
         }
 
         await SetPositionAndUpdateNeighborForPacket(packet, nodeFromPosition);
@@ -279,11 +309,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         if (packet.HopLimit == packet.HopStart)
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.From, packet.Gateway, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr!.Value, packet.GatewayPosition, nodeFromPosition);
         }
         else
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.From, packet.Gateway, packet.RxSnr ?? 0, nodeFromPosition, packet.GatewayPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, packet.GatewayPosition, nodeFromPosition);
         }
     }
 
@@ -480,18 +510,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
-        if (packet.RxSnr == 0)
-        {
-            return;
-        }
-        
         // On ne regarde que la réponse du traceroute qui PART du destinaire voulu pour arriver à l'expéditeur et donc contient la route en inversé 
         if (packet.RequestId is null or 0)
         {
             return;
         }
 
-        var (routes, routesBack) = GetTracerouteInfo(nodeFrom.NodeId, nodeTo.NodeId, payload);
+        var (routes, routesBack) = GetTracerouteInfo(nodeFrom.NodeId, nodeTo.NodeId, packet.Gateway.NodeId, payload);
         var lastNode = nodeTo; // C'est inversé dans un traceroute
 
         foreach (var route in routes)
@@ -510,64 +535,40 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 await Context.SaveChangesAsync();
             }
 
-            // var traceroute = new Traceroute
-            // {
-            //     From = nodeTo, // From
-            //     To = nodeFrom, // To
-            //     Packet = packet,
-            //     Node = node, // Target
-            //     Hop = route.Hop,
-            //     Snr = snr,
-            //     CreatedAt = packet.CreatedAt,
-            //     UpdatedAt = packet.UpdatedAt
-            // };
-            
-            // Context.Add(traceroute);
-            
-            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, lastNode, node, route.Snr ?? 0, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, lastNode, node, route.Snr ?? -999, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
 
             lastNode = node;
         }
-        
-        lastNode = nodeFrom;
 
-        foreach (var route in routesBack)
+        if (packet.To == packet.Gateway)
         {
-            var node = await Context.Nodes
-                .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
-                .FindByNodeIdAsync(route.NodeId) ?? new Node
-            {
-                NodeId = route.NodeId
-            };
-            
-            if (node.Id == 0)
-            {
-                Context.Add(node);
-                Logger.LogInformation("New node (traceroute) created {node}", node);
-                await Context.SaveChangesAsync();
-            }
-            
-            // var traceroute = new Traceroute
-            // {
-            //     From = nodeFrom,
-            //     To = nodeTo,
-            //     Packet = packet,
-            //     Node = node, // Target
-            //     Hop = route.Hop,
-            //     Snr = route.Snr,
-            //     CreatedAt = packet.CreatedAt,
-            //     UpdatedAt = packet.UpdatedAt
-            // };
-            
-            // Context.Add(traceroute);
-            
-            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, node, lastNode, route.Snr ?? 0, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+            lastNode = nodeFrom;
 
-            lastNode = node;
+            foreach (var route in routesBack)
+            {
+                var node = await Context.Nodes
+                    .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
+                    .FindByNodeIdAsync(route.NodeId) ?? new Node
+                {
+                    NodeId = route.NodeId
+                };
+
+                if (node.Id == 0)
+                {
+                    Context.Add(node);
+                    Logger.LogInformation("New node (traceroute) created {node}", node);
+                    await Context.SaveChangesAsync();
+                }
+
+                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, node, lastNode, route.Snr ?? -999,
+                    lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+
+                lastNode = node;
+            }
         }
     }
 
-    public (List<TracerouteNodeRoute> routes, List<TracerouteNodeRoute> routesBack) GetTracerouteInfo(uint nodeFromId, uint nodeToId, RouteDiscovery? payload)
+    public (List<TracerouteNodeRoute> routes, List<TracerouteNodeRoute> routesBack) GetTracerouteInfo(uint nodeFromId, uint nodeToId, uint nodeGatewayId, RouteDiscovery? payload)
     {
         List<TracerouteNodeRoute> routes = [];
         List<TracerouteNodeRoute> routesBack = [];
@@ -589,7 +590,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             {
                 routesBack = new List<uint> { nodeFromId }
                     .Concat(payload.RouteBack)
-                    .Concat([nodeToId])
+                    // .Concat([nodeGatewayId])
                     .Select((n, i) => new TracerouteNodeRoute
                     {
                         NodeId = n,
@@ -711,29 +712,30 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         await Context.SaveChangesAsync();
     }
 
-    public async Task<Context.Entities.NeighborInfo?> SetNeighbor(Context.Entities.NeighborInfo.Source source, Packet packet, Node nodeFrom, Node neighborNode, double snr, Position? nodeFromPosition, Position? neighborPosition)
+    public async Task<Entities_NeighborInfo?> SetNeighbor(Entities_NeighborInfo.Source source, Packet packet, 
+        Node nodeFrom, Node neighborNode, 
+        double snr, 
+        Position? nodeFromPosition, Position? neighborPosition)
     {
         if (nodeFrom == neighborNode 
             || packet.PortNum == PortNum.MapReportApp
-            || source == Entities_NeighborInfo.Source.Gateway && (snr == 0 || packet.HopLimit != packet.HopStart) // Utile ?
             || NodesIgnored.Contains(nodeFrom.NodeId) 
             || NodesIgnored.Contains(neighborNode.NodeId)
             || packet.ViaMqtt == true
-            || packet.RxSnr == 0 // Attention avec l'argument snr ?
         )
         {
             return null;
         }
 
         double? distance = null;
-        var latitude1 = nodeFromPosition?.Latitude ?? nodeFrom.Latitude;
-        var longitude1 = nodeFromPosition?.Longitude ?? nodeFrom.Longitude;
-        var latitude2 = neighborPosition?.Latitude ?? neighborNode.Latitude;
-        var longitude2 = neighborPosition?.Longitude ?? neighborNode.Longitude;
+        var latitudeFrom = nodeFromPosition?.Latitude ?? nodeFrom.Latitude;
+        var longitudeFron = nodeFromPosition?.Longitude ?? nodeFrom.Longitude;
+        var latitudeNeighbor = neighborPosition?.Latitude ?? neighborNode.Latitude;
+        var longitudeNeighbor = neighborPosition?.Longitude ?? neighborNode.Longitude;
 
-        if (latitude1.HasValue && longitude1.HasValue && latitude2.HasValue && longitude2.HasValue)
+        if (latitudeFrom.HasValue && longitudeFron.HasValue && latitudeNeighbor.HasValue && longitudeNeighbor.HasValue)
         {
-            distance = MeshtasticUtils.CalculateDistance(latitude1.Value, longitude1.Value, latitude2.Value, longitude2.Value);
+            distance = MeshtasticUtils.CalculateDistance(latitudeFrom.Value, longitudeFron.Value, latitudeNeighbor.Value, longitudeNeighbor.Value);
         }
         
         var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new Entities_NeighborInfo
@@ -769,25 +771,6 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         await Context.SaveChangesAsync();
 
         return neighborInfo;
-    }
-
-    public void SimplifyNeighborForNode(Node nodeFrom, Node nodeTo)
-    {
-        var graph = new AdjacencyGraph<Node, Edge<Node>>();
-        
-        var findNeighborForNode = Context.NeighborInfos.Where(n => (n.Node == nodeFrom || n.Neighbor == nodeTo) && (
-                n.DataSource == Entities_NeighborInfo.Source.Gateway
-                || n.DataSource == Entities_NeighborInfo.Source.Traceroute
-                || n.DataSource == Entities_NeighborInfo.Source.Neighbor))
-            .Include(n => n.Node)
-            .Include(n => n.Neighbor);
-        
-        foreach (var neighbor in findNeighborForNode)
-        {
-            graph.AddVertex(neighbor.Node);
-            graph.AddVertex(neighbor.Neighbor);
-            graph.AddEdge(new Edge<Node>(neighbor.Node, neighbor.Neighbor));
-        }
     }
 
     public MeshPacket CreateMeshPacket(uint nodeToId, uint nodeFromId, string channel, Data data, uint hopLimit = 3, string? key = null)

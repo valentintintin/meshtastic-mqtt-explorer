@@ -10,11 +10,13 @@ public class RecorderService(ILogger<AService> logger, IDbContextFactory<DataCon
 {
     public async Task<IEnumerable<MqttConfiguration>> GetMqttConfigurations()
     {
-        Logger.LogInformation("Get MqttConfigurations from Recorder");
-        
+        var recorderUrl = configuration.GetValue<string>("RecorderUrl") ?? throw new MissingConfigurationException("RecorderUrl");
+
+        Logger.LogInformation("Get MqttConfigurations from Recorder {url}", recorderUrl);
+
         var client = new HttpClient
         {
-            BaseAddress = new Uri(configuration.GetValue<string>("RecorderUrl") ?? throw new MissingConfigurationException("RecorderUrl"))
+            BaseAddress = new Uri(recorderUrl)
         };
 
         try

@@ -1,8 +1,13 @@
 using AntDesign;
 using AntDesign.Charts;
+using Common;
+using Common.Context.Entities;
+using Common.Extensions;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Models;
 using Color = System.Drawing.Color;
+using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
+using Waypoint = Common.Context.Entities.Waypoint;
 
 namespace MeshtasticMqttExplorer.Components;
 
@@ -139,7 +144,52 @@ public static class Utils
                 Visible = false
             },
             SeriesField = nameof(DateChartData<object>.type),
-            Color = new [] { Blue, Red }
+            Color = new [] { Blue, Red, Orange, Green, Gray }
         };
+    }
+
+    public static string GetNeighborLinePopupHtml(Node node, Common.Context.Entities.NeighborInfo neighborInfo)
+    {
+        return $"<p>" +
+               $"<a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+               $"<b>{node.AllNames}</b>" +
+               $"</a>" +
+               $"</p>" +
+               $"<p>" +
+               $"Voisin ({neighborInfo.DataSource}) : " +
+               $"<a href=\"/node/{neighborInfo.Neighbor.Id}\" target=\"_blank\">" +
+               $"<b>{neighborInfo.Neighbor.AllNames}</b>" +
+               $"</a>" +
+               $"</p>" +
+               $"<p>" +
+               $"Distance : <b>{(neighborInfo.Distance.HasValue ? Math.Round(neighborInfo.Distance.Value, 2) : "-")}</b> Km" +
+               $"</p>" +
+               $"<p>" +
+               $"SNR : <b>{neighborInfo.Snr}</b> | Date : <b>{neighborInfo.UpdatedAt.ToFrench()}</b>" +
+               $"</p>" +
+               $"<p>" +
+               $"<a href=\"/packet/{neighborInfo.PacketId}\" target=\"_blank\" rel=\"nofollow\">" +
+               $"<i>Voir la trame</i>" +
+               $"</a>" +
+               $"</p>";
+    }
+
+    public static string GetWaypointLinePopupHtml(Node node, Waypoint waypoint)
+    {
+        return $"<p>" +
+               $"<a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+               $"<b>{node.AllNames}</b>" +
+               $"</a>" +
+               $"</p>" +
+               $"<p>" +
+               $"Point d'intérêt : <b>{waypoint.Name}</b>" +
+               $"</p>" +
+               $"<p>" +
+               $"Ajouté le <b>{waypoint.CreatedAt.ToFrench()}</b>" +
+               $"<br />{waypoint.Description}" +
+               $"</p>" +
+               $"<p>" +
+               $"Distance : {MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, waypoint.Latitude, waypoint.Longitude)} Km" +
+               $"</p>";
     }
 }

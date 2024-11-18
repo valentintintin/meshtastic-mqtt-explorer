@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.ComponentModel.DataAnnotations;
 using System.Reactive.Concurrency;
 using System.Text;
@@ -14,9 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic.CompilerServices;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Protocol;
 using MqttConfiguration = Common.Models.MqttConfiguration;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
@@ -57,7 +56,7 @@ public class MqttService : BackgroundService
             .Select(a => new MqttClientAndConfiguration
             {
                 Configuration = a,
-                Client = new MqttFactory().CreateMqttClient()
+                Client = new MqttClientFactory().CreateMqttClient()
             })
             .ToList()
         );
@@ -104,7 +103,7 @@ public class MqttService : BackgroundService
                 mqttClientAndConfiguration.Configuration.NbPacket++;
                 mqttClientAndConfiguration.Configuration.LastPacketDate = DateTime.UtcNow;
 
-                await DoReceive(topic, e.ApplicationMessage.PayloadSegment.Array, mqttClientAndConfiguration.Configuration);
+                await DoReceive(topic, e.ApplicationMessage.Payload, mqttClientAndConfiguration.Configuration);
             };
 
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
@@ -126,11 +125,11 @@ public class MqttService : BackgroundService
             .FirstOrDefaultAsync())?.MqttServer;
     }
 
-    private async Task DoReceive(string topic, byte[]? data, MqttConfiguration mqttConfiguration)
+    private async Task DoReceive(string topic, ReadOnlySequence<byte> data, MqttConfiguration mqttConfiguration)
     {
         var topicSegments = topic.Split("/");
 
-        if (data == null || data.Length == 0)
+        if (data.Length == 0)
         {
             _logger.LogWarning("Received from {name} on {topic} without data so ignored",
                 mqttConfiguration.Name, topic);
@@ -156,14 +155,14 @@ public class MqttService : BackgroundService
         {
             _logger.LogWarning(ex,
                 "Received from {name} on {topic} but packet incorrect. Packet Raw : {packetRaw} | {rawString}",
-                mqttConfiguration.Name, topic, Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
+                mqttConfiguration.Name, topic, Convert.ToBase64String(data.ToArray()), Encoding.UTF8.GetString(data));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw} | {rawString}",
                 mqttConfiguration.Name, topic, JsonSerializer.Serialize(rootPacket),
-                Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
+                Convert.ToBase64String(data.ToArray()), Encoding.UTF8.GetString(data));
         }
     }
 
@@ -379,7 +378,6 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
-        context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate && a.Node == node));
         context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.Node == node));
 
         await context.SaveChangesAsync();
@@ -395,7 +393,6 @@ public class MqttService : BackgroundService
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Positions.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.Telemetries.Where(a => a.CreatedAt < minDate));
-        context.RemoveRange(context.Traceroutes.Where(a => a.CreatedAt < minDate));
         context.RemoveRange(context.NeighborInfos.Where(a => a.CreatedAt < minDate));
 
         await context.SaveChangesAsync();
