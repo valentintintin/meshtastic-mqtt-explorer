@@ -241,55 +241,52 @@
                                     <text>Réponse du traceroute (retour)</text>
                                 }
                             </DescriptionsItem>
-                            @if (Packet.RequestId > 0)
-                            {
-                                <DescriptionsItem Title="Route aller">
-                                    @if (TracerouteInfo?.routes.Any() == true)
-                                    {
-                                        <Timeline>
-                                            @foreach (var route in TracerouteInfo!.Value.routes)
-                                            {
-                                                <TimelineItem Color="@(route.Hop == 0 ? "red" : route.Hop == TraceRoute!.Route.Count + 1 ? "blue" : "green")">
-                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
-                                                    @if (route.Snr != null)
-                                                    {
-                                                        <br/>
-                                                        <text>SNR : </text>
-                                                        @route.Snr
-                                                    }
-                                                </TimelineItem>
-                                            }
-                                        </Timeline>
-                                    }
-                                    else
-                                    {
-                                        <text>Aucune</text>
-                                    }
-                                </DescriptionsItem>
-                                <DescriptionsItem Title="Route retour">
-                                    @if (TracerouteInfo?.routesBack.Any() == true)
-                                    {
-                                        <Timeline>
-                                            @foreach (var route in TracerouteInfo!.Value.routesBack)
-                                            {
-                                                <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.RouteBack.Count ? "red" : "green")">
-                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
-                                                    @if (route.Snr != null)
-                                                    {
-                                                        <br/>
-                                                        <text>SNR : </text>
-                                                        @route.Snr
-                                                    }
-                                                </TimelineItem>
-                                            }
-                                        </Timeline>
-                                    }
-                                    else
-                                    {
-                                        <text>Aucune</text>
-                                    }
-                                </DescriptionsItem>
-                            }
+                            <DescriptionsItem Title="Route aller">
+                                @if (TracerouteInfo?.routes.Any() == true)
+                                {
+                                    <Timeline>
+                                        @foreach (var route in TracerouteInfo!.Value.routes)
+                                        {
+                                            <TimelineItem Color="@(route.Hop == 0 ? "red" : route.Hop == TraceRoute!.Route.Count + 1 ? "blue" : "green")">
+                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                @if (route.Snr != null)
+                                                {
+                                                    <br/>
+                                                    <text>SNR : </text>
+                                                    @route.Snr
+                                                }
+                                            </TimelineItem>
+                                        }
+                                    </Timeline>
+                                }
+                                else
+                                {
+                                    <text>Aucune</text>
+                                }
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Route retour">
+                                @if (TracerouteInfo?.routesBack.Any() == true)
+                                {
+                                    <Timeline>
+                                        @foreach (var route in TracerouteInfo!.Value.routesBack)
+                                        {
+                                            <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.RouteBack.Count ? "red" : "green")">
+                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                @if (route.Snr != null)
+                                                {
+                                                    <br/>
+                                                    <text>SNR : </text>
+                                                    @route.Snr
+                                                }
+                                            </TimelineItem>
+                                        }
+                                    </Timeline>
+                                }
+                                else
+                                {
+                                    <text>Aucune</text>
+                                }
+                            </DescriptionsItem>
                         </Descriptions>
                         break;
                     case PortNum.RoutingApp:

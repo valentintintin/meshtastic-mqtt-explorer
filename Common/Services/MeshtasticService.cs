@@ -753,12 +753,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         };
         if (neighborInfo.Id == 0)
         {
-            Logger.LogInformation("Add neighbor {neighbor} to {node}", neighborNode, nodeFrom);
+            Logger.LogInformation("Add neighbor for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", nodeFrom, neighborNode, snr, source, packet.Id, distance);
             Context.Add(neighborInfo);
         }
         else
         {
-            Logger.LogInformation("Update neighbor {neighbor} to {node}", neighborNode, nodeFrom);
+            Logger.LogInformation("Update neighbor #{id} for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", neighborInfo.Id, nodeFrom, neighborNode, snr, source, packet.Id, distance);
             neighborInfo.Packet = packet;
             neighborInfo.Snr = snr;
             neighborInfo.NodePosition = nodeFromPosition;

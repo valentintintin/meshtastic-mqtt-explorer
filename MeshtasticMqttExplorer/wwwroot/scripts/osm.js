@@ -160,7 +160,6 @@ window.addMarkerToMap = (marker) => {
             title: marker.label ?? '',
             alt: marker.label ?? '',
             icon: icon,
-            zIndexOffset: 1000
         });
     } else {
         if (pin) {
@@ -246,8 +245,6 @@ window.addMarkerToMap = (marker) => {
 
     pin.addTo(window.leafletMap);
     
-    pin.bringToFront();
-    
     window.leafletMarkers[marker.id] = pin;
 };
 
@@ -295,8 +292,6 @@ window.addPolylineToMap = (line) => {
     }
 
     polyline = window.createPolyline(line).addTo(window.leafletMap);
-    
-    polyline.bringToBack();
     
     window.leafletMarkers[line.id] = polyline;
 };
