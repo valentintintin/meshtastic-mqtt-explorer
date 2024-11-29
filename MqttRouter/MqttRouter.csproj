@@ -75,6 +75,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.0" />
@@ -85,6 +86,7 @@
       <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
       <PackageReference Include="MQTTnet" Version="5.0.0.1214-RC" />
+      <PackageReference Include="MQTTnet.AspNetCore" Version="5.0.0.1214-RC" />
       <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.43.0" />
       <PackageReference Include="NLog" Version="5.3.4" />
       <PackageReference Include="NLog.Extensions.Logging" Version="5.3.14" />
@@ -101,11 +103,6 @@
 
     <ItemGroup>
       <EmbeddedResource Remove="Properties\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Context\Configurations\" />
-      <Folder Include="Context\Entities\" />
     </ItemGroup>
 
 </Project>

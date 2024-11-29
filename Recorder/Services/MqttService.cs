@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Protocol;
 using MqttConfiguration = Common.Models.MqttConfiguration;
+using User = Meshtastic.Protobufs.User;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
 
 namespace Recorder.Services;
@@ -118,11 +119,16 @@ public class MqttService : BackgroundService
 
     public async Task<string?> GetMqttServerForNode(Node node)
     {
+        // TODO Retravailler cette partie pour voir si elle est correct
         return (await (await _contextFactory.CreateDbContextAsync()).Packets
-            .Where(a => a.Gateway == node && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
-            .Where(a => (a.PortNum == PortNum.TextMessageApp && a.To.NodeId != MeshtasticService.NodeBroadcast) || a.PortNum == PortNum.TelemetryApp || a.PortNum == PortNum.NodeinfoApp || a.PortNum == PortNum.NeighborinfoApp || a.PortNum == PortNum.PositionApp)
+            .Where(a => a.Gateway == node)
             .OrderByDescending(a => a.UpdatedAt)
             .FirstOrDefaultAsync())?.MqttServer;
+        // return (await (await _contextFactory.CreateDbContextAsync()).Packets
+            // .Where(a => a.Gateway == node && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
+            // .Where(a => (a.PortNum == PortNum.TextMessageApp && a.To.NodeId != MeshtasticService.NodeBroadcast) || a.PortNum == PortNum.TelemetryApp || a.PortNum == PortNum.NodeinfoApp || a.PortNum == PortNum.NeighborinfoApp || a.PortNum == PortNum.PositionApp)
+            // .OrderByDescending(a => a.UpdatedAt)
+            // .FirstOrDefaultAsync())?.MqttServer;
     }
 
     private async Task DoReceive(string topic, ReadOnlySequence<byte> data, MqttConfiguration mqttConfiguration)
@@ -178,16 +184,20 @@ public class MqttService : BackgroundService
 
         var serviceProvider = _serviceProvider.CreateScope().ServiceProvider;
         var meshtasticService = serviceProvider.GetRequiredService<MeshtasticService>();
-        var packet = await meshtasticService.DoReceive(nodeGatewayId, rootPacket.ChannelId, rootPacket.Packet, mqtt.Name, topics);
+        var packetAndMeshPacket = await meshtasticService.DoReceive(nodeGatewayId, rootPacket.ChannelId, rootPacket.Packet, mqtt.Name, topics);
 
-        if (packet != null)
+        if (packetAndMeshPacket != null)
         {
-            packet.Value.packet.From.MqttServer = await GetMqttServerForNode(packet.Value.packet.From);
-            var dataContext = await _contextFactory.CreateDbContextAsync();
-            dataContext.Attach(packet.Value.packet.From);
-            dataContext.Update(packet.Value.packet.From);
-            await dataContext.SaveChangesAsync();
-            
+            var mqttServer = await GetMqttServerForNode(packetAndMeshPacket.Value.packet.From);
+            if (!string.IsNullOrWhiteSpace(mqttServer))
+            {
+                packetAndMeshPacket.Value.packet.From.MqttServer = mqttServer;
+                var dataContext = await _contextFactory.CreateDbContextAsync();
+                dataContext.Attach(packetAndMeshPacket.Value.packet.From);
+                dataContext.Update(packetAndMeshPacket.Value.packet.From);
+                await dataContext.SaveChangesAsync();
+            }
+
             Config.Types.LoRaConfig.Types.RegionCode? regionCode = null;
             Config.Types.LoRaConfig.Types.ModemPreset? modemPreset = null;
             
@@ -213,12 +223,12 @@ public class MqttService : BackgroundService
                 modemPreset = Config.Types.LoRaConfig.Types.ModemPreset.LongSlow;
             }
             
-            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
-            await meshtasticService.UpdateRegionCodeAndModemPreset(packet.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packetAndMeshPacket.Value.packet.From, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
+            await meshtasticService.UpdateRegionCodeAndModemPreset(packetAndMeshPacket.Value.packet.Gateway, regionCode, modemPreset, MeshtasticService.RegionCodeAndModemPresetSource.Mqtt);
 
-            await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packet.Value.packet, packet.Value.meshPacket);
+            await serviceProvider.GetRequiredService<NotificationService>().SendNotification(packetAndMeshPacket.Value.packet, packetAndMeshPacket.Value.meshPacket);
 
-            await KeepNbPacketsTypeForNode(packet.Value.packet.From, PortNum.MapReportApp, 10);
+            await KeepNbPacketsTypeForNode(packetAndMeshPacket.Value.packet.From, PortNum.MapReportApp, 10);
         }
     }
 

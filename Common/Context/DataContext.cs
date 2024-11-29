@@ -1,17 +1,21 @@
 using System.Reflection;
 using Common.Context.Configurations;
 using Common.Context.Entities;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Channel = Common.Context.Entities.Channel;
 using NeighborInfo = Common.Context.Entities.NeighborInfo;
+using NodeConfiguration = Common.Context.Entities.NodeConfiguration;
 using Position = Common.Context.Entities.Position;
 using Telemetry = Common.Context.Entities.Telemetry;
 using Waypoint = Common.Context.Entities.Waypoint;
 
 namespace Common.Context;
 
-public class DataContext(DbContextOptions<DataContext> options, ILogger<DataContext> logger) : DbContext(options)
+public class DataContext(DbContextOptions<DataContext> options, ILogger<DataContext> logger) : 
+    IdentityDbContext<User, IdentityRole<long>, long>(options)
 {
     public required DbSet<Packet> Packets { get; set; }
     public required DbSet<Node> Nodes { get; set; }
@@ -21,12 +25,22 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
+    
+    public required DbSet<NodeConfiguration> NodeConfigurations { get; set; }
+    public required DbSet<PacketActivity> PacketActivities { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetAssembly(typeof(PacketConfiguration))!);
+        
+        modelBuilder.Entity<IdentityRole<long>>().ToTable("Roles", "router");
+        modelBuilder.Entity<IdentityUserClaim<long>>().ToTable("UserClaims", "router");
+        modelBuilder.Entity<IdentityUserRole<long>>().ToTable("UserRoles", "router");
+        modelBuilder.Entity<IdentityUserLogin<long>>().ToTable("UserLogins", "router");
+        modelBuilder.Entity<IdentityUserToken<long>>().ToTable("UserTokens", "router");
+        modelBuilder.Entity<IdentityRoleClaim<long>>().ToTable("RoleClaims", "router");
     }
     
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

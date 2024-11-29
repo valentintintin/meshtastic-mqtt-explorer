@@ -17,6 +17,7 @@ using Entities_NeighborInfo = Common.Context.Entities.NeighborInfo;
 using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
 using Position = Common.Context.Entities.Position;
 using Telemetry = Common.Context.Entities.Telemetry;
+using User = Meshtastic.Protobufs.User;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
 
 namespace Common.Services;
