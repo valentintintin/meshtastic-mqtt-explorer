@@ -50,10 +50,10 @@
                             @(NodeInfo?.IsMqttGateway == true ? "Oui" : "Non")
                         </DescriptionsItem>
                         
-                        @if (!string.IsNullOrWhiteSpace(NodeInfo.MqttServer))
+                        @if (NodeInfo.MqttServer != null)
                         {
                             <DescriptionsItem Title="Serveur MQTT" ContentStyle="font-weight: bold">
-                                @NodeInfo.MqttServer
+                                @NodeInfo.MqttServer.Name
                             </DescriptionsItem>
                         }
                         

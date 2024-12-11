@@ -42,6 +42,7 @@ try
         option.UseNpgsql(
             builder.Configuration.GetConnectionString("Default")
         );
+        option.EnableSensitiveDataLogging();
     });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -51,8 +52,10 @@ try
     
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<NotificationService>();
-    builder.Services.AddSingleton<MqttService>();
-    builder.Services.AddHostedService(p => p.GetRequiredService<MqttService>());
+    builder.Services.AddScoped<MqttService>();
+    builder.Services.AddSingleton<MqttClientService>();
+    builder.Services.AddSingleton<PurgeService>();
+    builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
     
     if (!builder.Environment.IsDevelopment())
     {
@@ -74,6 +77,8 @@ try
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()
         .CreateDbContextAsync();
     await context.Database.MigrateAsync();
+
+    app.Services.GetRequiredService<PurgeService>(); // Instance to schedule
 
     MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>()
         .GetSection("NodesIgnored").Get<List<uint>>() ?? new List<uint>());

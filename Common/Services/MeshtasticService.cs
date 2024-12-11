@@ -38,25 +38,30 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         WriteIndented = true
     };
     
-    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(uint nodeGatewayId, string channelId, MeshPacket meshPacket, string origin, string[]? topics)
+    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(uint nodeGatewayId, string channelId, MeshPacket meshPacket)
     {
         if (NodesIgnored.Contains(nodeGatewayId))
         {
             Logger.LogInformation("Node (gateway) ignored : {node}", nodeGatewayId);
             return null;
         }
-        
-        var nodeGateway = await Context.Nodes
+
+        var nodes = await Context.Nodes
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .FindByNodeIdAsync(nodeGatewayId) ?? new Node
+            .Where(a => a.NodeId == nodeGatewayId || a.NodeId == meshPacket.From || a.NodeId == meshPacket.To)
+            .ToListAsync();
+
+        var nodeGateway = nodes.FindByNodeId(nodeGatewayId) ?? new Node
         {
             NodeId = nodeGatewayId,
             IsMqttGateway = true
         };
         if (nodeGateway.Id == 0)
         {
-            Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
+            nodeGateway.LastSeen = DateTime.UtcNow;
             Context.Add(nodeGateway);
+            Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
+            await Context.SaveChangesAsync();
         }
         else
         {
@@ -66,11 +71,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 return null;
             }
             
+            nodeGateway.LastSeen = DateTime.UtcNow;
             nodeGateway.IsMqttGateway = true;
             Context.Update(nodeGateway);
+            await Context.SaveChangesAsync();
         }
-        nodeGateway.LastSeen = DateTime.UtcNow;
-        await Context.SaveChangesAsync();
         
         if (NodesIgnored.Contains(meshPacket.From))
         {
@@ -78,9 +83,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return null;
         }
         
-        var nodeFrom = await Context.Nodes
-            .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt).Take(1))
-            .FindByNodeIdAsync(meshPacket.From) ?? new Node
+        var nodeFrom = nodes.FindByNodeId(meshPacket.From) ?? new Node
         {
             NodeId = meshPacket.From,
             ModemPreset = nodeGateway.ModemPreset,
@@ -88,8 +91,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         };
         if (nodeFrom.Id == 0)
         {
-            Context.Add(nodeFrom);
             Logger.LogInformation("New node (from) created {node}", nodeFrom);
+            Context.Add(nodeFrom);
+            await Context.SaveChangesAsync();
         }
         else
         {
@@ -105,13 +109,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         nodeFrom.LastSeen = DateTime.UtcNow;
         nodeFrom.HopStart = Math.Max((int) meshPacket.HopStart, 
             await Context.Packets
-            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp && p.ViaMqtt != true)
+            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp)
             .OrderByDescending(p => p.UpdatedAt)
             .Take(10)
             .MaxAsync(p => p.HopStart) ?? 0);
         await Context.SaveChangesAsync();
 
-        var nodeTo = await Context.Nodes.FindByNodeIdAsync(meshPacket.To) ?? new Node
+        var nodeTo = nodes.FindByNodeId(meshPacket.To) ?? new Node
         {
             NodeId = meshPacket.To,
             ModemPreset = nodeGateway.ModemPreset,
@@ -124,7 +128,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             await Context.SaveChangesAsync();
         }
         
-        var channel = await Context.Channels.FindByNameAsync(channelId) ?? new Context.Entities.Channel()
+        var channel = await Context.Channels.FindByNameAsync(channelId) ?? new Context.Entities.Channel
         {
             Name = channelId
         };
@@ -133,12 +137,6 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Add(channel);
             await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
-        }
-        else
-        {
-            channel.UpdatedAt = DateTime.UtcNow;
-            Context.Update(channel);
-            await Context.SaveChangesAsync();
         }
         
         var isEncrypted = meshPacket.Decoded == null;
@@ -178,9 +176,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
             To = nodeTo,
-            MqttServer = origin,
-            MqttTopic = topics?.Take(topics.Length - 1).JoinString("/"),
-            PacketDuplicated = await Context.Packets.OrderBy(a => a.CreatedAt)
+            PacketDuplicated = await Context.Packets
+                .OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
                 .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo/* && (DateTime.UtcNow - a.CreatedAt).TotalDays < 1*/)
         };
@@ -190,7 +187,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         Logger.LogInformation("Add new packet #{id}|{idPacket} of type {type} from {from} to {to} by {gateway}. Encrypted : {encrypted}", packet.Id, meshPacket.Id, packet.PortNum, nodeFrom, nodeTo, nodeGateway, packet.Encrypted);
         Logger.LogDebug("New packet #{id} of type {type} {payload}", meshPacket.Id, meshPacket.Decoded?.Portnum, meshPacket.GetPayload());
-        
+
         return await DoReceive(packet, meshPacket);
     }
 
@@ -383,19 +380,19 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Packet = packet,
             Type = telemetryPayload.VariantCase,
             BatteryLevel = telemetryPayload.DeviceMetrics?.BatteryLevel,
-            Voltage = telemetryPayload.DeviceMetrics?.Voltage.IfNaNGetNull(),
-            ChannelUtilization = telemetryPayload.DeviceMetrics?.ChannelUtilization.IfNaNGetNull(),
-            AirUtilTx = telemetryPayload.DeviceMetrics?.AirUtilTx.IfNaNGetNull(),
+            Voltage = telemetryPayload.DeviceMetrics?.Voltage.IfNaNOrInfinityGetNull(),
+            ChannelUtilization = telemetryPayload.DeviceMetrics?.ChannelUtilization.IfNaNOrInfinityGetNull(),
+            AirUtilTx = telemetryPayload.DeviceMetrics?.AirUtilTx.IfNaNOrInfinityGetNull(),
             Uptime = telemetryPayload.DeviceMetrics?.UptimeSeconds > 0 ? TimeSpan.FromSeconds(telemetryPayload.DeviceMetrics.UptimeSeconds) : null,
-            Temperature = telemetryPayload.EnvironmentMetrics?.Temperature.IfNaNGetNull(),
-            RelativeHumidity = telemetryPayload.EnvironmentMetrics?.RelativeHumidity.IfNaNGetNull(),
-            BarometricPressure = telemetryPayload.EnvironmentMetrics?.BarometricPressure.IfNaNGetNull(),
-            Channel1Voltage = telemetryPayload.PowerMetrics?.Ch1Voltage.IfNaNGetNull(),
-            Channel2Voltage = telemetryPayload.PowerMetrics?.Ch2Voltage.IfNaNGetNull(),
-            Channel3Voltage = telemetryPayload.PowerMetrics?.Ch3Voltage.IfNaNGetNull(),
-            Channel1Current = telemetryPayload.PowerMetrics?.Ch1Current.IfNaNGetNull(),
-            Channel2Current = telemetryPayload.PowerMetrics?.Ch2Current.IfNaNGetNull(),
-            Channel3Current = telemetryPayload.PowerMetrics?.Ch3Current.IfNaNGetNull(),
+            Temperature = telemetryPayload.EnvironmentMetrics?.Temperature.IfNaNOrInfinityGetNull(),
+            RelativeHumidity = telemetryPayload.EnvironmentMetrics?.RelativeHumidity.IfNaNOrInfinityGetNull(),
+            BarometricPressure = telemetryPayload.EnvironmentMetrics?.BarometricPressure.IfNaNOrInfinityGetNull(),
+            Channel1Voltage = telemetryPayload.PowerMetrics?.Ch1Voltage.IfNaNOrInfinityGetNull(),
+            Channel2Voltage = telemetryPayload.PowerMetrics?.Ch2Voltage.IfNaNOrInfinityGetNull(),
+            Channel3Voltage = telemetryPayload.PowerMetrics?.Ch3Voltage.IfNaNOrInfinityGetNull(),
+            Channel1Current = telemetryPayload.PowerMetrics?.Ch1Current.IfNaNOrInfinityGetNull(),
+            Channel2Current = telemetryPayload.PowerMetrics?.Ch2Current.IfNaNOrInfinityGetNull(),
+            Channel3Current = telemetryPayload.PowerMetrics?.Ch3Current.IfNaNOrInfinityGetNull(),
             CreatedAt = packet.CreatedAt,
             UpdatedAt = packet.UpdatedAt
         };

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Common.Extensions;
@@ -15,6 +17,18 @@ public static class PropertyBuilderExtensions
     {
         return builder.HasMaxLength(maxLength)
                 .HasConversion<string?>()
+            ;
+    }
+    
+    public static PropertyBuilder<List<string>> ListOfString(this PropertyBuilder<List<string>> builder)
+    {
+        return builder.HasConversion(
+            v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+            v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions)null),
+            new ValueComparer<ICollection<string>>(
+                (c1, c2) => c1.SequenceEqual(c2),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => (ICollection<string>)c.ToList()));
             ;
     }
 }

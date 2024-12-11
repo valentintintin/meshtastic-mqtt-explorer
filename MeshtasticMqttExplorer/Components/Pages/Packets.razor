@@ -3,6 +3,7 @@
 @implements IAsyncDisposable
 @using Common.Context
 @using Common.Context.Entities
+@using Meshtastic.Protobufs
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using Node = Common.Context.Entities.Node
@@ -19,11 +20,6 @@
         <SubtitleTemplate>
             @Total trames @(Node?.AllNames) enregistrées
         </SubtitleTemplate>
-        <PageHeaderContent>
-            <div>
-                <Switch @bind-Checked="ShowDuplicated" UnCheckedChildren="Afficher les paquets dupliqués" CheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
-            </div>
-        </PageHeaderContent>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
         </PageHeaderExtra>
@@ -35,11 +31,6 @@ else
         <SubtitleTemplate>
             @Total trames
         </SubtitleTemplate>
-        <PageHeaderContent>
-            <div>
-                <Switch @bind-Checked="ShowDuplicated" UnCheckedChildren="Afficher les paquets dupliqués" CheckedChildren="Cacher les paquets dupliqués" OnChange="value => SetShowDuplicated(value)"/>
-            </div>
-        </PageHeaderContent>
         <PageHeaderExtra>
             <Button OnClick="FetchData">Actualiser</Button>
         </PageHeaderExtra>
@@ -48,19 +39,40 @@ else
 
 @if (Id.HasValue)
 {
-    <Segmented Block Options="@ShowTypesOptions" Value="CurrentShowType" TValue="ShowType" OnChange="SetShowType"/>
+    <Segmented Block Options="@_showTypesOptions" Value="CurrentShowType" TValue="ShowType" OnChange="SetShowType"/>
 }
 
 <Table TItem="Packet" DataSource="PacketsQueryable" Responsive
        PaginationPosition="bottomRight" Locale="Utils.TableLocale">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
-            <div style="width: 80px">
+            <div style="width: 130px">
                 <a href="/packet/@context.Id" target="_blank" rel="nofollow">@context.PacketId</a>
-                @if (context.PacketDuplicated != null)
+                @foreach (var duplicated in context.AllDuplicatedPackets.OrderBy(a => a.CreatedAt))
                 {
-                    <br/>
-                    <text>Doublon pour </text><a href="/packet/@context.PacketDuplicatedId" target="_blank" rel="nofollow">un autre</a>
+                    <br />
+                    <text>Doublon </text><a href="/packet/@duplicated.Id" target="_blank" rel="nofollow">
+                        Via @duplicated.Gateway.OneName()
+                        <text> - </text>
+                        <Tooltip Title="@("Début : " + context.HopStart + " | Limite : " + context.HopLimit)">
+                            @if (duplicated.HopStart - duplicated.HopLimit == 0)
+                            {
+                                <text>En direct</text>
+                            }
+                            else
+                            {
+                                @Math.Abs(duplicated.HopStart - duplicated.HopLimit ?? 0)
+                                <text> sauts</text>
+                            }
+
+                            @if (duplicated.GatewayDistanceKm > 0)
+                            {
+                                <text> - </text>
+                                @Math.Round(duplicated.GatewayDistanceKm.Value, 2)
+                                <text> Km</text>
+                            }
+                        </Tooltip>
+                    </a>
                 }
             </div>
         </PropertyColumn>
@@ -123,9 +135,9 @@ else
                 }
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttServer" Title="MQTT" Filters="Utils.MqttServerFilters">
+        <PropertyColumn Property="c => c.MqttServerId" Title="MQTT" Filters="Utils.MqttServerFilters">
             <div style="width: 100px">
-                @context.MqttServer<br />@context.MqttTopic?.Split("/").LastOrDefault()
+                @context.MqttServer?.Name<br />@context.MqttTopic?.Split("/").LastOrDefault()
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
@@ -158,9 +170,8 @@ else
     private int Total { get; set; }
     private DataContext Context { get; set; } = null!;
     private ShowType CurrentShowType { get; set; } = ShowType.From;
-    private bool ShowDuplicated { get; set; }
     
-    private readonly List<SegmentedOption<ShowType>> ShowTypesOptions = [
+    private readonly List<SegmentedOption<ShowType>> _showTypesOptions = [
         new(ShowType.From, "En tant qu'expéditeur"),
         new(ShowType.To, "En tant que destinataire"),
         new(ShowType.Gateway, "En tant que passerelle"),
@@ -190,12 +201,13 @@ else
     private void FetchData()
     {
         PacketsQueryable = Context.Packets
+                .Include(a => a.MqttServer)
                 .Include(a => a.Channel)
                 .Include(a => a.Gateway)
                 .Include(a => a.From)
                 .Include(a => a.To)
-                .Include(a => a.PacketDuplicated)
-                .Where(a => ShowDuplicated || a.PacketDuplicated == null)
+                .Include(a => a.AllDuplicatedPackets)
+                .ThenInclude(a => a.Gateway)
                 .AsNoTrackingWithIdentityResolution();
 
         IQueryable<Packet> totalQueryable = Context.Packets;
@@ -228,6 +240,11 @@ else
                     throw new ArgumentOutOfRangeException();
             }
         }
+        else
+        {
+            PacketsQueryable = PacketsQueryable.Where(a => a.PortNum != PortNum.MapReportApp);
+            totalQueryable = totalQueryable.Where(a => a.PortNum != PortNum.MapReportApp);
+        }
         
         Total = totalQueryable
             .AsNoTrackingWithIdentityResolution()
@@ -250,12 +267,6 @@ else
         NavigationManager.NavigateTo($"/node/{Id}");
     }
 
-    private void SetShowDuplicated(bool value)
-    {
-        ShowDuplicated = value;
-        FetchData();
-    }
-    
     private enum ShowType
     {
         From,

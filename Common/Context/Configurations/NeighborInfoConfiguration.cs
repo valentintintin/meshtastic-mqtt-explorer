@@ -36,5 +36,6 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.Property(a => a.DataSource).EnumToString();
+        builder.HasIndex(a => a.DataSource);
     }
 }

@@ -1,3 +1,4 @@
+using Common.Context.Entities.Router;
 using Google.Protobuf;
 using Meshtastic.Protobufs;
 
@@ -50,12 +51,17 @@ public class Packet : IEntity
     public bool? WantResponse { get; set; }
     public long? RequestId { get; set; }
     public long? ReplyId { get; set; }
-
-    public string? MqttServer { get; set; }
+    
+    public long? MqttServerId { get; set; }
+    public virtual MqttServer? MqttServer { get; set; }
+    
     public string? MqttTopic { get; set; }
     
     public double? GatewayDistanceKm { get; set; }
     
     public long? PacketDuplicatedId { get; set; }
     public virtual Packet? PacketDuplicated { get; set; }
+    public virtual ICollection<Packet> AllDuplicatedPackets { get; set; } = [];
+    
+    public virtual PacketActivity? PacketActivity { get; set; }
 }

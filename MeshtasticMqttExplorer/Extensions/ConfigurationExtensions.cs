@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using MeshtasticMqttExplorer.Exceptions;
+using Common.Exceptions;
 
 namespace MeshtasticMqttExplorer.Extensions;
 

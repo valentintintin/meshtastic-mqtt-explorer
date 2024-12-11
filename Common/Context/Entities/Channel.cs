@@ -8,8 +8,8 @@ public class Channel : IEntity
     
     public required string Name { get; set; }
 
-    public ICollection<TextMessage> TextMessages { get; set; } = [];
-    public ICollection<Packet> Packets { get; set; } = [];
+    public virtual ICollection<TextMessage> TextMessages { get; set; } = [];
+    public virtual ICollection<Packet> Packets { get; set; } = [];
 
     public override string ToString()
     {

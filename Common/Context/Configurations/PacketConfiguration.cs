@@ -12,9 +12,6 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
         builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => a.PacketId);
         
-        builder.Property(a => a.MqttServer).HasMaxLength(64);
-        builder.HasIndex(a => a.MqttServer);
-        
         builder.Property(a => a.MqttTopic).HasMaxLength(128);
 
         builder.Property(a => a.PayloadJson).HasColumnType("TEXT");
@@ -51,8 +48,13 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
             .HasForeignKey(a => a.ChannelId);
         
         builder.HasOne(a => a.PacketDuplicated)
-            .WithMany()
+            .WithMany(a => a.AllDuplicatedPackets)
             .HasForeignKey(a => a.PacketDuplicatedId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(a => a.MqttServer)
+            .WithMany(a => a.Packets)
+            .HasForeignKey(a => a.MqttServerId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

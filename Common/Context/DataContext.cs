@@ -1,13 +1,14 @@
 using System.Reflection;
 using Common.Context.Configurations;
 using Common.Context.Entities;
+using Common.Context.Entities.Router;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Channel = Common.Context.Entities.Channel;
 using NeighborInfo = Common.Context.Entities.NeighborInfo;
-using NodeConfiguration = Common.Context.Entities.NodeConfiguration;
+using NodeConfiguration = Common.Context.Entities.Router.NodeConfiguration;
 using Position = Common.Context.Entities.Position;
 using Telemetry = Common.Context.Entities.Telemetry;
 using Waypoint = Common.Context.Entities.Waypoint;
@@ -26,6 +27,9 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
     
+    public required DbSet<MqttServer> MqttServers { get; set; }
+    public required DbSet<Webhook> Webhooks { get; set; }
+    
     public required DbSet<NodeConfiguration> NodeConfigurations { get; set; }
     public required DbSet<PacketActivity> PacketActivities { get; set; }
 
@@ -35,7 +39,20 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
 
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetAssembly(typeof(PacketConfiguration))!);
         
-        modelBuilder.Entity<IdentityRole<long>>().ToTable("Roles", "router");
+        modelBuilder.Entity<IdentityRole<long>>().ToTable("Roles", "router")
+            .HasData([
+                new IdentityRole<long>(SecurityConstants.RoleName.Client.ToString())
+                {
+                    Id = 1,
+                    NormalizedName = SecurityConstants.RoleName.Client.ToString().ToUpper(),
+                },
+                new IdentityRole<long>(SecurityConstants.RoleName.Admin.ToString())
+                {
+                    Id = 2,
+                    NormalizedName = SecurityConstants.RoleName.Admin.ToString().ToUpper(),
+                },
+            ]);
+        
         modelBuilder.Entity<IdentityUserClaim<long>>().ToTable("UserClaims", "router");
         modelBuilder.Entity<IdentityUserRole<long>>().ToTable("UserRoles", "router");
         modelBuilder.Entity<IdentityUserLogin<long>>().ToTable("UserLogins", "router");

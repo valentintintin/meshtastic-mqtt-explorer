@@ -1,4 +1,4 @@
-namespace Common.Context.Entities;
+namespace Common.Context.Entities.Router;
 
 public class NodeConfiguration : IEntity
 {

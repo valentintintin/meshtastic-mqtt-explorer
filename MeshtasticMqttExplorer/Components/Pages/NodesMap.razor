@@ -343,6 +343,7 @@
         Loading = true;
         
         Nodes = await Context.Nodes
+            .Include(n => n.MqttServer)
             .Include(n => n.MyNeighbors
                 .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
                 .Where(a => !a.Neighbor.Ignored)
@@ -385,7 +386,7 @@
             Latitude = node.Latitude!.Value,
             Longitude = node.Longitude!.Value,
             Label = node.AllNames,
-            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? $"Passerelle MQTT {node.MqttServer}" : "Radio uniquement")} | {node.PrimaryChannel}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Popup = $"<p><a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{node.AllNames}</b></a></p><p>{node.RegionCode?.ToString() ?? "UNSET"} | {node.ModemPreset?.ToString() ?? ""}</p><p>{node.Role?.ToString() ?? ""} | {(node.IsMqttGateway == true ? $"Passerelle MQTT {node.MqttServer?.Name}" : "Radio uniquement")} | {node.PrimaryChannel}</p><p>Dernière MAJ : {node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
             IconType = Osm.IconType.Circle,
             Color = color,
             FillColor = node is { RegionCode: not null, ModemPreset: not null } ? color : Utils.Gray,
@@ -498,7 +499,7 @@
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Error during set save map position");
+                // ignored
             }
         }
     }

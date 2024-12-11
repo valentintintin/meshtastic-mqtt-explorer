@@ -1,9 +1,13 @@
 using Meshtastic.Protobufs;
 
-namespace Recorder.Models;
+namespace Common.Context.Entities;
 
-public class NotificationConfiguration
+public class Webhook : IEntity
 {
+    public long Id { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    
     public required string Name { get; set; }
     public required string Url { set; get; }
 
@@ -17,6 +21,9 @@ public class NotificationConfiguration
     public uint? To { get; set; }
     public uint? Gateway { get; set; }
     public uint? FromOrTo { get; set; }
-    public string? MqttServer { get; set; }
+    
+    public long? MqttServerId { get; set; }
+    public virtual MqttServer? MqttServer { get; set; }
+    
     public string? Channel { get; set; }
 }

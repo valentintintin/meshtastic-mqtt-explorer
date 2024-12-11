@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Common.Context;
 using Common.Context.Entities;
+using Common.Context.Entities.Router;
 using Common.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -13,10 +14,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet.AspNetCore;
 using MqttRouter.Controllers;
+using MqttRouter.Models;
 using MqttRouter.Services;
 using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 Console.WriteLine("Starting");
@@ -44,7 +47,7 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
     
-    builder.Services.AddIdentity<User, IdentityRole>(options =>
+    builder.Services.AddIdentity<User, IdentityRole<long>>(options =>
         {
             options.Lockout.AllowedForNewUsers = false;
 
@@ -65,6 +68,7 @@ try
         option.UseNpgsql(
             builder.Configuration.GetConnectionString("Default")
         );
+        option.EnableSensitiveDataLogging();
     });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -72,12 +76,14 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
+    builder.Services.AddScoped<UserService>();
+    builder.Services.AddScoped<MqttService>();
+    builder.Services.AddScoped<NotificationService>();
+    builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
 
     builder.Services.AddHostedMqttServer(options => options.WithDefaultEndpoint());
     builder.Services.AddMqttConnectionHandler();
-    
-    builder.Services.AddScoped<MeshtasticService>();
     
     if (!builder.Environment.IsDevelopment())
     {
@@ -99,11 +105,14 @@ try
     app.UseMqttServer(
         server =>
         {
-            var mqttController = new MqttController();
-    
-            server.ValidatingConnectionAsync += mqttController.ValidateConnection;
-            server.ClientConnectedAsync += mqttController.OnClientConnected;
-            server.InterceptingClientEnqueueAsync += mqttController.InterceptingPublish;
+            var serviceProvider = app.Services.CreateScope().ServiceProvider;
+            
+            var mqttController = new MqttServerController(serviceProvider);
+
+            server.ValidatingConnectionAsync += mqttController.OnValidateConnection;
+            server.InterceptingPublishAsync += mqttController.OnInterceptingInbound;
+            server.InterceptingClientEnqueueAsync += mqttController.OnInterceptingPublish;
+            server.ClientDisconnectedAsync += mqttController.OnDisconnected;
         });
 
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()

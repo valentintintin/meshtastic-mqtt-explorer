@@ -1,13 +1,15 @@
-using Common.Context.Entities;
+using Common.Context.Entities.Router;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Common.Context.Configurations;
+namespace Common.Context.Configurations.Router;
 
 public class PacketActivityConfiguration : IEntityTypeConfiguration<PacketActivity>
 {
     public void Configure(EntityTypeBuilder<PacketActivity> builder)
     {
+        builder.ToTable("PacketActivities", "router");
+        
         builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => a.UpdatedAt);
 

@@ -5,6 +5,11 @@ namespace Common.Extensions.Entities;
 
 public static class NodeExtensions
 {
+    public static Node? FindByNodeId(this IEnumerable<Node> nodes, uint nodeId)
+    {
+        return nodeId > 0 ? nodes.FirstOrDefault(n => n.NodeId == nodeId) : null;
+    }
+    
     public static async Task<Node?> FindByNodeIdAsync(this IQueryable<Node> nodes, uint nodeId)
     {
         return nodeId > 0 ? await nodes.FirstOrDefaultAsync(n => n.NodeId == nodeId) : null;

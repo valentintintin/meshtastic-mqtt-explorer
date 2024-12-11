@@ -1,11 +1,13 @@
 ﻿@page "/about"
 @page "/a-propos"
 
-@using Common.Extensions
-@using Common.Models
-@using MeshtasticMqttExplorer.Services
+@implements IAsyncDisposable
 
-@inject RecorderService RecorderService
+@using Common.Context
+@using Common.Context.Entities
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<DataContext> ContextFactory
 
 <PageTitle>Meshtastic Mqtt Explorer</PageTitle>
 
@@ -26,8 +28,8 @@
                     <li><a href="https://meshtastic.liamcottle.net/" rel="nofollow" target="_blank">Liam Cottle</a></li>
                     <li><a href="https://www.serveurperso.com/" rel="nofollow" target="_blank">Pascal de ServeurPerso</a></li>
                     <li><a href="http://gaulix.fr/" rel="nofollow" target="_blank">Le réseau Gaulix</a></li>
-                    <li><a href="https://wiki.fr-emcom.com/gaulix_reseau_meshtastic_-_france:1:start" target="_blank">Le Wiki du réseau Gaulix</a></li>
                     <li><a href="https://meshtastic.discourse.group/t/france-public-channel/10230" target="_blank">Le Forum Meshtastic France</a></li>
+                    <li><a href="https://www.facebook.com/groups/meshtastic.france" target="_blank">Le groupe Facebook Meshtastic France</a></li>
                 </ul>
             </ChildContent>
         </Card>
@@ -36,12 +38,13 @@
     <GridCol Xs="24" Lg="12">
         <Card Title="Serveurs MQTT utilisés">
             <ChildContent>
-                @foreach (var mqtt in MqttConfigurations)
+                @foreach (var mqtt in MqttServers)
                 {
                     <Descriptions Bordered Column="1">
                         <DescriptionsItem Title="Nom" ContentStyle="font-weight: bold">@mqtt.Name</DescriptionsItem>
+                        <DescriptionsItem Title="État" ContentStyle="font-weight: bold">@(mqtt.Enabled ? "Activé" : "Désactivé")</DescriptionsItem>
                         <DescriptionsItem Title="URL" ContentStyle="font-weight: bold">@mqtt.Host</DescriptionsItem>
-                        <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @mqtt.LastPacketDate?.ToFrench()</DescriptionsItem>
+                        @* <DescriptionsItem Title="Messages reçus" ContentStyle="font-weight: bold">@mqtt.NbPacket | @mqtt.LastPacketDate?.ToFrench()</DescriptionsItem> *@
                         <DescriptionsItem Title="Topics">
                             @foreach (var topic in mqtt.Topics)
                             {
@@ -58,12 +61,23 @@
 
 @code
 {
-    private IEnumerable<MqttConfiguration> MqttConfigurations { get; set; } = [];
+    private DataContext Context { get; set; } = null!;
+    private IList<MqttServer> MqttServers { get; set; } = [];
         
     protected override async Task OnInitializedAsync()
     {
-        MqttConfigurations = await RecorderService.GetMqttConfigurations();
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        MqttServers = await Context.MqttServers
+            .OrderByDescending(a => a.Enabled)
+            .ThenBy(a => a.Name)
+            .ToListAsync();
 
         await base.OnInitializedAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
     }
 }

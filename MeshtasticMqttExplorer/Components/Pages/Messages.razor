@@ -35,7 +35,7 @@
         }
     </SubtitleTemplate>
     <PageHeaderContent>
-        <Segmented Disabled="Loading" Options="@MqttServers" Value="CurrentMqttServer" TValue="string?" OnChange="value => SetMqttServer(value)" />
+        <Segmented Disabled="Loading" Options="@MqttServers" Value="CurrentMqttServer" TValue="long?" OnChange="value => SetMqttServer(value)" />
     </PageHeaderContent>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -91,8 +91,8 @@
     public long? ChannelId { get; set; }
     
     private bool Loading { get; set; } = true;
-    private List<SegmentedOption<string?>> MqttServers { get; } = [new("", "Tous")];
-    private string? CurrentMqttServer { get; set; }
+    private List<SegmentedOption<long?>> MqttServers { get; } = [new(null, "Tous")];
+    private long? CurrentMqttServer { get; set; }
     private int PageIndex { get; set; }
     private int PageSize { get; set; } = 20;
     private int Total { get; set; }
@@ -109,7 +109,7 @@
         
         MqttServers.AddRange(
             Utils.MqttServerFilters
-                .Select(a => new SegmentedOption<string?>(a.Value, a.Text))
+                .Select(a => new SegmentedOption<long?>(a.Value, a.Text))
         );
         
         await base.OnInitializedAsync();
@@ -146,7 +146,7 @@
 
         Totals = Context.TextMessages
             .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
-            .Where(a => CurrentMqttServer == "" || a.To!.MqttServer == CurrentMqttServer)
+            .Where(a => !CurrentMqttServer.HasValue || (a.To!.MqttServer != null && a.To!.MqttServer.Id == CurrentMqttServer))
             .GroupBy(t => t.ChannelId)
             .AsNoTrackingWithIdentityResolution()
             .ToDictionary(a => a.Key, messages => messages.Count());
@@ -164,7 +164,7 @@
                     .ThenInclude(a => a.Gateway)
                     .Where(a => a.Channel == Channel)
                     .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
-                    .Where(a => CurrentMqttServer == "" || a.To!.MqttServer == CurrentMqttServer || (a.Packet != null && a.Packet.MqttServer == CurrentMqttServer))
+                    .Where(a => !CurrentMqttServer.HasValue || (a.To!.MqttServer != null && a.To!.MqttServerId == CurrentMqttServer) || (a.Packet != null && a.Packet.MqttServer != null && a.Packet.MqttServer.Id == CurrentMqttServer))
                     .OrderByDescending(a => a.CreatedAt)
                     .Skip(PageIndex * PageSize).Take(PageSize)
                     .AsNoTrackingWithIdentityResolution()
@@ -188,7 +188,7 @@
         FetchData();
     }
 
-    public void SetMqttServer(string? mqttServer)
+    public void SetMqttServer(long? mqttServer)
     {
         CurrentMqttServer = mqttServer;
 

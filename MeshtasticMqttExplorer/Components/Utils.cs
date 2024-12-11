@@ -77,7 +77,7 @@ public static class Utils
         .Concat([new TableFilter<PortNum?> { Text = "Chiffrée", Value = null }])
         .OrderBy(p => p.Text)
         .ToArray();
-    public static readonly List<TableFilter<string?>> MqttServerFilters = [];
+    public static readonly List<TableFilter<long?>> MqttServerFilters = [];
 
     public static readonly TableLocale TableLocale = new()
     {
@@ -150,6 +150,8 @@ public static class Utils
 
     public static string GetNeighborLinePopupHtml(Node node, Common.Context.Entities.NeighborInfo neighborInfo)
     {
+        var neighbor = neighborInfo.Neighbor == node ? neighborInfo.Node : neighborInfo.Neighbor;
+        
         return $"<p>" +
                $"<a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\">" +
                $"<b>{node.AllNames}</b>" +
@@ -157,8 +159,8 @@ public static class Utils
                $"</p>" +
                $"<p>" +
                $"Voisin ({neighborInfo.DataSource}) : " +
-               $"<a href=\"/node/{neighborInfo.Neighbor.Id}\" target=\"_blank\">" +
-               $"<b>{neighborInfo.Neighbor.AllNames}</b>" +
+               $"<a href=\"/node/{neighbor.Id}\" target=\"_blank\">" +
+               $"<b>{neighbor.AllNames}</b>" +
                $"</a>" +
                $"</p>" +
                $"<p>" +

@@ -1,4 +1,4 @@
-namespace Common.Context.Entities;
+namespace Common.Context.Entities.Router;
 
 public class PacketActivity : IEntity
 {
@@ -8,4 +8,13 @@ public class PacketActivity : IEntity
     
     public long NodeConfigurationId { get; set; }
     public virtual NodeConfiguration NodeConfiguration { get; set; } = null!;
+    
+    public long PacketId { get; set; }
+    public virtual Packet Packet { get; set; } = null!;
+    
+    public bool Accepted { get; set; }
+
+    public List<string> ReceiverIds { get; set; } = [];
+    
+    public string? Comment { get; set; }
 }

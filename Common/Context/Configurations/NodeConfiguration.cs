@@ -42,7 +42,11 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         
         builder.HasIndex(a => a.LastSeen).IsDescending();
         
-        builder.Property(a => a.MqttServer).HasMaxLength(128);
         builder.Property(a => a.PrimaryChannel).HasMaxLength(32);
+
+        builder.HasOne(a => a.MqttServer)
+            .WithMany(a => a.Nodes)
+            .HasForeignKey(a => a.MqttServerId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

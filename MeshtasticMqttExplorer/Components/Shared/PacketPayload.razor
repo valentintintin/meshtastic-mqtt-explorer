@@ -146,13 +146,13 @@
                                     @(Telemetry?.DeviceMetrics?.BatteryLevel)%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Tension batterie">
-                                    @(Telemetry?.DeviceMetrics?.Voltage.IfNaNGetNull())V
+                                    @(Telemetry?.DeviceMetrics?.Voltage.IfNaNOrInfinityGetNull())V
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Utilisation du canal">
-                                    @(Telemetry?.DeviceMetrics?.ChannelUtilization.IfNaNGetNull())%
+                                    @(Telemetry?.DeviceMetrics?.ChannelUtilization.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Emission sur l'air">
-                                    @(Telemetry?.DeviceMetrics?.AirUtilTx.IfNaNGetNull())%
+                                    @(Telemetry?.DeviceMetrics?.AirUtilTx.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Durée de fonctionnement">
                                     <TimeElapsed Value="@TimeSpan.FromSeconds(Telemetry?.DeviceMetrics?.UptimeSeconds ?? 0)" Fallback="-"></TimeElapsed>
@@ -161,34 +161,34 @@
                             @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.EnvironmentMetrics)
                             {
                                 <DescriptionsItem Title="Température">
-                                    @(Telemetry?.EnvironmentMetrics?.Temperature.IfNaNGetNull())°C
+                                    @(Telemetry?.EnvironmentMetrics?.Temperature.IfNaNOrInfinityGetNull())°C
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Humidité">
-                                    @(Telemetry?.EnvironmentMetrics?.RelativeHumidity.IfNaNGetNull())%
+                                    @(Telemetry?.EnvironmentMetrics?.RelativeHumidity.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Pression atmosphérique">
-                                    @(Telemetry?.EnvironmentMetrics?.BarometricPressure.IfNaNGetNull())hPa
+                                    @(Telemetry?.EnvironmentMetrics?.BarometricPressure.IfNaNOrInfinityGetNull())hPa
                                 </DescriptionsItem>
                             }
                             @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.PowerMetrics)
                             {
                                 <DescriptionsItem Title="Voltage 1">
-                                    @(Telemetry?.PowerMetrics?.Ch1Voltage.IfNaNGetNull())°C
+                                    @(Telemetry?.PowerMetrics?.Ch1Voltage.IfNaNOrInfinityGetNull())°C
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Intensité 1">
-                                    @(Telemetry?.PowerMetrics?.Ch1Current.IfNaNGetNull())%
+                                    @(Telemetry?.PowerMetrics?.Ch1Current.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Voltage 2">
-                                    @(Telemetry?.PowerMetrics?.Ch2Voltage.IfNaNGetNull())°C
+                                    @(Telemetry?.PowerMetrics?.Ch2Voltage.IfNaNOrInfinityGetNull())°C
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Intensité 2">
-                                    @(Telemetry?.PowerMetrics?.Ch2Current.IfNaNGetNull())%
+                                    @(Telemetry?.PowerMetrics?.Ch2Current.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Voltage 3">
-                                    @(Telemetry?.PowerMetrics?.Ch3Voltage.IfNaNGetNull())°C
+                                    @(Telemetry?.PowerMetrics?.Ch3Voltage.IfNaNOrInfinityGetNull())°C
                                 </DescriptionsItem>
                                 <DescriptionsItem Title="Intensité 3">
-                                    @(Telemetry?.PowerMetrics?.Ch3Current.IfNaNGetNull())%
+                                    @(Telemetry?.PowerMetrics?.Ch3Current.IfNaNOrInfinityGetNull())%
                                 </DescriptionsItem>
                             }
                         </Descriptions>

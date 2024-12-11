@@ -54,9 +54,9 @@
                 @(context.IsMqttGateway == true ? "Oui" : "Non")
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
+        <PropertyColumn Property="c => c.MqttServerId" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
             <div style="width: 150px">
-                @context.MqttServer
+                @context.MqttServer?.Name
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PrimaryChannel" Title="Canal principal" Filterable>

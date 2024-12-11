@@ -11,10 +11,12 @@
 @using Common.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
+@using NotificationService = Common.Services.NotificationService
 
 @inject IDbContextFactory<DataContext> ContextFactory
 @inject IMessageService Message
 @inject MeshtasticService MeshtasticService
+@inject NotificationService NotificationService
 
 <PageTitle>Détail du packet @Packet?.PacketId</PageTitle>
 
@@ -65,6 +67,7 @@
         <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
         
         <Button OnClick="() => ComputeAgain()">Traiter la trame</Button>
+        <Button OnClick="() => Notify()">Notifier</Button>
     }
     else if (Loading)
     {
@@ -102,9 +105,12 @@
         Loading = true;
         
         var query = Context.Packets
+            .Include(n => n.Channel)
+            .Include(n => n.MqttServer)
             .Include(n => n.From)
             .Include(n => n.To)
             .Include(n => n.Gateway)
+            .Include(a => a.PacketDuplicated)
             .AsNoTrackingWithIdentityResolution()
         ;
 
@@ -131,6 +137,12 @@
     {
         await MeshtasticService.DoReceive(Packet);
         await Message.Info("Trame traitée !");
+    }
+
+    private async Task Notify()
+    {
+        await NotificationService.SendNotification(Packet);
+        await Message.Info("Notification envoyé !");
     }
 
     public async ValueTask DisposeAsync()

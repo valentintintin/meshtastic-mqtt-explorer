@@ -35,9 +35,9 @@
                     <Tag Color="@PresetColor.Green.ToString()">Passerelle MQTT</Tag>
                 }
 
-                @if (!string.IsNullOrWhiteSpace(Node?.MqttServer))
+                @if (Node?.MqttServer != null)
                 {
-                    <Tag>@Node.MqttServer</Tag>
+                    <Tag>@Node.MqttServer?.Name</Tag>
                 }
 
                 @if (!string.IsNullOrWhiteSpace(Node?.PrimaryChannel))
@@ -115,6 +115,7 @@
         var yesterday = DateTime.UtcNow.Date.AddDays(-1);
         
         var query = Context.Nodes
+            .Include(n => n.MqttServer)
             .Include(n => n.MyNeighbors
                 .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
@@ -156,11 +157,11 @@
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         
-        if (!string.IsNullOrWhiteSpace(Node.MqttServer))
+        if (Node.MqttServer != null)
         {
             var mqttPackets = await Context.Packets
-                .Where(a => a.Gateway == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && !string.IsNullOrWhiteSpace(a.MqttServer) && !string.IsNullOrWhiteSpace(a.MqttTopic))
-                .Where(a => a.MqttServer! == Node.MqttServer)
+                .Where(a => a.Gateway == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && a.MqttServer != null && !string.IsNullOrWhiteSpace(a.MqttTopic))
+                .Where(a => a.MqttServer == Node.MqttServer)
                 .Select(a => a.MqttTopic!)
                 .Distinct()
                 .AsNoTrackingWithIdentityResolution()

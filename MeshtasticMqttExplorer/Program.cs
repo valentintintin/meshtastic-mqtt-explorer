@@ -13,6 +13,7 @@ using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
+using NotificationService = Common.Services.NotificationService;
 
 Console.WriteLine("Starting");
 
@@ -43,6 +44,7 @@ try
         option.UseNpgsql(
             builder.Configuration.GetConnectionString("Default")
         );
+        option.EnableSensitiveDataLogging();
     });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -52,6 +54,7 @@ try
 
     builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<NotificationService>();
 
     if (!builder.Environment.IsDevelopment())
     {
@@ -96,7 +99,9 @@ try
     await context.Database.MigrateAsync();
     
     Utils.MqttServerFilters.AddRange(
-        (await app.Services.GetRequiredService<RecorderService>().GetMqttConfigurations()).Select(c => new TableFilter<string?> { Text = c.Name, Value = c.Name })
+        await (await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync()).MqttServers
+            .Select(c => new TableFilter<long?> { Text = c.Name, Value = c.Id })
+            .ToListAsync()
     );
 
     Console.WriteLine("Started");

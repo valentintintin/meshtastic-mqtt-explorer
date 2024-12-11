@@ -1,3 +1,4 @@
+using Common.Context.Entities.Router;
 using Common.Extensions;
 using Meshtastic.Protobufs;
 
@@ -33,7 +34,9 @@ public class Node : IEntity
     
     public bool? IsMqttGateway { get; set; }
     
-    public string? MqttServer { get; set; }
+    public long? MqttServerId { get; set; }
+    public virtual MqttServer? MqttServer { get; set; }
+    
     public string? PrimaryChannel { get; set; }
     
     public bool Ignored { get; set; }
@@ -49,6 +52,8 @@ public class Node : IEntity
     public virtual ICollection<NeighborInfo> NeighborsFor { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesFrom { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesTo { get; set; } = [];
+    
+    public virtual NodeConfiguration? NodeConfiguration { get; set; }
 
     public string NodeIdAsString() => NodeId.ToHexString();
     public string Name() => LongName != null && ShortName != null ? $"{LongName} | {ShortName}" : NodeIdAsString();

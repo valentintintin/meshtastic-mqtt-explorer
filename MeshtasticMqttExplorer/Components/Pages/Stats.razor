@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 
 @using Common.Context
+@using Common.Context.Entities
 @using Common.Extensions
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Models
@@ -169,8 +170,8 @@
     <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
         <ChildContent>
             <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
-                <PropertyColumn Property="c => c.MqttServer" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
-                    @context.MqttServer
+                <PropertyColumn Property="c => c.MqttServer!.Id" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
+                    @context.MqttServer!.Name
                 </PropertyColumn>
 
                 <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="Utils.RegionCodeFilters">
@@ -372,11 +373,13 @@
             .ToListAsync();
         
         DataYesterdayNodePackets = await Context.Packets
+            .Include(a => a.MqttServer)
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
+            .Where(a => a.MqttServer != null)
             .GroupBy(a => new
             {
-                a.MqttServer,
+                MqttServer = a.MqttServer,
                 a.From.RegionCode,
                 NodeId = a.From.Id,
                 NodeName = a.From.AllNames,
@@ -407,7 +410,7 @@
     
     public class PacketNodeType
     {
-        public required string? MqttServer { get; set; }
+        public required MqttServer? MqttServer { get; set; }
         public required Config.Types.LoRaConfig.Types.RegionCode? RegionCode { get; set; }
         public required long NodeId { get; set; }
         public required string NodeName { get; set; }
