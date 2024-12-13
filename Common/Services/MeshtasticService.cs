@@ -250,8 +250,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 case PortNum.TelemetryApp:
                     Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
                     await Context.SaveChangesAsync();
-                    await DoTelemetryPacket(packet.From, packet,
-                        meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
+                    await DoTelemetryPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
                     break;
                 case PortNum.NeighborinfoApp:
                     Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
@@ -395,6 +394,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         Logger.LogInformation("Update {node} with new Telemetry {type}", nodeFrom, telemetry.Type);
         
         Context.Add(telemetry);
+
+        packet.PortNumVariant = telemetryPayload.VariantCase.ToString();
+        Context.Update(packet);
+        
         await Context.SaveChangesAsync();
     }
     

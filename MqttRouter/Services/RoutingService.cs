@@ -66,8 +66,6 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
 
     private async Task DoWhenPositionOrTelemetry(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
-        // TODO cas telemetry environemnet etc
-        
         if (await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-1)) != null)
         {
             await DoWhenPositionOrTelemetryForLocalOnly(clientId, userId, packet, packetActivity);
@@ -79,7 +77,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
 
             packetActivity.Accepted = true;
-            packetActivity.Comment = "Trame autorisée et la dernière date de plus d'une heure";
+            packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus d'une heure";
         }
     }
 
@@ -93,7 +91,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there are some packets of this type during the 15 minutes",
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
             
-            packetActivity.Comment = $"Trame interdite car envoyée frequemment : {hasPacketTypeBeforeDate}";
+            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée frequemment : {hasPacketTypeBeforeDate}";
         }
         else
         {
@@ -144,12 +142,12 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             {
                 packetActivity.Accepted = true;
                 packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).ToList());
-                packetActivity.Comment = $"Trame autorisée et la dernière date de plus de 15 minutes donc seulement pour les {localNodes.Count} locaux";
+                packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de 15 minutes donc seulement pour les {localNodes.Count} locaux";
             }
             else
             {
                 packetActivity.Accepted = true;
-                packetActivity.Comment = "Trame autorisée et la dernière date de plus de 15 minutes. Aucun noeud local trouvé";
+                packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de 15 minutes. Aucun noeud local trouvé";
             }
         }
     }
@@ -236,8 +234,9 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
     {
         return (await Context.PacketActivities.OrderByDescending(a => a.CreatedAt).FirstOrDefaultAsync(a =>
             a.Accepted
-            && a.Packet.PortNum == packet.PortNum && a.Packet.From == packet.From 
-            && a.CreatedAt > minDate 
+            && a.Packet.PortNum == packet.PortNum && a.Packet.From == packet.From
+            && a.Packet.PortNumVariant == packet.PortNumVariant
+            && a.CreatedAt > minDate
         ))?.CreatedAt;
     }
 }

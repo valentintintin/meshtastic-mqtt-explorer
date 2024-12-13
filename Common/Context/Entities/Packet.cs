@@ -44,6 +44,7 @@ public class Packet : IEntity
     public MeshPacket.Types.Priority? Priority { get; set; }
     
     public PortNum? PortNum { get; set; }
+    public string? PortNumVariant { get; set; }
     public byte[]? Payload { get; set; }
     public ByteString? ByteString => Payload != null ? ByteString.CopyFrom(Payload) : null;
     

@@ -19,6 +19,9 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
         builder.Property(a => a.PortNum).EnumToString(64);
         builder.HasIndex(a => a.PortNum);
         
+        builder.Property(a => a.PortNumVariant).HasMaxLength(128);
+        builder.HasIndex(a => a.PortNumVariant);
+        
         builder.Property(a => a.Priority).EnumToString();
 
         builder.HasOne(a => a.Gateway)
