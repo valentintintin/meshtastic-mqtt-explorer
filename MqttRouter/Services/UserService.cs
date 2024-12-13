@@ -52,6 +52,12 @@ public class UserService(
             return null;
         }
         
+        if (await IsAuthorized(user.Id))
+        {
+            Logger.LogWarning("Login of {username}#{userId} KO. Locked out", username, user.Id);
+            return null;
+        }
+        
         var signInResult = await signInManager.CheckPasswordSignInAsync(user, password, false);
 
         if (!signInResult.Succeeded)
@@ -67,5 +73,11 @@ public class UserService(
         await userManager.UpdateAsync(user);
 
         return user;
+    }
+
+    public async Task<bool> IsAuthorized(long userId)
+    {
+        var user = await userManager.FindByIdAsync(userId.ToString());
+        return user != null && !await userManager.IsLockedOutAsync(user);
     }
 }

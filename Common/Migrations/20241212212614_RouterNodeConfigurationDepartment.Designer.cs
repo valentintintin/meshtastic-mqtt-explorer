@@ -3,6 +3,7 @@ using System;
 using Common.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Common.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20241212212614_RouterNodeConfigurationDepartment")]
+    partial class RouterNodeConfigurationDepartment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -257,11 +260,7 @@ namespace Common.Migrations
                     b.HasIndex("LastSeen")
                         .IsDescending();
 
-                    b.HasIndex("Latitude");
-
                     b.HasIndex("LongName");
-
-                    b.HasIndex("Longitude");
 
                     b.HasIndex("ModemPreset");
 
@@ -474,6 +473,9 @@ namespace Common.Migrations
                     b.Property<long>("NodeId")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("NodeId1")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -484,11 +486,12 @@ namespace Common.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Department");
-
                     b.HasIndex("MqttId");
 
                     b.HasIndex("NodeId")
+                        .IsUnique();
+
+                    b.HasIndex("NodeId1")
                         .IsUnique();
 
                     b.HasIndex("UpdatedAt");
@@ -527,8 +530,6 @@ namespace Common.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Accepted");
 
                     b.HasIndex("CreatedAt");
 
@@ -1168,10 +1169,14 @@ namespace Common.Migrations
             modelBuilder.Entity("Common.Context.Entities.Router.NodeConfiguration", b =>
                 {
                     b.HasOne("Common.Context.Entities.Node", "Node")
-                        .WithOne("NodeConfiguration")
+                        .WithOne()
                         .HasForeignKey("Common.Context.Entities.Router.NodeConfiguration", "NodeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Common.Context.Entities.Node", null)
+                        .WithOne("NodeConfiguration")
+                        .HasForeignKey("Common.Context.Entities.Router.NodeConfiguration", "NodeId1");
 
                     b.HasOne("Common.Context.Entities.Router.User", "User")
                         .WithMany("NodeConfigurations")

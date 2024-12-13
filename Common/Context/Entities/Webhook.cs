@@ -26,4 +26,8 @@ public class Webhook : IEntity
     public virtual MqttServer? MqttServer { get; set; }
     
     public string? Channel { get; set; }
+ 
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public int? DistanceAroundPositionKm { get; set; }
 }

@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.ComponentModel.DataAnnotations;
-using System.Reactive.Concurrency;
 using System.Text;
 using System.Text.Json;
 using Common.Context;
@@ -16,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
+using MQTTnet.Client;
 using MQTTnet.Protocol;
 using User = Meshtastic.Protobufs.User;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
@@ -46,7 +46,8 @@ public class MqttClientService : BackgroundService
             .Select(a => new MqttClientAndConfiguration
             {
                 MqttServer = a,
-                Client = new MqttClientFactory().CreateMqttClient()
+                // Client = new MqttClientFactory().CreateMqttClient()
+                Client = new MqttFactory().CreateMqttClient()
             })
         );
         
@@ -71,8 +72,9 @@ public class MqttClientService : BackgroundService
             
             mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
             {
+                var guid = Guid.NewGuid();
                 var topic = e.ApplicationMessage.Topic;
-                _logger.LogTrace("Received from {name} on {topic}", mqttClientAndConfiguration.MqttServer.Name, topic);
+                _logger.LogInformation("Received from {name} on {topic} with id {guid}", mqttClientAndConfiguration.MqttServer.Name, topic, guid);
 
                 if (topic.Contains("json"))
                 {
@@ -89,16 +91,24 @@ public class MqttClientService : BackgroundService
                     return;
                 }
 
-                if (topic.Contains("RxCanaux")) // Gaulix répéteur
+                if (topic.Contains("json"))
+                {
+                    return;
+                }
+
+                if (topic.Contains("RxCanaux")) // Gaulix filtre de Nivek
                 {
                     return;
                 }
 
                 mqttClientAndConfiguration.NbPacket++;
-                mqttClientAndConfiguration.LastPacketDate = DateTime.UtcNow;
+                mqttClientAndConfiguration.LastPacketReceivedDate = DateTime.UtcNow;
 
                 var mqttService = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<MqttService>();
-                await mqttService.DoReceive(topic, e.ApplicationMessage.Payload, mqttClientAndConfiguration.MqttServer);
+                // var packet = await mqttService.DoReceive(topic, e.ApplicationMessage.Payload, mqttClientAndConfiguration.MqttServer);
+                var packet = await mqttService.DoReceive(topic, new ReadOnlySequence<byte>(e.ApplicationMessage.Payload), mqttClientAndConfiguration.MqttServer);
+
+                _logger.LogInformation("Received frame#{packetId} from {name} on {topic} with id {guid} done. Frame time {frameTime}", packet?.packet.Id, mqttClientAndConfiguration.MqttServer.Name, topic, guid, DateTimeOffset.FromUnixTimeSeconds(packet?.meshPacket.RxTime ?? 0));
             };
 
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
@@ -230,6 +240,7 @@ public class MqttClientService : BackgroundService
             var mqttClientOptionsBuilder = new MqttClientOptionsBuilder()
                     .WithTcpServer(mqttClientAndConfiguration.MqttServer.Host, mqttClientAndConfiguration.MqttServer.Port)
                     .WithClientId($"MeshtasticMqttExplorer_ValentinF4HVV_{_environment.EnvironmentName}")
+                    .WithCleanSession()
                 ;
             
             if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.MqttServer.Username))
@@ -267,7 +278,7 @@ public class MqttClientService : BackgroundService
         public required IMqttClient Client { get; init; }
         public required MqttServer MqttServer { get; init; }
         public int NbPacket { get; set; }
-        public DateTime? LastPacketDate { get; set; }
+        public DateTime? LastPacketReceivedDate { get; set; }
     }
 }
 

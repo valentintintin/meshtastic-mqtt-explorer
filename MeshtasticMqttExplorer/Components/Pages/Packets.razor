@@ -12,7 +12,7 @@
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject NavigationManager NavigationManager
 
-<PageTitle>Liste des trames envoyés</PageTitle>
+<PageTitle>Liste des trames envoyées</PageTitle>
 
 @if (Id.HasValue)
 {
@@ -208,9 +208,12 @@ else
                 .Include(a => a.To)
                 .Include(a => a.AllDuplicatedPackets)
                 .ThenInclude(a => a.Gateway)
+                .Where(a => a.PacketDuplicated == null)
                 .AsNoTrackingWithIdentityResolution();
 
-        IQueryable<Packet> totalQueryable = Context.Packets;
+        var totalQueryable = Context.Packets
+            .AsNoTrackingWithIdentityResolution()
+            .Where(a => a.PacketDuplicated == null);
 
         if (Id.HasValue)
         {
@@ -246,9 +249,7 @@ else
             totalQueryable = totalQueryable.Where(a => a.PortNum != PortNum.MapReportApp);
         }
         
-        Total = totalQueryable
-            .AsNoTrackingWithIdentityResolution()
-            .Count();
+        Total = totalQueryable.Count();
     }
 
     private void SetShowType(ShowType showType)

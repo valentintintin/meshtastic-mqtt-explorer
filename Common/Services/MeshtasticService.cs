@@ -56,12 +56,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             NodeId = nodeGatewayId,
             IsMqttGateway = true
         };
+        nodeGateway.LastSeen = DateTime.UtcNow;
         if (nodeGateway.Id == 0)
         {
-            nodeGateway.LastSeen = DateTime.UtcNow;
             Context.Add(nodeGateway);
             Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
-            await Context.SaveChangesAsync();
         }
         else
         {
@@ -71,12 +70,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 return null;
             }
             
-            nodeGateway.LastSeen = DateTime.UtcNow;
             nodeGateway.IsMqttGateway = true;
             Context.Update(nodeGateway);
-            await Context.SaveChangesAsync();
         }
-        
+        await Context.SaveChangesAsync();
+
         if (NodesIgnored.Contains(meshPacket.From))
         {
             Logger.LogInformation("Node (from) ignored : {node}", meshPacket.From.ToHexString());
@@ -89,11 +87,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             ModemPreset = nodeGateway.ModemPreset,
             RegionCode = nodeGateway.RegionCode
         };
+        nodeFrom.LastSeen = DateTime.UtcNow;
         if (nodeFrom.Id == 0)
         {
             Logger.LogInformation("New node (from) created {node}", nodeFrom);
             Context.Add(nodeFrom);
-            await Context.SaveChangesAsync();
         }
         else
         {
@@ -106,13 +104,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Update(nodeFrom);
             await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, RegionCodeAndModemPresetSource.Gateway);
         }
-        nodeFrom.LastSeen = DateTime.UtcNow;
-        nodeFrom.HopStart = Math.Max((int) meshPacket.HopStart, 
-            await Context.Packets
-            .Where(p => p.From == nodeFrom && p.PortNum != PortNum.MapReportApp)
-            .OrderByDescending(p => p.UpdatedAt)
-            .Take(10)
-            .MaxAsync(p => p.HopStart) ?? 0);
+        if (meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.TelemetryApp or PortNum.PositionApp)
+        {
+            nodeFrom.HopStart = (int?)meshPacket.HopStart;
+        }
         await Context.SaveChangesAsync();
 
         var nodeTo = nodes.FindByNodeId(meshPacket.To) ?? new Node
@@ -179,7 +174,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PacketDuplicated = await Context.Packets
                 .OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo/* && (DateTime.UtcNow - a.CreatedAt).TotalDays < 1*/)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo)
         };
 
         Context.Add(packet);
@@ -446,7 +441,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
         
-        Logger.LogInformation("Send message {message} from {nodeFrom} to {nodeTo}", textMessagePayload, nodeFrom, nodeTo);
+        Logger.LogInformation("New message {message} from {nodeFrom} to {nodeTo}", textMessagePayload, nodeFrom, nodeTo);
 
         var textMessage = new TextMessage
         {
@@ -758,7 +753,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             Logger.LogInformation("Update neighbor #{id} for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", neighborInfo.Id, nodeFrom, neighborNode, snr, source, packet.Id, distance);
             neighborInfo.Packet = packet;
-            neighborInfo.Snr = snr;
+            if (snr != -999)
+            {
+                neighborInfo.Snr = snr;
+            }
             neighborInfo.NodePosition = nodeFromPosition;
             neighborInfo.NeighborPosition = neighborPosition;
             neighborInfo.Distance = distance;

@@ -3,6 +3,7 @@ using System;
 using Common.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Common.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20241213134723_RouterNodeConfigurationNodeId")]
+    partial class RouterNodeConfigurationNodeId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -257,11 +260,7 @@ namespace Common.Migrations
                     b.HasIndex("LastSeen")
                         .IsDescending();
 
-                    b.HasIndex("Latitude");
-
                     b.HasIndex("LongName");
-
-                    b.HasIndex("Longitude");
 
                     b.HasIndex("ModemPreset");
 
@@ -484,8 +483,6 @@ namespace Common.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("Department");
-
                     b.HasIndex("MqttId");
 
                     b.HasIndex("NodeId")
@@ -527,8 +524,6 @@ namespace Common.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Accepted");
 
                     b.HasIndex("CreatedAt");
 

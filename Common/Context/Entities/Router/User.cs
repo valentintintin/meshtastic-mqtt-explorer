@@ -8,6 +8,7 @@ public class User : IdentityUser<long>, IEntity
     public DateTime UpdatedAt { get; set; }
     
     public DateTime? ConnectedAt { get; set; }
+    public DateTime? LastSeenAt { get; set; }
     
     public string? Ip { get; set; }
 

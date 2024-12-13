@@ -15,8 +15,11 @@ public class NodeConfigurationConfiguration : IEntityTypeConfiguration<Entities.
         builder.Property(a => a.MqttId).HasMaxLength(512);
         builder.HasIndex(a => a.MqttId);
 
+        builder.HasIndex(a => a.Department);
+        builder.Property(a => a.Department).HasMaxLength(2);
+
         builder.HasOne(a => a.Node)
-            .WithOne()
+            .WithOne(a => a.NodeConfiguration)
             .HasForeignKey<Entities.Router.NodeConfiguration>(a => a.NodeId);
         
         builder.HasOne(a => a.User)

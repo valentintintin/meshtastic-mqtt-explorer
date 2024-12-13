@@ -16,14 +16,5 @@ public class NodeConfiguration : IEntity
     public long? UserId { get; set; }
     public virtual User? User { get; set; }
     
-    public int Department { get; set; }
-
-    public virtual ICollection<PacketActivity> PacketActivities { get; set; } = [];
-}
-
-public enum LastPositionSource
-{
-    Unknown,
-    Department,
-    Position
+    public string? Department { get; set; }
 }

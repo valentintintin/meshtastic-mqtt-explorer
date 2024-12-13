@@ -28,17 +28,23 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
             .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
             .AsEnumerable()
+            .Where(n => !n.DistanceAroundPositionKm.HasValue
+                        || (
+                            n is { Latitude: not null, Longitude: not null } 
+                            && packet.GatewayPosition != null && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value, packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <= n.DistanceAroundPositionKm)
+                        )
             .DistinctBy(n => n.Url)
             .ToList();
 
         var isText = packet.PortNum is PortNum.TextMessageApp;
+        var nbSauts = packet.HopStart - packet.HopLimit;
         
         var message = $"""
                        [{packet.Channel.Name}] {packet.From.AllNames}
                        
-                       {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? $"Pour : {packet.To.AllNames}" : "En broadcast")}
+                       Pour : {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? packet.To.AllNames : "tout le monde")}
 
-                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames} ({packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}, RSSI {packet.RxRssi}, {packet.HopStart - packet.HopLimit} sauts, {(packet is { HopStart: not null, HopLimit: not null } && packet.HopLimit == packet.HopStart ? " reçu en direct": "")})" : "Via lui-même")}
+                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames}\n{packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}, RSSI {packet.RxRssi}, {(nbSauts == 0 ? " reçu en direct" : $" {nbSauts} sauts")}" : "Via lui-même")}, {packet.HopLimit} sauts restants
 
                        > {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}
                        """;

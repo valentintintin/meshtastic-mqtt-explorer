@@ -13,6 +13,8 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         builder.HasIndex(a => a.UpdatedAt);
         
         builder.HasIndex(a => a.NodeId);
+        builder.HasIndex(a => a.Latitude);
+        builder.HasIndex(a => a.Longitude);
         
         builder.Property(a => a.NodeIdString).HasMaxLength(16);
         builder.HasIndex(a => a.NodeIdString);

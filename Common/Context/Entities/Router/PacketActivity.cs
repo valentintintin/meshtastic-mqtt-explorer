@@ -6,9 +6,6 @@ public class PacketActivity : IEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     
-    public long NodeConfigurationId { get; set; }
-    public virtual NodeConfiguration NodeConfiguration { get; set; } = null!;
-    
     public long PacketId { get; set; }
     public virtual Packet Packet { get; set; } = null!;
     

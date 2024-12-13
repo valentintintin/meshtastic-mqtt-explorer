@@ -1,4 +1,5 @@
 using Common.Context.Entities.Router;
+using Common.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -13,8 +14,9 @@ public class PacketActivityConfiguration : IEntityTypeConfiguration<PacketActivi
         builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => a.UpdatedAt);
 
-        builder.HasOne(a => a.NodeConfiguration)
-            .WithMany(a => a.PacketActivities)
-            .HasForeignKey(a => a.NodeConfigurationId);
+        builder.HasIndex(a => a.Accepted);
+        
+        builder.Property(a => a.ReceiverIds).ListOfString();
+        builder.Property(a => a.Comment).HasMaxLength(256);
     }
 }

@@ -20,12 +20,12 @@
       </PackageReference>
       <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-      <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.43.0" />
+      <PackageReference Include="NetDaemon.Extensions.Scheduling" Version="24.50.0" />
       <PackageReference Include="NLog" Version="5.3.4" />
-      <PackageReference Include="NLog.Extensions.Logging" Version="5.3.14" />
+      <PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.14" />
-      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.1-dev-00124" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>
