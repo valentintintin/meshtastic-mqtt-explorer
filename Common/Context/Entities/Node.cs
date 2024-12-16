@@ -44,6 +44,7 @@ public class Node : IEntity
     public int? HopStart { get; set; }
 
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
+    public virtual ICollection<Packet> PacketsGateway { get; set; } = [];
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];
     public virtual ICollection<Position> Positions { get; set; } = [];
     public virtual ICollection<Waypoint> Waypoints { get; set; } = [];

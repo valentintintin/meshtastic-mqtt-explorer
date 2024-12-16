@@ -12,7 +12,5 @@ public class User : IdentityUser<long>, IEntity
     
     public string? Ip { get; set; }
 
-    public bool Forbidden { get; set; }
-
     public virtual ICollection<NodeConfiguration>? NodeConfigurations { get; set; } = [];
 }

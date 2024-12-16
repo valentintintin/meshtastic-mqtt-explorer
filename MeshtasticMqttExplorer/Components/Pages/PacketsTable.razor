@@ -3,12 +3,12 @@
 @implements IAsyncDisposable
 @using Common.Context
 @using Common.Context.Entities
+@using Common.Extensions
 @using Meshtastic.Protobufs
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
 @using Node = Common.Context.Entities.Node
 
-@inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject NavigationManager NavigationManager
 
@@ -138,12 +138,20 @@ else
         <PropertyColumn Property="c => c.MqttServerId" Title="MQTT" Filters="Utils.MqttServerFilters">
             <div style="width: 100px">
                 @context.MqttServer?.Name<br />@context.MqttTopic?.Split("/").LastOrDefault()
+                
+                @if (context.PacketActivity != null)
+                {
+                    <br />
+                    <Tooltip Title="@($"{context.PacketActivity.Comment} ({context.PacketActivity.ReceiverIds.JoinString()})")">
+                        @(context.PacketActivity.Accepted ? "Autorisée" : "Refusée")
+                    </Tooltip>
+                }
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
                         Class="@(context is { Encrypted: true, PortNum: null } ? "red" : "")">
             <div style="width: 80px">
-                @(context.PortNum?.ToString()?.Replace("App", string.Empty) ?? "Chiffrée")
+                @(context.PortNum?.ToString().Replace("App", string.Empty) ?? "Chiffrée")
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.PayloadJson" Title="Contenu">
@@ -201,6 +209,7 @@ else
     private void FetchData()
     {
         PacketsQueryable = Context.Packets
+                .Include(a => a.PacketActivity)
                 .Include(a => a.MqttServer)
                 .Include(a => a.Channel)
                 .Include(a => a.Gateway)

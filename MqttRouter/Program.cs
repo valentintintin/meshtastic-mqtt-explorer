@@ -35,7 +35,7 @@ try
 
     builder.WebHost.UseKestrel(o =>
     {
-        o.ListenAnyIP(1884, l => l.UseMqtt());
+        o.ListenAnyIP(1883, l => l.UseMqtt());
     });
     
     builder.Services.AddControllers().AddJsonOptions(options =>
@@ -49,6 +49,12 @@ try
     
     builder.Services.AddIdentity<User, IdentityRole<long>>(options =>
         {
+            options.Lockout.AllowedForNewUsers = false;
+            
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequireNonAlphanumeric = false;
             options.Password.RequiredLength = 1;
             options.Password.RequiredUniqueChars = 1;
 
@@ -103,16 +109,23 @@ try
             
             var mqttController = new MqttServerController(serviceProvider);
 
-            server.ValidatingConnectionAsync += mqttController.OnValidateConnection;
-            server.InterceptingPublishAsync += mqttController.OnInterceptingInbound;
-            server.InterceptingClientEnqueueAsync += mqttController.OnInterceptingPublish;
-            server.ClientDisconnectedAsync += mqttController.OnDisconnected;
+            server.ValidatingConnectionAsync += mqttController.OnConnection;
+            server.InterceptingPublishAsync += mqttController.OnNewPacket;
+            server.InterceptingClientEnqueueAsync += mqttController.BeforeSend;
+            server.ClientDisconnectedAsync += mqttController.OnDisconnection;
         });
 
     var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()
         .CreateDbContextAsync();
     await context.Database.MigrateAsync();
-
+    
+    foreach (var nodeConfiguration in context.NodeConfigurations.Where(a => a.MqttId != null))
+    {
+        nodeConfiguration.MqttId = null;
+        context.Update(nodeConfiguration);
+    }
+    await context.SaveChangesAsync();
+    
     Console.WriteLine("Started");
 
     await app.RunAsync();

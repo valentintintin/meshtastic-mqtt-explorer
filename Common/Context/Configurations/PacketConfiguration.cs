@@ -25,7 +25,7 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
         builder.Property(a => a.Priority).EnumToString();
 
         builder.HasOne(a => a.Gateway)
-            .WithMany()
+            .WithMany(a => a.PacketsGateway)
             .HasForeignKey(a => a.GatewayId);
 
         builder.HasOne(a => a.GatewayPosition)

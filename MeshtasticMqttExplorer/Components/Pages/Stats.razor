@@ -15,6 +15,13 @@
 
 <PageHeader Title="Statistiques">
     <SubtitleTemplate>Depuis le @MinDate.ToFrench()</SubtitleTemplate>
+    <PageHeaderContent>
+        <Switch @bind-Checked="ShowOnlyRouterAccepted" Disabled="@Loading" UnCheckedChildren="Compter toutes les trames" CheckedChildren="Compter les trames autorisées uniquement" OnChange="value => SetShowOnlyRouterAccepted(value)"/>
+        @if (ShowOnlyRouterAccepted)
+        {
+            @* <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> *@
+        }
+    </PageHeaderContent>
 </PageHeader>
 
 <Spin Spinning="Loading">
@@ -170,8 +177,8 @@
     <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
         <ChildContent>
             <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
-                <PropertyColumn Property="c => c.MqttServer!.Id" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
-                    @context.MqttServer!.Name
+                <PropertyColumn Property="c => c.MqttServerId" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
+                    @context.MqttServerName
                 </PropertyColumn>
 
                 <PropertyColumn Property="c => c.RegionCode" Title="Bande" Filters="Utils.RegionCodeFilters">
@@ -198,6 +205,8 @@
 {
     private DateTime MinDate { get; set; } = DateTime.UtcNow;
     private bool Loading { get; set; } = true;
+    private bool ShowOnlyRouterAccepted { get; set; }
+    private bool IncludeOnlyBroadcast { get; set; } = true;
     private DataContext Context { get; set; } = null!;
     private int NbNodes { get; set; }
     private int NbNodesLastHour { get; set; }
@@ -250,6 +259,15 @@
         Context = await ContextFactory.CreateDbContextAsync();
         
         MinDate = DateTime.Today.ToUniversalTime().AddDays(-7);
+
+        await FetchData();
+        
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
 
         var today = DateTime.UtcNow.Date;
         var yesterday = today.AddDays(-1);
@@ -355,6 +373,7 @@
         NbPacketsSent = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted)) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
             .AsNoTrackingWithIdentityResolution()
             .CountAsync();
 
@@ -363,6 +382,7 @@
         DataPaquetsTypes = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(a => a.PortNum != PortNum.MapReportApp && a.PacketDuplicatedId == null)
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted))
             .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
             {
                 type = portNum.ToString()!,
@@ -377,16 +397,19 @@
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
             .Where(a => a.MqttServer != null)
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted))
             .GroupBy(a => new
             {
-                MqttServer = a.MqttServer,
+                MqttServerId = a.MqttServer!.Id,
+                MqttServerName = a.MqttServer.Name,
                 a.From.RegionCode,
                 NodeId = a.From.Id,
                 NodeName = a.From.AllNames,
                 a.PortNum
             }, (grouped, packets) => new PacketNodeType
             {
-                MqttServer = grouped.MqttServer,
+                MqttServerId = grouped.MqttServerId,
+                MqttServerName = grouped.MqttServerName,
                 RegionCode = grouped.RegionCode,
                 NodeId = grouped.NodeId,
                 NodeName = grouped.NodeName!,
@@ -399,8 +422,16 @@
             .ToListAsync();
         
         Loading = false;
-        
-        await base.OnInitializedAsync();
+    }
+    
+    private async Task SetShowOnlyRouterAccepted(bool showOnlyRouterAccepted)
+    {
+        await FetchData();
+    }
+    
+    private async Task SetIncludeOnlyBroadcast(bool showOnlyRouterAccepted)
+    {
+        await FetchData();
     }
 
     public async ValueTask DisposeAsync()
@@ -410,7 +441,8 @@
     
     public class PacketNodeType
     {
-        public required MqttServer? MqttServer { get; set; }
+        public required long? MqttServerId { get; set; }
+        public required string? MqttServerName { get; set; }
         public required Config.Types.LoRaConfig.Types.RegionCode? RegionCode { get; set; }
         public required long NodeId { get; set; }
         public required string NodeName { get; set; }

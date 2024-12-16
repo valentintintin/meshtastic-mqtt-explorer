@@ -1,28 +1,22 @@
 using Common.Context;
 using Common.Context.Entities;
 using Common.Context.Entities.Router;
+using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
-using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using static Meshtastic.Protobufs.PortNum;
 
 namespace MqttRouter.Services;
 
 public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
 {
-    public async Task<PacketActivity> Route(string clientId, long? userId, uint? mqttUserNodeId, Packet packet)
+    public async Task<PacketActivity> Route(string clientId, long? userId, Packet packet)
     {
-        if (mqttUserNodeId.HasValue && packet.From == packet.Gateway && packet.From.NodeId == mqttUserNodeId)
-        {
-            await UpdateNodeConfiguration(packet.From, clientId, userId);
-        }
-        else
-        {
-            await UpdateNodeConfiguration(packet.From);
-            await UpdateNodeConfiguration(packet.Gateway);
-        }
-
+        await UpdateNodeConfiguration(packet.From);
+        await UpdateNodeConfiguration(packet.Gateway);
+     
         List<string> receivers = [];
 
         var packetActivity = new PacketActivity
@@ -31,7 +25,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             ReceiverIds = receivers 
         };
 
-        if (packet.To.NodeId != MeshtasticService.NodeBroadcast)
+        if (!MeshtasticService.NodesIgnored.Contains(packet.To.NodeId)) // Message direct
         {
             await UpdateNodeConfiguration(packet.To);
             await DoWhenPacketIsNotBroadcast(clientId, userId, packet, receivers, packetActivity);
@@ -40,15 +34,15 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         {
             switch (packet.PortNum)
             {
-                case PortNum.TextMessageApp:
+                case TextMessageApp:
                     DoWhenTextMessage(clientId, userId, packet, packetActivity);
                     break;
-                case PortNum.NodeinfoApp:
+                case NodeinfoApp:
                     await UpdateNodeConfiguration(packet.From);
                     await DoWhenNodeInfo(clientId, userId, packet, packetActivity);
                     break;
-                case PortNum.TelemetryApp:
-                case PortNum.PositionApp:
+                case TelemetryApp:
+                case PositionApp:
                     await DoWhenPositionOrTelemetry(clientId, userId, packet, packetActivity);
                     break;
                 default:
@@ -91,48 +85,11 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there are some packets of this type during the 15 minutes",
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
             
-            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée frequemment : {hasPacketTypeBeforeDate}";
+            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée frequemment : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
         else
         {
-            List<NodeConfiguration> localNodes = [];
-            double minLatitude;
-            double maxLatitude;
-            double minLongitude;
-            double maxLongitude;
-                            
-            if (packet.Position != null)
-            {
-                var rayonKm = 100;
-                var rayonLatitude = rayonKm / 111.0;
-                var rayonLongitude = rayonKm / 78.477;
-                minLatitude = packet.Position.Latitude - rayonLatitude;
-                maxLatitude = packet.Position.Latitude + rayonLatitude;
-                minLongitude = packet.Position.Longitude - rayonLongitude;
-                maxLongitude = packet.Position.Longitude + rayonLongitude;
-                
-                logger.LogDebug("Packet #{id} does have a position so we use it around {km} Km between latitude [{minLat}; {maxLat}] and longitude [{minLong}; {maxLong}]", packet.Id, rayonKm, minLatitude, maxLatitude, minLongitude, maxLongitude);
-
-                localNodes = await Context.NodeConfigurations.Where(a =>
-                    packet.Position != null && a.Node.Latitude != null && a.Node.Longitude != null 
-                    && a.Node.Latitude >= minLatitude && a.Node.Latitude <= maxLatitude 
-                    && a.Node.Longitude != null && a.Node.Longitude >= minLongitude && a.Node.Longitude <= maxLongitude
-                    && !string.IsNullOrWhiteSpace(a.MqttId)
-                ).ToListAsync();
-            }
-            else if (packet.From.NodeConfiguration?.Department != null)
-            {
-                logger.LogDebug("Packet #{id} does not have any position so we use the department {department}", packet.Id, packet.From.NodeConfiguration.Department);
-                                
-                localNodes = await Context.NodeConfigurations.Where(a =>
-                    packet.From.NodeConfiguration != null && packet.From.NodeConfiguration.Department == a.Department
-                    && !string.IsNullOrWhiteSpace(a.MqttId)
-                ).ToListAsync();
-            }
-            else
-            {
-                logger.LogDebug("Packet #{id} does not have department so we refused it", packet.Id);
-            }
+            var localNodes = await GetNodesAround(packet.Position, packet.From);
 
             logger.LogInformation(
                 "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted but there are some packets of this type during the last hour so only for {nb} local",
@@ -141,27 +98,71 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             if (localNodes.Count > 0)
             {
                 packetActivity.Accepted = true;
-                packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).ToList());
+                packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).Distinct().ToList());
                 packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de 15 minutes donc seulement pour les {localNodes.Count} locaux";
             }
             else
             {
-                packetActivity.Accepted = true;
-                packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de 15 minutes. Aucun noeud local trouvé";
+                packetActivity.Accepted = false;
+                packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car la dernière date de plus de 15 minuteset aucun noeud local trouvé";
             }
         }
     }
 
+    private async Task<List<NodeConfiguration>> GetNodesAround(Position? position, Node node)
+    {
+        List<NodeConfiguration> localNodes = [];
+        double minLatitude;
+        double maxLatitude;
+        double minLongitude;
+        double maxLongitude;
+                            
+        if (position != null)
+        {
+            var rayonKm = 100;
+            var rayonLatitude = rayonKm / 111.0;
+            var rayonLongitude = rayonKm / 78.477;
+            minLatitude = position.Latitude - rayonLatitude;
+            maxLatitude = position.Latitude + rayonLatitude;
+            minLongitude = position.Longitude - rayonLongitude;
+            maxLongitude = position.Longitude + rayonLongitude;
+                
+            logger.LogDebug("Position #{positionId} so we use it around {km} Km between latitude [{minLat}; {maxLat}] and longitude [{minLong}; {maxLong}]", position.Id, rayonKm, minLatitude, maxLatitude, minLongitude, maxLongitude);
+
+            localNodes = await Context.NodeConfigurations.Where(a =>
+                a.Node.Latitude != null && a.Node.Longitude != null 
+                && a.Node.Latitude >= minLatitude && a.Node.Latitude <= maxLatitude 
+                && a.Node.Longitude != null && a.Node.Longitude >= minLongitude && a.Node.Longitude <= maxLongitude
+                && !string.IsNullOrWhiteSpace(a.MqttId)
+            ).ToListAsync();
+        }
+        else if (node.NodeConfiguration?.Department != null)
+        {
+            logger.LogDebug("No position so we use the department {department}", node.NodeConfiguration.Department);
+                                
+            localNodes = await Context.NodeConfigurations.Where(a =>
+                node.NodeConfiguration != null && node.NodeConfiguration.Department == a.Department
+                                                      && !string.IsNullOrWhiteSpace(a.MqttId)
+            ).ToListAsync();
+        }
+        else
+        {
+            logger.LogDebug("Node #{id} does not have department", node.Id);
+        }
+
+        return localNodes;
+    }
+
     private async Task DoWhenNodeInfo(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
-        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-1));
+        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-4));
 
         if (hasPacketTypeBeforeDate != null)
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last hour",
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last 4shour",
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);   
-            packetActivity.Comment = $"Trame interdite car il y en a déjà eu dans la dernière heure : {hasPacketTypeBeforeDate}";
+            packetActivity.Comment = $"Trame interdite car il y en a déjà eu dans les dernières 4 heures : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
         else
         {
@@ -193,28 +194,45 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         if (nodeToConfiguration != null)
         {
             receivers.Add(nodeToConfiguration.MqttId!);
+            packetActivity.Accepted = true;
+            packetActivity.Comment = $"En direction d'un noeud précis : {packet.To}";
         }
+        else
+        {
+            if (packet.PortNum is TextMessageApp or AdminApp)
+            {
+                var localNodes = await GetNodesAround(packet.Position, packet.To);
+
+                logger.LogTrace("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId}). {nb} local nodes found", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId, localNodes.Count);
             
-        packetActivity.Accepted = true;
-        packetActivity.Comment = "En direction d'un noeud précis";
+                if (localNodes.Count > 0)
+                {
+                    packetActivity.Accepted = true;
+                    packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).Distinct().ToList());
+                    packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais pas connecté donc à son entourage : {localNodes.Count} locaux";
+                }
+                
+                packetActivity.Accepted = true;
+                packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais envoyé à tout le monde car pas connecté ni entourage";
+            }
+            else
+            {
+                packetActivity.Accepted = false;
+                packetActivity.Comment = $"Trame interdite même en direction d'un noeud précis : {packet.To}";
+            }
+        }
     }
 
-    private async Task<NodeConfiguration> UpdateNodeConfiguration(Node node, string? clientId = null, long? userId = null)
+    private async Task<NodeConfiguration> UpdateNodeConfiguration(Node node)
     {
         var nodeConfiguration = await Context.NodeConfigurations.FirstOrDefaultAsync(n => n.Node == node) ?? new NodeConfiguration
         {
-            Node = node,
-            User = userId.HasValue ? await Context.Users.FindByIdAsync(userId) : null
+            Node = node
         };
 
         if (node.LongName?.Length >= 2)
         {
             nodeConfiguration.Department = node.LongName[..2];
-        }
-
-        if (clientId != null)
-        {
-            nodeConfiguration.MqttId = clientId;
         }
 
         if (nodeConfiguration.Id == 0)

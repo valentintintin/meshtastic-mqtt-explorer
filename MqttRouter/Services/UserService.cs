@@ -52,7 +52,7 @@ public class UserService(
             return null;
         }
         
-        if (await IsAuthorized(user.Id))
+        if (!await IsAuthorized(user.Id))
         {
             Logger.LogWarning("Login of {username}#{userId} KO. Locked out", username, user.Id);
             return null;
@@ -62,7 +62,7 @@ public class UserService(
 
         if (!signInResult.Succeeded)
         {
-            Logger.LogWarning("Login of {username}#{userId} KO. Wrong password", username, user.Id);
+            Logger.LogWarning("Login of {username}#{userId} KO. Wrong password : {password}", username, user.Id, password);
             return null;
         }
         

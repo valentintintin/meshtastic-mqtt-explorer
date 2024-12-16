@@ -1,20 +1,16 @@
 using Common.Context;
-using Common.Context.Entities;
 using Common.Context.Entities.Router;
 using Common.Extensions;
 using Common.Extensions.Entities;
-using Common.Models;
 using Common.Services;
-using Meshtastic.Protobufs;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MQTTnet.Packets;
 using MQTTnet.Server;
 using MqttRouter.Services;
 using MqttServer = Common.Context.Entities.MqttServer;
+using User = Common.Context.Entities.Router.User;
 
 namespace MqttRouter.Controllers;
 
@@ -22,19 +18,20 @@ public class MqttServerController(IServiceProvider serviceProvider)
 {
     private readonly ILogger<MqttServerController> _logger = serviceProvider.GetRequiredService<ILogger<MqttServerController>>();
     private readonly Dictionary<string, List<string>> _clientIdReceivers = new();
+    private readonly Dictionary<string, long> _userIds = new();
+    private readonly Dictionary<string, long> _nodeConfigurationIds = new();
     private MqttServer? _mqttServer;
 
-    public async Task OnValidateConnection(ValidatingConnectionEventArgs eventArgs)
+    public async Task OnConnection(ValidatingConnectionEventArgs eventArgs)
     {
         var services = serviceProvider.CreateScope().ServiceProvider;
-        
+
         _logger.LogInformation("Client {username} try to join with id {clientId}", eventArgs.UserName, eventArgs.ClientId);
 
         if (string.IsNullOrWhiteSpace(eventArgs.UserName))
         {
-            // TODO not authorized
             _logger.LogWarning("Client {username} identified with id {clientId} as guest", eventArgs.UserName, eventArgs.ClientId);
-            return;
+            throw new UnauthorizedAccessException();
         }
 
         var user = await services.GetRequiredService<UserService>().Login(eventArgs.UserName, eventArgs.Password, eventArgs.Endpoint);
@@ -44,24 +41,25 @@ public class MqttServerController(IServiceProvider serviceProvider)
             _logger.LogWarning("Client {username} not identified", eventArgs.UserName);
             throw new UnauthorizedAccessException();
         }
-
-        eventArgs.SessionItems.Add("userId", user.Id);
+        
+        _userIds.Add(eventArgs.ClientId, user.Id);
         
         _logger.LogInformation("Client {username}#{userId} identified with id {clientId}", eventArgs.UserName, user.Id, eventArgs.ClientId);
     }
 
-    public async Task OnInterceptingInbound(InterceptingPublishEventArgs eventArgs)
+    public async Task OnNewPacket(InterceptingPublishEventArgs eventArgs)
     {
         var services = serviceProvider.CreateScope().ServiceProvider;
         var context = services.GetRequiredService<DataContext>();
+        var routingService = services.GetRequiredService<RoutingService>();
+        var mqttService = services.GetRequiredService<MqttService>();
 
-        if (_mqttServer == null)
-        {
-            _mqttServer = await context.MqttServers.FirstAsync(a => a.Name == serviceProvider.GetRequiredService<IConfiguration>().GetValue<string>("MqttServerName"));
-        }
-        
         var guid = Guid.NewGuid();
-        
+
+        routingService.SetDbContext(context);
+        mqttService.SetDbContext(context);
+        _mqttServer ??= await context.MqttServers.FirstAsync(a => a.Name == serviceProvider.GetRequiredService<IConfiguration>().GetValue<string>("MqttServerName"));
+
         _logger.LogInformation("Client {clientId} send packet {guid} on {topic}", eventArgs.ClientId, guid, eventArgs.ApplicationMessage.Topic);
         
         if (_clientIdReceivers.ContainsKey(eventArgs.ClientId))
@@ -69,13 +67,12 @@ public class MqttServerController(IServiceProvider serviceProvider)
             _clientIdReceivers.Remove(eventArgs.ClientId);
         }
 
-        eventArgs.ApplicationMessage.UserProperties ??= [];
-        
-        var userId = GetUserId(eventArgs.ApplicationMessage.UserProperties);
+        var userId = GetUserId(eventArgs.ClientId);
+        User? user = null;
 
         if (userId.HasValue)
         {
-            var user = await context.Users.FindByIdAsync(userId);
+            user = await context.Users.FindByIdAsync(userId);
             if (user == null)
             {
                 eventArgs.ProcessPublish = false;
@@ -91,7 +88,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
                 eventArgs.CloseConnection = true;
                 
                 _logger.LogError("Client {clientId} and user#{userId} locked. Refused packet", eventArgs.ClientId, userId);
-                return;   
+                return;
             }
             
             user.LastSeenAt = DateTime.UtcNow;
@@ -99,6 +96,50 @@ public class MqttServerController(IServiceProvider serviceProvider)
             await context.SaveChangesAsync();
         }
         
+        var connectedNodeId = GetConnectedNodeId(eventArgs.ApplicationMessage.Topic);
+        var nodeConfiguration = await context.NodeConfigurations.FirstOrDefaultAsync(a => a.Node.NodeId == connectedNodeId);
+
+        if (connectedNodeId.HasValue)
+        {
+            if (nodeConfiguration != null)
+            {
+                if (nodeConfiguration.Forbidden)
+                {
+                    eventArgs.ProcessPublish = false;
+                    eventArgs.CloseConnection = true;
+
+                    _logger.LogError("Client {clientId} and user#{userId} for node#{nodeId} locked. Refused packet",
+                        eventArgs.ClientId, userId, nodeConfiguration.Id);
+                    return;
+                }
+
+                nodeConfiguration.MqttId = eventArgs.ClientId;
+                context.Update(nodeConfiguration);
+                await context.SaveChangesAsync();
+            }
+            else
+            {
+                var node = await context.Nodes.FindByNodeIdAsync(connectedNodeId.Value);
+
+                if (node != null)
+                {
+                    nodeConfiguration = new NodeConfiguration
+                    {
+                        Node = node,
+                        User = user,
+                        MqttId = eventArgs.ClientId
+                    };
+                    context.Add(nodeConfiguration);
+                    await context.SaveChangesAsync();
+                }
+            }
+        }
+
+        if (nodeConfiguration != null && !_nodeConfigurationIds.ContainsKey(eventArgs.ClientId))
+        {
+            _nodeConfigurationIds.Add(eventArgs.ClientId, nodeConfiguration.Id);
+        }
+
         _logger.LogInformation("Client {clientId} and user#{userId} send packet {guid} on {topic}", eventArgs.ClientId, userId, guid, eventArgs.ApplicationMessage.Topic);
 
         if (eventArgs.ApplicationMessage.Topic.Contains("stat") || eventArgs.ApplicationMessage.Topic.Contains("json"))
@@ -107,28 +148,19 @@ public class MqttServerController(IServiceProvider serviceProvider)
             eventArgs.ProcessPublish = false;
             return;
         }
-
-        var mqttService = services.GetRequiredService<MqttService>();
-        mqttService.SetDbContext(context);
+        
         var packetAndMeshPacket = await mqttService.DoReceive(eventArgs.ApplicationMessage.Topic, eventArgs.ApplicationMessage.Payload, _mqttServer!);
 
-        if (packetAndMeshPacket?.packet is { PacketDuplicated: null })
+        if (packetAndMeshPacket?.packet != null)
         {
-            var routingService = services.GetRequiredService<RoutingService>();
-            routingService.SetDbContext(context);
-
-            var lastTopic = eventArgs.ApplicationMessage.Topic.Split('/').Last();
-            uint? connectedNodeId = null;
-            try
+            if (packetAndMeshPacket.Value.packet.PacketDuplicated != null)
             {
-                connectedNodeId = lastTopic.ToInteger();
+                eventArgs.ProcessPublish = false;
+                _logger.LogInformation("Client {clientId} and user#{userId} send packet {guid} on {topic} refused because packet#{packetId} duplicated", eventArgs.ClientId, userId, guid, eventArgs.ApplicationMessage.Topic, packetAndMeshPacket.Value.packet.Id);
+                return;
             }
-            catch
-            {
-                // Ignored
-            }
-
-            var packetActivity = await routingService.Route(eventArgs.ClientId, userId, connectedNodeId, packetAndMeshPacket.Value.packet);
+            
+            var packetActivity = await routingService.Route(eventArgs.ClientId, userId, packetAndMeshPacket.Value.packet);
             eventArgs.ProcessPublish = packetActivity.Accepted;
 
             if (packetActivity.Accepted)
@@ -156,7 +188,23 @@ public class MqttServerController(IServiceProvider serviceProvider)
         }
     }
 
-    public Task OnInterceptingPublish(InterceptingClientApplicationMessageEnqueueEventArgs eventArgs)
+    private uint? GetConnectedNodeId(string topic)
+    {
+        var lastTopic = topic.Split('/').Last();
+        uint? connectedNodeId = null;
+        try
+        {
+            connectedNodeId = lastTopic.ToInteger();
+        }
+        catch
+        {
+            // Ignored
+        }
+
+        return connectedNodeId;
+    }
+
+    public Task BeforeSend(InterceptingClientApplicationMessageEnqueueEventArgs eventArgs)
     {
         if (!_clientIdReceivers.TryGetValue(eventArgs.SenderClientId, out var receivers) || receivers.Contains(eventArgs.ReceiverClientId))
         {
@@ -164,20 +212,49 @@ public class MqttServerController(IServiceProvider serviceProvider)
         }
         else
         {
+            eventArgs.AcceptEnqueue = false;
             _logger.LogTrace("Packet from client {senderId} on {topic} not sent to {receiverId} because not in list", eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic, eventArgs.ReceiverClientId);
         }
         
         return Task.CompletedTask;   
     }
     
-    public Task OnDisconnected(ClientDisconnectedEventArgs eventArgs)
+    public async Task OnDisconnection(ClientDisconnectedEventArgs eventArgs)
     {
-        _logger.LogInformation("Client {clientId} for user{userId} disconnected for reason {reason}", eventArgs.ClientId, GetUserId(eventArgs.UserProperties), eventArgs.ReasonString);
-        return Task.CompletedTask;
+        if (_nodeConfigurationIds.ContainsKey(eventArgs.ClientId))
+        {
+            _nodeConfigurationIds.Remove(eventArgs.ClientId);
+        }
+        if (_userIds.ContainsKey(eventArgs.ClientId))
+        {
+            _userIds.Remove(eventArgs.ClientId);
+        }
+        
+        var services = serviceProvider.CreateScope().ServiceProvider;
+        var context = services.GetRequiredService<DataContext>();
+        
+        var nodeConfigurationId = GetNodeConfigurationId(eventArgs.ClientId);
+        if (nodeConfigurationId.HasValue)
+        {
+            var nodeConfiguration = await context.NodeConfigurations.FindByIdAsync(nodeConfigurationId.Value);
+            if (nodeConfiguration != null)
+            {
+                nodeConfiguration.MqttId = null;
+                context.Update(nodeConfiguration);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        _logger.LogInformation("Client {clientId} for user{userId} and node configuration #{nodeConfigurationId} disconnected for reason {reason}", eventArgs.ClientId, GetUserId(eventArgs.ClientId), GetNodeConfigurationId(eventArgs.ClientId), eventArgs.ReasonString);
     }
 
-    private long? GetUserId(List<MqttUserProperty>? userProperties)
+    private long? GetUserId(string clientId)
     {
-        return userProperties?.FirstOrDefault(k => k.Name == "userId")?.Value?.ToLongNullable();
+        return _userIds.TryGetValue(clientId, out var userId) ? userId : null;
+    }
+
+    private long? GetNodeConfigurationId(string clientId)
+    {
+        return _nodeConfigurationIds.TryGetValue(clientId, out var nodeConfigurationId) ? nodeConfigurationId : null;
     }
 }

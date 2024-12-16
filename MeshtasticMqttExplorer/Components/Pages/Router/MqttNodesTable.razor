@@ -1,0 +1,93 @@
+@page "/router/nodes"
+@implements IAsyncDisposable
+@using Common.Context
+@using Common.Context.Entities.Router
+@using Common.Extensions
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using Node = Common.Context.Entities.Node
+
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<PageTitle>Tableau des nœuds MQTT</PageTitle>
+
+<PageHeader Title="Nœuds MQTT">
+    <SubtitleTemplate>
+        @Total nœuds MQTT dont @TotalConnected connectés
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Table TItem="NodeConfiguration" DataSource="NodesQueryable" Responsive Locale="Utils.TableLocale">
+    <ChildContent>
+        <PropertyColumn Property="c => c.Node.AllNames" Title="ID - Nom" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
+            <div style="width: 300px">
+                <a href="/node/@context.Node.Id" target="_blank" rel="nofollow">@context.Node.AllNames</a>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.UpdatedAt" Title="Date de mise à jour" Sortable Filterable>
+            @context.UpdatedAt.ToFrench()
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Department" Title="Département" Sortable Filterable>
+            <div style="width: 100px">
+                @context.Department
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.MqttId" Title="MQTT client ID" Sortable Filterable>
+            @context.MqttId
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.MqttId" Title="Interdit d'emission" Filterable>
+            <div style="width: 100px">
+                @(context.Forbidden ? "Oui" : "Non")
+            </div>
+        </PropertyColumn>
+    </ChildContent>
+</Table>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private int Total { get; set; }
+    private int TotalConnected { get; set; }
+    private IQueryable<NodeConfiguration> NodesQueryable { get; set; } = null!;
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+        
+        NodesQueryable = Context.NodeConfigurations
+            .Include(a => a.Node)
+            .AsNoTrackingWithIdentityResolution();
+        
+        var localContext = await ContextFactory.CreateDbContextAsync();
+        
+        Total = localContext.NodeConfigurations
+            .AsNoTrackingWithIdentityResolution()
+            .Count();
+        
+        TotalConnected = localContext.NodeConfigurations
+            .AsNoTrackingWithIdentityResolution()
+            .Count(a => !string.IsNullOrWhiteSpace(a.MqttId));
+        
+        await localContext.DisposeAsync();
+
+        await base.OnInitializedAsync();
+    }
+
+    private void FetchData()
+    {
+        Total = Context.NodeConfigurations
+            .AsNoTrackingWithIdentityResolution()
+            .Count();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

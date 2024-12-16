@@ -60,6 +60,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeGateway.Id == 0)
         {
             Context.Add(nodeGateway);
+            await Context.SaveChangesAsync();
             Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
         }
         else
@@ -72,8 +73,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             
             nodeGateway.IsMqttGateway = true;
             Context.Update(nodeGateway);
+            await Context.SaveChangesAsync();
         }
-        await Context.SaveChangesAsync();
 
         if (NodesIgnored.Contains(meshPacket.From))
         {
@@ -92,6 +93,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             Logger.LogInformation("New node (from) created {node}", nodeFrom);
             Context.Add(nodeFrom);
+            await Context.SaveChangesAsync();
         }
         else
         {
@@ -107,8 +109,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.TelemetryApp or PortNum.PositionApp)
         {
             nodeFrom.HopStart = (int?)meshPacket.HopStart;
+            await Context.SaveChangesAsync();
         }
-        await Context.SaveChangesAsync();
 
         var nodeTo = nodes.FindByNodeId(meshPacket.To) ?? new Node
         {

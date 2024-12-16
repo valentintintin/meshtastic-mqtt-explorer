@@ -78,11 +78,7 @@ try
         .CreateDbContextAsync();
     await context.Database.MigrateAsync();
 
-    app.Services.GetRequiredService<PurgeService>(); // Instance to schedule
-
-    MeshtasticService.NodesIgnored.AddRange(app.Services.GetRequiredService<IConfiguration>()
-        .GetSection("NodesIgnored").Get<List<uint>>() ?? new List<uint>());
-    Console.WriteLine($"Nodes ignored: {string.Join(", ", MeshtasticService.NodesIgnored.Select(a => a.ToHexString()))}");
+    app.Services.GetRequiredService<PurgeService>(); // Instance to schedules
 
     if (false && app.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
     {
