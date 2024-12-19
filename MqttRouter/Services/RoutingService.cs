@@ -38,7 +38,6 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                     DoWhenTextMessage(clientId, userId, packet, packetActivity);
                     break;
                 case NodeinfoApp:
-                    await UpdateNodeConfiguration(packet.From);
                     await DoWhenNodeInfo(clientId, userId, packet, packetActivity);
                     break;
                 case TelemetryApp:
@@ -89,7 +88,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         }
         else
         {
-            var localNodes = await GetNodesAround(packet.Position, packet.From);
+            var localNodes = await GetNodesAround(packet.From);
 
             logger.LogInformation(
                 "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted but there are some packets of this type during the last hour so only for {nb} local",
@@ -109,14 +108,16 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         }
     }
 
-    private async Task<List<NodeConfiguration>> GetNodesAround(Position? position, Node node)
+    private async Task<List<NodeConfiguration>> GetNodesAround(Node node)
     {
         List<NodeConfiguration> localNodes = [];
         double minLatitude;
         double maxLatitude;
         double minLongitude;
         double maxLongitude;
-                            
+
+        var position = node.Positions.FirstOrDefault();
+        
         if (position != null)
         {
             var rayonKm = 100;
@@ -160,7 +161,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         if (hasPacketTypeBeforeDate != null)
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last 4shour",
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last 4 hours",
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);   
             packetActivity.Comment = $"Trame interdite car il y en a déjà eu dans les dernières 4 heures : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
@@ -201,7 +202,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         {
             if (packet.PortNum is TextMessageApp or AdminApp)
             {
-                var localNodes = await GetNodesAround(packet.Position, packet.To);
+                var localNodes = await GetNodesAround(packet.To);
 
                 logger.LogTrace("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId}). {nb} local nodes found", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId, localNodes.Count);
             
@@ -211,9 +212,11 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                     packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).Distinct().ToList());
                     packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais pas connecté donc à son entourage : {localNodes.Count} locaux";
                 }
-                
-                packetActivity.Accepted = true;
-                packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais envoyé à tout le monde car pas connecté ni entourage";
+                else
+                {
+                    packetActivity.Accepted = true;
+                    packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais envoyé à tout le monde car pas connecté ni entourage";
+                }
             }
             else
             {

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
@@ -6,12 +6,14 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyVersion>1.5.10</AssemblyVersion>
         <LangVersion>default</LangVersion>
-    </PropertyGroup>
+      <UserSecretsId>5f16860b-eff8-406f-9124-e5756bbf611e</UserSecretsId>
+  </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="AntDesign" Version="1.0.1" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.6" />
       <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">

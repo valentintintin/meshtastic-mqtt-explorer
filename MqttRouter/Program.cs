@@ -1,8 +1,12 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json.Serialization;
 using Common.Context;
 using Common.Context.Entities;
 using Common.Context.Entities.Router;
 using Common.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -12,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using MQTTnet.AspNetCore;
 using MqttRouter.Controllers;
 using MqttRouter.Models;
@@ -36,6 +41,7 @@ try
     builder.WebHost.UseKestrel(o =>
     {
         o.ListenAnyIP(1883, l => l.UseMqtt());
+        o.ListenAnyIP(5192); // Default HTTP pipeline
     });
     
     builder.Services.AddControllers().AddJsonOptions(options =>
@@ -70,6 +76,15 @@ try
         );
         option.EnableSensitiveDataLogging();
     });
+    
+    builder.Services.AddCors(option =>
+    {
+        option.AddDefaultPolicy(corsPolicyBuilder => corsPolicyBuilder
+            .WithOrigins(builder.Configuration.GetSection("CorsHosts").Value?.Split(",") ?? Array.Empty<string>())
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+        );
+    });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
@@ -92,14 +107,41 @@ try
             loggingBuilder.AddSeq(builder.Configuration.GetSection("Logging").GetSection("Seq"));
         });
     }
+    
+    builder.Services.AddAuthorization();
+    
+    var tokenSettings = builder.Configuration.GetSection("Authentication")
+        .GetSection("Schemes").GetSection("Bearer");
+    var jwtKey = tokenSettings.GetValue<string?>("IssuerSigningKey");
+
+    if (!string.IsNullOrEmpty(jwtKey))
+    {
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        }).AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters.ValidateAudience = false;
+            options.TokenValidationParameters.ValidateIssuer = false;
+            options.TokenValidationParameters.IssuerSigningKey =
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        });
+    }
 
     var app = builder.Build();
+
+    app.UseCors();
+    app.UseForwardedHeaders();
 
     if (!builder.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/error", createScopeForErrors: true);
     }
-    
+
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.MapControllers();
     
     app.UseMqttServer(

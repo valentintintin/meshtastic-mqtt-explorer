@@ -43,7 +43,7 @@
 </head>
 <body>
     <h1>Gaulix : Générateur de Noms Longs pour les Nœuds du Réseau</h1>
-    <form id="gaulixForm">
+    <form id="gaulixForm" onsubmit="generateNodeName()" onchange="generateNodeName()">
         <label for="departement">Département :</label>
         <input type="text" id="departement" placeholder="Exemple : 91" maxlength="2" required>
 
@@ -52,21 +52,22 @@
 
         <label for="modulation">Modulation :</label>
         <select id="modulation" required>
-            <option value="LM">LM - Long Moderate</option>
+            <option value="LF">LF - Long Fast</option>
+            <option value="LM" selected>LM - Long Moderate</option>
         </select>
 
         <label for="frequence">Bande de Fréquence :</label>
         <select id="frequence" required>
-            <option value="2">200 MHz</option>
-            <option value="4">400 MHz</option>
             <option value="8" selected>868 MHz</option>
+            <option value="4">433 MHz</option>
+            <option value="2">2.4 GHz</option>
         </select>
 
         <label for="role">Rôle du Nœud :</label>
         <select id="role" required>
-            <option value="Cl">CLIENT</option>
+            <option value="Cl" selected>CLIENT</option>
             <option value="CM">CLIENT_MUTE</option>
-            <option value="Ro" selected>ROUTER</option>
+            <option value="Ro">ROUTER</option>
             <option value="Re">REPEATER</option>
             <option value="Tr">TRACKER</option>
             <option value="Se">SENSOR</option>
@@ -76,10 +77,10 @@
             <option value="TT">TAK_TRACKER</option>
         </select>
 
-        <label for="gateway">Passerelle Internet :</label>
+        <label for="gateway">Passerelle Internet (MQTT -> LoRA) :</label>
         <select id="gateway" required>
-            <option value="G" selected>Oui</option>
-            <option value="P">Non</option>
+            <option value="P" selected>Oui</option>
+            <option value="N">Non</option>
         </select>
 
         <button type="button" onclick="generateNodeName()">Générer le Nom</button>
@@ -91,7 +92,21 @@
         function generateNodeName() {
             // Récupérer les valeurs des champs
             const departement = document.getElementById('departement').value.toUpperCase().padStart(2, '0');
-            const commune = document.getElementById('commune').value.replace(/[^A-Z]/gi, '').toUpperCase().slice(0, 4);
+            const commune = document.getElementById('commune').value.replace(/\b(saint|sainte|le|la|de|du)\b/gi, (match) => {
+                switch (match.toLowerCase()) {
+                    case "saint":
+                    case "sainte":
+                        return "S";
+                    case "le":
+                    case "la":
+                        return "L";
+                    case "de":
+                    case "du":
+                        return "D";
+                    default:
+                        return match;
+                }
+            }).replace(/[^A-Z]/gi, '').toUpperCase().slice(0, 4);
             const modulation = document.getElementById('modulation').value;
             const frequence = document.getElementById('frequence').value;
             const role = document.getElementById('role').value;

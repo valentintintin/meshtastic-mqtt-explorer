@@ -38,11 +38,17 @@
         <PropertyColumn Property="c => c.MqttId" Title="MQTT client ID" Sortable Filterable>
             @context.MqttId
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttId" Title="Interdit d'emission" Filterable>
-            <div style="width: 100px">
-                @(context.Forbidden ? "Oui" : "Non")
-            </div>
+        <PropertyColumn Property="c => c.UserId" Title="Utilisateur" Sortable Filterable>
+            @if (context.User != null)
+            {
+                <a href="mailto:@context.User.Email">@context.User.UserName - @context.User.Email</a>
+            }
         </PropertyColumn>
+        @* <PropertyColumn Property="c => c.MqttId" Title="Interdit d'emission" Filterable> *@
+            @* <div style="width: 100px"> *@
+                @* @(context.Forbidden ? "Oui" : "Non") *@
+            @* </div> *@
+        @* </PropertyColumn> *@
     </ChildContent>
 </Table>
 
@@ -62,6 +68,7 @@
         
         NodesQueryable = Context.NodeConfigurations
             .Include(a => a.Node)
+            .Include(a => a.User)
             .AsNoTrackingWithIdentityResolution();
         
         var localContext = await ContextFactory.CreateDbContextAsync();

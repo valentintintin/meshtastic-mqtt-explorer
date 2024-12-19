@@ -76,7 +76,6 @@ public class MqttServerController(IServiceProvider serviceProvider)
             if (user == null)
             {
                 eventArgs.ProcessPublish = false;
-                eventArgs.CloseConnection = true;
                 
                 _logger.LogError("Client {clientId} and user#{userId} unknown. Refused packet", eventArgs.ClientId, userId);
                 return;
@@ -85,7 +84,6 @@ public class MqttServerController(IServiceProvider serviceProvider)
             if (!await serviceProvider.GetRequiredService<UserService>().IsAuthorized(user.Id))
             {
                 eventArgs.ProcessPublish = false;
-                eventArgs.CloseConnection = true;
                 
                 _logger.LogError("Client {clientId} and user#{userId} locked. Refused packet", eventArgs.ClientId, userId);
                 return;
@@ -106,13 +104,13 @@ public class MqttServerController(IServiceProvider serviceProvider)
                 if (nodeConfiguration.Forbidden)
                 {
                     eventArgs.ProcessPublish = false;
-                    eventArgs.CloseConnection = true;
 
                     _logger.LogError("Client {clientId} and user#{userId} for node#{nodeId} locked. Refused packet",
                         eventArgs.ClientId, userId, nodeConfiguration.Id);
                     return;
                 }
 
+                nodeConfiguration.User = user;
                 nodeConfiguration.MqttId = eventArgs.ClientId;
                 context.Update(nodeConfiguration);
                 await context.SaveChangesAsync();

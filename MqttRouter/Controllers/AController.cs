@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Recorder.Controllers;
+namespace MqttRouter.Controllers;
 
 public abstract class AController(ILogger<AController> logger) : Controller
 {

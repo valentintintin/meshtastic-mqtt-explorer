@@ -11,5 +11,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ToTable("Users", "router");
 
         builder.Property(a => a.Ip).HasMaxLength(64);
+
+        builder.Property(a => a.ExternalId).HasMaxLength(128);
+        builder.HasIndex(a => a.ExternalId);
+        
+        builder.Property(a => a.TempBP).HasMaxLength(256);
     }
 }

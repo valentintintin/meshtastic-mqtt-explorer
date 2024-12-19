@@ -63,6 +63,9 @@ try
             loggingBuilder.AddSeq(builder.Configuration.GetSection("Logging").GetSection("Seq"));
         });
     }
+    
+    builder.Services.AddAuthorization();
+    builder.Services.AddAuthentication("Bearer").AddJwtBearer();
 
     var app = builder.Build();
 
@@ -77,6 +80,8 @@ try
     {
         ServeUnknownFileTypes = true
     });
+    
+    app.UseAuthorization();
     app.UseAntiforgery();
 
     app.MapControllers();
