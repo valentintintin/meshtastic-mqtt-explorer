@@ -221,7 +221,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             else
             {
                 packetActivity.Accepted = false;
-                packetActivity.Comment = $"Trame interdite même en direction d'un noeud précis : {packet.To}";
+                packetActivity.Comment = $"Trame interdite même en direction d'un noeud précis quand le destinataire est introuvable : {packet.To}";
             }
         }
     }

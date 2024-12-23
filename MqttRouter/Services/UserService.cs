@@ -1,4 +1,5 @@
 using System.Text;
+using Common;
 using Common.Context;
 using Common.Context.Entities.Router;
 using Common.Exceptions;
@@ -35,20 +36,33 @@ public class UserService(
         };
 
         var userResult = await userManager.CreateAsync(user, createDto.Password);
-
-        try
-        {
-            userResult.IsSucceedOrThrow();
-        }
-        catch (Exception e)
-        {
-            Logger.LogWarning(e, "Create new user {mail} KO", createDto.Email);
-            throw;
-        }            
+        userResult.IsSucceedOrThrow();
         
         Logger.LogInformation("Create new user#{id} {mail} OK", user.Id, createDto.Email);
 
         return user;
+    }
+
+    public async Task UpdateUser(long userId, UserUpdateDto updateDto)
+    {
+        Utils.ValidateModel(updateDto);
+        
+        Logger.LogInformation("Update user#{id}", userId);
+
+        var user = await userManager.FindByIdAsync(userId.ToString());
+
+        if (user == null)
+        {
+            throw new NotFoundException<User>(userId);
+        }
+        
+        user.UserName = updateDto.Username;
+        user.Email = updateDto.Email;
+
+        var identityResult = await userManager.UpdateAsync(user);
+        identityResult.IsSucceedOrThrow();
+
+        Logger.LogInformation("Update user#{id} {mail} OK", user.Id, updateDto.Email);
     }
 
     public async Task<User?> Login(string username, string password, string ip)
@@ -63,7 +77,7 @@ public class UserService(
             return null;
         }
         
-        if (!await IsAuthorized(user.Id))
+        if (!await IsAuthorized(user))
         {
             Logger.LogWarning("Login of {username}#{userId} KO. Locked out", username, user.Id);
             return null;
@@ -86,10 +100,9 @@ public class UserService(
         return user;
     }
 
-    public async Task<bool> IsAuthorized(long userId)
+    public async Task<bool> IsAuthorized(User user)
     {
-        var user = await userManager.FindByIdAsync(userId.ToString());
-        return user != null && !await userManager.IsLockedOutAsync(user);
+        return !await userManager.IsLockedOutAsync(user);
     }
 
     public async Task ChangePassword(long userId, string password)
@@ -107,5 +120,10 @@ public class UserService(
     public string GeneratePassword(int length)
     {
         return new string(Enumerable.Repeat(Chars, length).Select(s => s[Random.Next(s.Length)]).ToArray());
+    }
+
+    public async Task<bool> HasClaim(User user, SecurityConstants.Claim claimType)
+    {
+        return (await userManager.GetClaimsAsync(user)).Any(c => c.Type == claimType.ToString());
     }
 }

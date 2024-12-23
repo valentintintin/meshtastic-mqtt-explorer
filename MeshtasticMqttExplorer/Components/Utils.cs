@@ -1,3 +1,4 @@
+using System.Text;
 using AntDesign;
 using AntDesign.Charts;
 using Common;
@@ -116,7 +117,7 @@ public static class Utils
         }
     };
 
-    public static LineConfig GetLineConfig(string yAxisText, double? min = null, double? max = null)
+    public static LineConfig GetLineConfig(string yAxisText, double? min = null, double? max = null, bool legend = false)
     {
         return new LineConfig
         {
@@ -141,24 +142,60 @@ public static class Utils
             },
             Legend = new Legend
             {
-                Visible = false
+                Visible = legend
             },
             SeriesField = nameof(DateChartData<object>.type),
             Color = new [] { Blue, Red, Orange, Green, Gray }
         };
     }
 
-    public static string GetNeighborLinePopupHtml(Node node, Common.Context.Entities.NeighborInfo neighborInfo)
+    public static string GetNeighborLinePopupHtml(Node node, Common.Context.Entities.NeighborInfo neighborInfo, Common.Context.Entities.NeighborInfo? reverseNeighborInfo = null)
     {
-        var neighbor = neighborInfo.Neighbor == node ? neighborInfo.Node : neighborInfo.Neighbor;
+        if (reverseNeighborInfo != null)
+        {
+            return $"<p>" +
+                   $"<a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                   $"<b>{node.AllNames}</b>" +
+                   $"</a>" +
+                   $"</p>" +
+                   $"<p>" +
+                   $"SNR : <b>{neighborInfo.Snr}</b> | Date : <b>{neighborInfo.UpdatedAt.ToFrench()}</b>" +
+                   $"</p>" +
+                   $"<p>" +
+                   $"<a href=\"/packet/{neighborInfo.PacketId}\" target=\"_blank\" rel=\"nofollow\">" +
+                   $"<i>Voir la trame ({neighborInfo.DataSource})</i>" +
+                   $"</a>" +
+                   $"</p>" +
+                   $"<p>" +
+                   $"<a href=\"/node/{reverseNeighborInfo.NodeReceiver.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                   $"<b>{reverseNeighborInfo.NodeReceiver.AllNames}</b>" +
+                   $"</a>" +
+                   $"</p>" +
+                   $"<p>" +
+                   $"SNR : <b>{reverseNeighborInfo.Snr}</b> | Date : <b>{reverseNeighborInfo.UpdatedAt.ToFrench()}</b>" +
+                   $"</p>" +
+                   $"<p>" +
+                   $"<a href=\"/packet/{reverseNeighborInfo.PacketId}\" target=\"_blank\" rel=\"nofollow\">" +
+                   $"<i>Voir la trame ({reverseNeighborInfo.DataSource})</i>" +
+                   $"</a>" +
+                   $"</p>" + 
+                   $"<p>" +
+                   $"Distance : <b>{(neighborInfo.Distance.HasValue ? Math.Round(neighborInfo.Distance.Value, 2) : "-")}</b> Km" +
+                   $"</p>" + 
+                   $"<p>" +
+                   $"<a href=\"/signal-plotter/{node.Id}/{reverseNeighborInfo.NodeReceiverId}\" target=\"_blank\" rel=\"nofollow\">Comparer les signaux</a>" +
+                   $"</p>";
+        }
         
+        var neighbor = neighborInfo.NodeHeard == node ? neighborInfo.NodeReceiver : neighborInfo.NodeHeard;
+
         return $"<p>" +
                $"<a href=\"/node/{node.Id}\" target=\"_blank\" rel=\"nofollow\">" +
                $"<b>{node.AllNames}</b>" +
                $"</a>" +
                $"</p>" +
                $"<p>" +
-               $"Voisin ({neighborInfo.DataSource}) : " +
+               $"Entend ({neighborInfo.DataSource}) : " +
                $"<a href=\"/node/{neighbor.Id}\" target=\"_blank\">" +
                $"<b>{neighbor.AllNames}</b>" +
                $"</a>" +

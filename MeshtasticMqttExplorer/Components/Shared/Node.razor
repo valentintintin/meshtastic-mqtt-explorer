@@ -196,14 +196,15 @@
                                     <ListItem>
                                         <ListItemMeta>
                                             <AvatarTemplate>
-                                                <Avatar Src="@neighbor.Neighbor.HardwareModel.GetImageUrl()"></Avatar>
+                                                <Avatar Src="@neighbor.NodeHeard.HardwareModel.GetImageUrl()"></Avatar>
                                             </AvatarTemplate>
                                             <TitleTemplate>
-                                                <a href="/node/@neighbor.Neighbor.Id" target="_blank" rel="nofollow">@neighbor.Neighbor.AllNames (@neighbor.DataSource)</a>
+                                                <a href="/node/@neighbor.NodeHeard.Id" target="_blank" rel="nofollow">@neighbor.NodeHeard.AllNames (@neighbor.DataSource)</a>
                                                 @if (neighbor.PacketId.HasValue)
                                                 {
                                                     <br/>
                                                     <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                                    <a href="/signal-plotter/@neighbor.NodeReceiverId/@neighbor.NodeHeardId" target="_blank" rel="nofollow"><i>Comparer les signaux</i></a>
                                                 }
                                             </TitleTemplate>
                                             <DescriptionTemplate>
@@ -230,14 +231,15 @@
                                     <ListItem>
                                         <ListItemMeta>
                                             <AvatarTemplate>
-                                                <Avatar Src="@neighbor.Node.HardwareModel.GetImageUrl()"></Avatar>
+                                                <Avatar Src="@neighbor.NodeReceiver.HardwareModel.GetImageUrl()"></Avatar>
                                             </AvatarTemplate>
                                             <TitleTemplate>
-                                                <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.AllNames (@neighbor.DataSource)</a>
+                                                <a href="/node/@neighbor.NodeReceiver.Id" target="_blank" rel="nofollow">@neighbor.NodeReceiver.AllNames (@neighbor.DataSource)</a>
                                                 @if (neighbor.PacketId.HasValue)
                                                 {
                                                     <br/>
                                                     <a href="/packet/@neighbor.PacketId" target="_blank" rel="nofollow"><i>Voir la trame</i></a>
+                                                    <a href="/signal-plotter/@neighbor.NodeReceiverId/@neighbor.NodeHeardId" target="_blank" rel="nofollow"><i>Comparer les signaux</i></a>
                                                 }
                                             </TitleTemplate>
                                             <DescriptionTemplate>
@@ -501,15 +503,15 @@
                 {
                     lines.AddRange(
                         NodeInfo.MyNeighbors
-                            .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => n.NodeHeard is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.NodeHeard.Latitude!.Value, n.NodeHeard.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
-                                Id = $"node(neighbor)-{n.Neighbor.Id}->node-{NodeInfo.Id}",
+                                Id = $"node(neighbor)-{n.NodeHeard.Id}->node-{NodeInfo.Id}",
                                 Points =
                                 [
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
-                                    [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
+                                    [n.NodeHeard.Latitude!.Value, n.NodeHeard.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                 Popup = Utils.GetNeighborLinePopupHtml(NodeInfo, n)
@@ -519,7 +521,7 @@
                 
                 markers.AddRange(
                     NodeInfo.MyNeighbors
-                        .Select(n => n.Neighbor)
+                        .Select(n => n.NodeHeard)
                         .Where(n => n is { Latitude: not null, Longitude: not null })
                         .Select(n => new Osm.Marker
                         {
@@ -539,15 +541,15 @@
                 {
                     lines.AddRange(
                         NodeInfo.NeighborsFor
-                            .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
+                            .Where(n => n.NodeReceiver is { Latitude: not null, Longitude: not null })
+                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value, n.NodeReceiver.Latitude!.Value, n.NodeReceiver.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
                             .Select(n => new Osm.Line
                             {
-                                Id = $"node(neighbor)-{n.Node.Id}->node-{NodeInfo.Id}",
+                                Id = $"node(neighbor)-{n.NodeReceiver.Id}->node-{NodeInfo.Id}",
                                 Points =
                                 [
                                     [NodeInfo.Latitude!.Value, NodeInfo.Longitude!.Value],
-                                    [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
+                                    [n.NodeReceiver.Latitude!.Value, n.NodeReceiver.Longitude!.Value]
                                 ],
                                 Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
                                 Popup = Utils.GetNeighborLinePopupHtml(NodeInfo, n)
@@ -557,7 +559,7 @@
                     
                 markers.AddRange(
                     NodeInfo.NeighborsFor
-                        .Select(n => n.Node)
+                        .Select(n => n.NodeReceiver)
                         .Where(n => n is { Latitude: not null, Longitude: not null })
                         .Select(n => new Osm.Marker
                         {

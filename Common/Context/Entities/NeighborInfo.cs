@@ -6,22 +6,23 @@ public class NeighborInfo : IEntity
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     
-    public long NodeId { get; set; }
-    public virtual Node Node { get; set; } = null!;
+    public long NodeReceiverId { get; set; }
+    public virtual Node NodeReceiver { get; set; } = null!;
     
-    public long? NodePositionId { get; set; }
-    public virtual Position? NodePosition { get; set; }
+    public long? NodeReceiverPositionId { get; set; }
+    public virtual Position? NodeReceiverPosition { get; set; }
     
     public long? PacketId { get; set; }
     public virtual Packet? Packet { get; set; }
     
-    public long NeighborId { get; set; }
-    public virtual Node Neighbor { get; set; } = null!;
+    public long NodeHeardId { get; set; }
+    public virtual Node NodeHeard { get; set; } = null!;
     
-    public long? NeighborPositionId { get; set; }
-    public virtual Position? NeighborPosition { get; set; }
+    public long? NodeHeardPositionId { get; set; }
+    public virtual Position? NodeHeardPosition { get; set; }
     
-    public double Snr { get; set; }
+    public float Snr { get; set; }
+    public float? Rssi { get; set; }
     
     public double? Distance { get; set; }
 

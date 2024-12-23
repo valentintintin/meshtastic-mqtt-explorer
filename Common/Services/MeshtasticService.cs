@@ -303,11 +303,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         if (packet.HopLimit == packet.HopStart)
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr!.Value, packet.GatewayPosition, nodeFromPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr!.Value, packet.RxRssi!.Value, packet.GatewayPosition, nodeFromPosition);
         }
         else
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, packet.GatewayPosition, nodeFromPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, null, packet.GatewayPosition, nodeFromPosition);
         }
     }
 
@@ -434,7 +434,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             var nodePosition = nodeFrom.Positions.FirstOrDefault();
             var neighborPosition = neighborNode.Positions.FirstOrDefault();
 
-            await SetNeighbor(Entities_NeighborInfo.Source.Neighbor, packet, nodeFrom, neighborNode, neighbor.Snr, nodePosition, neighborPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Neighbor, packet, nodeFrom, neighborNode, neighbor.Snr, null, nodePosition, neighborPosition);
         }
     }
 
@@ -533,7 +533,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 await Context.SaveChangesAsync();
             }
 
-            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, lastNode, node, route.Snr ?? -999, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, node, lastNode, route.Snr ?? -999, 
+                null, node.Positions.FirstOrDefault(), lastNode.Positions.FirstOrDefault());
 
             lastNode = node;
         }
@@ -558,8 +559,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                     await Context.SaveChangesAsync();
                 }
 
-                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, node, lastNode, route.Snr ?? -999,
-                    lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, lastNode, node, route.Snr ?? -999,
+                    null, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
 
                 lastNode = node;
             }
@@ -711,14 +712,14 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     }
 
     public async Task<Entities_NeighborInfo?> SetNeighbor(Entities_NeighborInfo.Source source, Packet packet, 
-        Node nodeFrom, Node neighborNode, 
-        double snr, 
-        Position? nodeFromPosition, Position? neighborPosition)
+        Node nodeReceiver, Node heardNode, 
+        float snr, float? rssi,
+        Position? nodeFromPosition, Position? heardPosition)
     {
-        if (nodeFrom == neighborNode 
+        if (nodeReceiver == heardNode 
             || packet.PortNum == PortNum.MapReportApp
-            || NodesIgnored.Contains(nodeFrom.NodeId) 
-            || NodesIgnored.Contains(neighborNode.NodeId)
+            || NodesIgnored.Contains(nodeReceiver.NodeId) 
+            || NodesIgnored.Contains(heardNode.NodeId)
             || packet.ViaMqtt == true
         )
         {
@@ -726,24 +727,25 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
 
         double? distance = null;
-        var latitudeFrom = nodeFromPosition?.Latitude ?? nodeFrom.Latitude;
-        var longitudeFron = nodeFromPosition?.Longitude ?? nodeFrom.Longitude;
-        var latitudeNeighbor = neighborPosition?.Latitude ?? neighborNode.Latitude;
-        var longitudeNeighbor = neighborPosition?.Longitude ?? neighborNode.Longitude;
+        var latitudeFrom = nodeFromPosition?.Latitude ?? nodeReceiver.Latitude;
+        var longitudeFrom = nodeFromPosition?.Longitude ?? nodeReceiver.Longitude;
+        var latitudeNeighbor = heardPosition?.Latitude ?? heardNode.Latitude;
+        var longitudeNeighbor = heardPosition?.Longitude ?? heardNode.Longitude;
 
-        if (latitudeFrom.HasValue && longitudeFron.HasValue && latitudeNeighbor.HasValue && longitudeNeighbor.HasValue)
+        if (latitudeFrom.HasValue && longitudeFrom.HasValue && latitudeNeighbor.HasValue && longitudeNeighbor.HasValue)
         {
-            distance = MeshtasticUtils.CalculateDistance(latitudeFrom.Value, longitudeFron.Value, latitudeNeighbor.Value, longitudeNeighbor.Value);
+            distance = MeshtasticUtils.CalculateDistance(latitudeFrom.Value, longitudeFrom.Value, latitudeNeighbor.Value, longitudeNeighbor.Value);
         }
         
-        var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.Node == nodeFrom && n.Neighbor == neighborNode) ?? new Entities_NeighborInfo
+        var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.NodeReceiver == nodeReceiver && n.NodeHeard == heardNode) ?? new Entities_NeighborInfo
         {
-            Node = nodeFrom,
-            NodePosition = nodeFromPosition,
+            NodeReceiver = nodeReceiver,
+            NodeReceiverPosition = nodeFromPosition,
             Packet = packet,
-            Neighbor = neighborNode,
-            NeighborPosition = neighborPosition,
+            NodeHeard = heardNode,
+            NodeHeardPosition = heardPosition,
             Snr = snr,
+            Rssi = rssi,
             Distance = distance,
             DataSource = source,
             CreatedAt = packet.CreatedAt,
@@ -751,22 +753,42 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         };
         if (neighborInfo.Id == 0)
         {
-            Logger.LogInformation("Add neighbor for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", nodeFrom, neighborNode, snr, source, packet.Id, distance);
+            Logger.LogInformation("Add neighbor for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", nodeReceiver, heardNode, snr, source, packet.Id, distance);
             Context.Add(neighborInfo);
         }
         else
         {
-            Logger.LogInformation("Update neighbor #{id} for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", neighborInfo.Id, nodeFrom, neighborNode, snr, source, packet.Id, distance);
+            if (neighborInfo.PacketId > packet.Id)
+            {
+                Logger.LogInformation("Update neighbor #{id} for {node} to {neighbor} ignored because old packet#{packetId} given", neighborInfo.Id, nodeReceiver, heardNode, packet.Id);
+                
+                return null;
+            }
+            
+            Logger.LogInformation("Update neighbor #{id} for {node} to {neighbor} with SNR {snr} and data source {datasource} from packet #{packetId} and distance {distance} km", neighborInfo.Id, nodeReceiver, heardNode, snr, source, packet.Id, distance);
             neighborInfo.Packet = packet;
             if (snr != -999)
             {
                 neighborInfo.Snr = snr;
+                neighborInfo.Rssi = rssi;
             }
-            neighborInfo.NodePosition = nodeFromPosition;
-            neighborInfo.NeighborPosition = neighborPosition;
+            neighborInfo.NodeReceiverPosition = nodeFromPosition;
+            neighborInfo.NodeHeardPosition = heardPosition;
             neighborInfo.Distance = distance;
             neighborInfo.DataSource = source;
             Context.Update(neighborInfo);
+        }
+
+        if (snr != -999)
+        {
+            Context.Add(new SignalHistory
+            {
+                NodeReceiver = nodeReceiver,
+                NodeHeard = heardNode,
+                Snr = snr,
+                Rssi = rssi,
+                Packet = packet
+            });
         }
         
         await Context.SaveChangesAsync();

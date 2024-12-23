@@ -13,8 +13,8 @@ public class Webhook : IEntity
 
     public bool Enabled { get; set; } = true;
     
-    public bool AllowDuplication { get; set; } = false;
-    public bool AllowByHimSelf { get; set; } = true;
+    public bool AllowDuplication { get; set; }
+    public bool AllowByHimSelf { get; set; }
     
     public PortNum? PortNum { get; set; }
     public uint? From { get; set; }

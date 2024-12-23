@@ -13,7 +13,6 @@
 @using Node = Common.Context.Entities.Node
 @using Common;
 
-@inject IConfiguration Configuration
 @inject IDbContextFactory<DataContext> ContextFactory;
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 @inject ILogger<Osm> Logger
@@ -32,14 +31,6 @@
             <div>
                 <Segmented Disabled="Loading" Options="@ModemsPresets" Value="Settings.CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
                 <Segmented Disabled="Loading" Options="@RegionsCodes" Value="Settings.CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
-                @if (Settings.CurrentRegionCode == Config.Types.LoRaConfig.Types.RegionCode.Eu868)
-                {
-                    <Segmented Disabled="Loading" Options="@Frequencies" Value="Settings.CurrentFrequencies" TValue="string[]" OnChange="value => SetFrequency(value)"/>
-                }
-            </div>
-
-            <div>
-                <Switch @bind-Checked="Settings.ShowIndirectsPaths" Disabled="@Loading" UnCheckedChildren="Afficher les liens indirects" CheckedChildren="Cacher les liens indirects" OnChange="value => SetShowIndirectsPaths(value)"/>
             </div>
 
             <div>
@@ -89,25 +80,18 @@
 
                     <GridCol Xs="24" Md="12">
                         <div class="legend">
-                            <span style="background-color: @Utils.Gold" class="legend-bar"></span>
-                            Lien radio direct
+                            <span style="background-color: @Utils.Green" class="legend-bar"></span>
+                            Lien radio fonctionnel entre 2 noeuds
+                        </div>
+                        <div class="legend">
+                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
+                            Lien radio manquant entre 2 noeuds
                         </div>
 
-                        @if (Settings.ShowIndirectsPaths)
-                        {
-                            <div class="legend">
-                                <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                                Lien indirect
-                            </div>
-                        }
-
-                        @if (Settings.ShowPois)
-                        {
-                            <div class="legend">
-                                <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
-                                Point d'intétêt
-                            </div>
-                        }
+                        <div class="legend">
+                            <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
+                            Point d'intétêt
+                        </div>
                     </GridCol>
                 </GridRow>
             </ChildContent>
@@ -126,14 +110,13 @@
         Longitude = 2.321139,
         Zoom = 5,
         ShowLegend = true,
-        ShowIndirectsPaths = false,
-        ShowPois = true,
         CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868
     };
     private int Total { get; set; }
     private int TotalAlive { get; set; }
     private DateTime MinDate { get; set; } = DateTime.MinValue;
     private List<Node> Nodes { get; set; } = [];
+    private List<NeighborInfo> Neighbors { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> RegionsCodes { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>> { new(null, "Tous") }
@@ -142,11 +125,7 @@
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> { new(null, "Tous") } 
         .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
-    private List<SegmentedOption<string[]>> Frequencies { get; } = [ 
-        new([""], "Tous"),
-        new([".4625", "Gaulix"], "869.4625 Mhz (Gaulix)"),
-        new(["869.4", ".400"], "869.400 Mhz (Paris)"),
-    ];
+    private List<SegmentedOption<long[]>> MqttServer { get; } = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -159,8 +138,6 @@
                 Settings.Longitude = settings.Longitude;
                 Settings.Zoom = settings.Zoom;
                 Settings.ShowLegend = settings.ShowLegend;
-                Settings.ShowPois = settings.ShowPois;
-                Settings.ShowIndirectsPaths = settings.ShowIndirectsPaths;
                 // Settings = settings; // Semble bugger sur le modem preset, region et frequence
                 Logger.LogDebug("Utilisation de settings : {settings}", JsonSerializer.Serialize(settings));
             }
@@ -177,105 +154,7 @@
             
             foreach (var node in Nodes)
             {
-                if (node.MyNeighbors.Any() || node.NeighborsFor.Any())
-                {
-                    lines.AddRange(
-                        node.MyNeighbors
-                            .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
-                            .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
-                            .Select(n =>
-                            {
-                                markers.Add(GetMarker(n.Neighbor));
-                                
-                                return new Osm.Line
-                                {
-                                    Id = $"node(neighbor)-{n.Neighbor.Id}->node-{node.Id}",
-                                    Points =
-                                    [
-                                        [node.Latitude!.Value, node.Longitude!.Value],
-                                        [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
-                                    ],
-                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                    Popup = Utils.GetNeighborLinePopupHtml(node, n)
-                                };
-                            })
-                    );
-                    
-                    lines.AddRange(
-                        node.NeighborsFor
-                            .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
-                            .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
-                            .Select(n =>
-                            {
-                                markers.Add(GetMarker(n.Node));
-                                
-                                return new Osm.Line
-                                {
-                                    Id = $"node(neighbor-for)-{n.Node.Id}->node-{node.Id}",
-                                    Points =
-                                    [
-                                        [node.Latitude!.Value, node.Longitude!.Value],
-                                        [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
-                                    ],
-                                    Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                    Popup = Utils.GetNeighborLinePopupHtml(node, n)
-                                };
-                            })
-                    );
-
-                    if (Settings.ShowIndirectsPaths)
-                    {
-                        lines.AddRange(
-                            node.MyNeighbors
-                                .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
-                                .Where(n => n.Neighbor is { Latitude: not null, Longitude: not null })
-                                .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
-                                .Select(n =>
-                                {
-                                    markers.Add(GetMarker(n.Neighbor));
-                                
-                                    return new Osm.Line
-                                    {
-                                        Id = $"node(neighbor)-{n.Neighbor.Id}->node-{node.Id}",
-                                        Points =
-                                        [
-                                            [node.Latitude!.Value, node.Longitude!.Value],
-                                            [n.Neighbor.Latitude!.Value, n.Neighbor.Longitude!.Value]
-                                        ],
-                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                        Popup = Utils.GetNeighborLinePopupHtml(node, n)
-                                    };
-                                })
-                        );
-                        
-                        lines.AddRange(
-                            node.NeighborsFor
-                                .Where(n => n.DataSource == NeighborInfo.Source.Unknown)
-                                .Where(n => n.Node is { Latitude: not null, Longitude: not null })
-                                .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, n.Node.Latitude!.Value, n.Node.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
-                                .Select(n =>
-                                {
-                                    markers.Add(GetMarker(n.Node));
-
-                                    return new Osm.Line
-                                    {
-                                        Id = $"node(neighbor-for)-{n.Node.Id}->node-{node.Id}",
-                                        Points =
-                                        [
-                                            [node.Latitude!.Value, node.Longitude!.Value],
-                                            [n.Node.Latitude!.Value, n.Node.Longitude!.Value]
-                                        ],
-                                        Color = n.DataSource == NeighborInfo.Source.Unknown ? Utils.Red : Utils.Gold,
-                                        Popup = Utils.GetNeighborLinePopupHtml(node, n)
-                                    };
-                                })
-                        );
-                    }
-                }
-
-                if (Settings.ShowPois && node.Waypoints.Any())
+                if (node.Waypoints.Any())
                 {
                     lines.AddRange(
                         node.Waypoints
@@ -307,6 +186,64 @@
                 }
             }
 
+            foreach (var neighbor in Neighbors.Where(a => a.DataSource != NeighborInfo.Source.Unknown))
+            {
+                var reverseNeighbor = Neighbors.FirstOrDefault(n => n.NodeHeard == neighbor.NodeReceiver && n.NodeReceiver == neighbor.NodeHeard && n.DataSource != NeighborInfo.Source.Unknown);
+                var isBidirectionnal = reverseNeighbor != null;
+                var reverseAlreadyDrawn = isBidirectionnal && lines.Exists(l => l.Id == $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}");
+
+                if (isBidirectionnal && reverseAlreadyDrawn)
+                {
+                    continue;
+                }
+
+                double[] startPoint = [neighbor.NodeReceiver.Latitude!.Value, neighbor.NodeReceiver.Longitude!.Value];
+                double[] endPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
+
+                endPoint = isBidirectionnal ? endPoint : MeshtasticUtils.GetMiddle(startPoint[0], startPoint[1], endPoint[0], endPoint[1]);
+                
+                lines.Add(new Osm.Line
+                {
+                    Id = $"node-{neighbor.NodeReceiver.Id}->node-{neighbor.NodeHeard.Id}",
+                    Points =
+                    [
+                        startPoint,
+                        endPoint
+                    ],
+                    Color = Utils.Green,
+                    Popup = Utils.GetNeighborLinePopupHtml(neighbor.NodeReceiver, neighbor, reverseNeighbor)
+                });
+
+                if (!isBidirectionnal) // Il manque un côté donc on le fait artificiellement pour mettre une ligne rouge
+                {
+                    startPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
+
+                    lines.Add(new Osm.Line
+                    {
+                        Id = $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}",
+                        Points =
+                        [
+                            startPoint,
+                            endPoint
+                        ],
+                        Color = Utils.Red,
+                        Popup = $"<p>" +
+                                $"<a href=\"/node/{neighbor.NodeHeard.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                                $"<b>{neighbor.NodeHeard.AllNames}</b>" +
+                                $"</a>" +
+                                $"</p>" +
+                                $"<p>" +
+                                $"N'entend pas" +
+                                $"</p>" +
+                                $"<p>" +
+                                $"<a href=\"/node/{neighbor.NodeReceiver.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                                $"<b>{neighbor.NodeReceiver.AllNames}</b>" +
+                                $"</a>" +
+                                $"</p>"
+                    });
+                }
+            }
+
             await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
             await Task.Delay(TimeSpan.FromMilliseconds(150)); // Marker devant les lignes
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
@@ -325,7 +262,6 @@
         {
             Settings.CurrentRegionCode = null;
             Settings.CurrentModemPreset = null;
-            Settings.CurrentFrequencies = null;
         }
         
         Context = await ContextFactory.CreateDbContextAsync();
@@ -344,28 +280,28 @@
         
         Nodes = await Context.Nodes
             .Include(n => n.MqttServer)
-            .Include(n => n.MyNeighbors
-                .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.Neighbor.Latitude.HasValue && a.Neighbor.Longitude.HasValue)
-                .Where(a => !a.Neighbor.Ignored)
-                .Where(a => a.Neighbor.LastSeen.HasValue && a.Neighbor.LastSeen >= MinDate)
-                .OrderBy(t => t.UpdatedAt))
-            .ThenInclude(n => n.Neighbor)
-            .Include(n => n.NeighborsFor
-                .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.Node.Latitude.HasValue && a.Node.Longitude.HasValue)
-                .Where(a => !a.Node.Ignored)
-                .Where(a => a.Node.LastSeen.HasValue && a.Node.LastSeen >= MinDate)
-                .OrderBy(t => t.UpdatedAt))
-            .ThenInclude(n => n.Node)
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow))
             .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => Settings.CurrentRegionCode == null|| n.RegionCode == Settings.CurrentRegionCode)
             .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
-            .Where(n => Settings.CurrentFrequencies == null || n.LongName != null && Settings.CurrentFrequencies.Any(c => n.LongName.Contains(c)))
-            .AsSplitQuery()
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
+        
+        Neighbors = (await Context.NeighborInfos
+            .Include(a => a.NodeReceiver)
+            .Include(a => a.NodeHeard)
+            .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
+            .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.NodeHeard.Latitude.HasValue && a.NodeHeard.Longitude.HasValue)
+            .Where(a => !a.NodeReceiver.Ignored && !a.NodeHeard.Ignored)
+            .Where(a => a.NodeHeard.LastSeen.HasValue && a.NodeHeard.LastSeen >= MinDate && a.NodeReceiver.LastSeen.HasValue && a.NodeReceiver.LastSeen >= MinDate)
+            .Where(n => Settings.CurrentRegionCode == null|| n.NodeReceiver.RegionCode == Settings.CurrentRegionCode)
+            .Where(n => Settings.CurrentModemPreset == null || n.NodeReceiver.ModemPreset == Settings.CurrentModemPreset || n.NodeReceiver.ModemPreset == null)
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync())
+            .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(n.NodeReceiver.Latitude!.Value, n.NodeReceiver.Longitude!.Value, n.NodeHeard.Latitude!.Value, n.NodeHeard.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
+            .ToList();
 
         Total = Nodes.Count;
         TotalAlive = Nodes.Count(n => !n.IsOffline());
@@ -421,27 +357,6 @@
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
             await FetchData();
         }
-    }
-
-    private async Task SetFrequency(string[]? frequency)
-    {
-        Settings.CurrentFrequencies = frequency;
-
-        if (RenderFinished)
-        {
-            await SaveMapPosition();
-            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
-            await FetchData();
-        }
-    }
-
-    private async Task SetShowIndirectsPaths(bool showIndirectsPaths)
-    {
-        Settings.ShowIndirectsPaths = showIndirectsPaths;
-        await SaveMapPosition();
-        
-        await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
-        await FetchData();
     }
 
     private async Task SetShowLegend(bool showLegend)
@@ -508,10 +423,6 @@
     {
         public bool ShowLegend { get; set; }
         
-        public bool ShowIndirectsPaths { get; set; }
-        
-        public bool ShowPois { get; set; }
-        
         public double Latitude { get; set; }
         
         public double Longitude { get; set; }
@@ -521,7 +432,5 @@
         public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; }
         
         public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; }
-        
-        public string[]? CurrentFrequencies { get; set; }
     }
 }

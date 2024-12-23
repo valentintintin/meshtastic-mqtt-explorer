@@ -21,11 +21,11 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
         var context = await contextFactory.CreateDbContextAsync();
 
         var links = await context.NeighborInfos
-            .Include(a => a.Node)
+            .Include(a => a.NodeReceiver)
             .ThenInclude(a => a.Telemetries.OrderByDescending(t => t.UpdatedAt).Take(10))
-            .Include(a => a.Neighbor)
+            .Include(a => a.NodeHeard)
             .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
-            .Where(n => !MeshtasticService.NodesIgnored.Contains(n.Node.NodeId) && !MeshtasticService.NodesIgnored.Contains(n.Neighbor.NodeId))
+            .Where(n => !MeshtasticService.NodesIgnored.Contains(n.NodeReceiver.NodeId) && !MeshtasticService.NodesIgnored.Contains(n.NodeHeard.NodeId))
             .Where(a => a.Distance > 0 && a.Distance < MeshtasticUtils.DefaultDistanceAllowed)
             .OrderByDescending(n => n.UpdatedAt)
             .ToListAsync()
@@ -34,7 +34,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
         return new GraphDto
         {
             Nodes = links
-                .GroupBy(n => n.Node, (key, values) => key)
+                .GroupBy(n => n.NodeReceiver, (key, values) => key)
                 .Select(n => new GraphDto.NodeDto
                 {
                     NodeId = n.NodeId,
@@ -54,7 +54,7 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
                 })
                 .Union(
                     links
-                        .GroupBy(n => n.Neighbor, (key, values) => key)
+                        .GroupBy(n => n.NodeHeard, (key, values) => key)
                         .Select(n => new GraphDto.NodeDto
                         {
                             NodeId = n.NodeId,
@@ -80,8 +80,8 @@ public class GraphController(ILogger<AController> logger, IDbContextFactory<Data
             Links = links.Select(l => new GraphDto.LinkDto
             {
                 NeighborId = l.Id,
-                NodeSourceId = l.Node.NodeId,
-                NodeTargetId = l.Neighbor.NodeId,
+                NodeSourceId = l.NodeReceiver.NodeId,
+                NodeTargetId = l.NodeHeard.NodeId,
                 Date = l.UpdatedAt,
                 Snr = l.Snr
             }).ToList()

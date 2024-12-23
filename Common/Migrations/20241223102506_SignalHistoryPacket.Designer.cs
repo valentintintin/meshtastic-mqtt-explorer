@@ -3,6 +3,7 @@ using System;
 using Common.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Common.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20241223102506_SignalHistoryPacket")]
+    partial class SignalHistoryPacket
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -117,16 +120,16 @@ namespace Common.Migrations
                     b.Property<double?>("Distance")
                         .HasColumnType("double precision");
 
-                    b.Property<long>("NodeHeardId")
+                    b.Property<long>("NeighborId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("NodeHeardPositionId")
+                    b.Property<long?>("NeighborPositionId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("NodeReceiverId")
+                    b.Property<long>("NodeId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("NodeReceiverPositionId")
+                    b.Property<long?>("NodePositionId")
                         .HasColumnType("bigint");
 
                     b.Property<long?>("PacketId")
@@ -147,13 +150,13 @@ namespace Common.Migrations
 
                     b.HasIndex("DataSource");
 
-                    b.HasIndex("NodeHeardId");
+                    b.HasIndex("NeighborId");
 
-                    b.HasIndex("NodeHeardPositionId");
+                    b.HasIndex("NeighborPositionId");
 
-                    b.HasIndex("NodeReceiverId");
+                    b.HasIndex("NodeId");
 
-                    b.HasIndex("NodeReceiverPositionId");
+                    b.HasIndex("NodePositionId");
 
                     b.HasIndex("PacketId");
 
@@ -653,10 +656,7 @@ namespace Common.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("NodeHeardId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("NodeReceiverId")
+                    b.Property<long>("FromId")
                         .HasColumnType("bigint");
 
                     b.Property<long?>("PacketId")
@@ -668,6 +668,9 @@ namespace Common.Migrations
                     b.Property<float>("Snr")
                         .HasColumnType("real");
 
+                    b.Property<long>("ToId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -675,11 +678,11 @@ namespace Common.Migrations
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("NodeHeardId");
-
-                    b.HasIndex("NodeReceiverId");
+                    b.HasIndex("FromId");
 
                     b.HasIndex("PacketId");
+
+                    b.HasIndex("ToId");
 
                     b.ToTable("SignalHistories");
                 });
@@ -973,6 +976,20 @@ namespace Common.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("Roles", "router");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1L,
+                            Name = "Client",
+                            NormalizedName = "CLIENT"
+                        },
+                        new
+                        {
+                            Id = 2L,
+                            Name = "Admin",
+                            NormalizedName = "ADMIN"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<long>", b =>
@@ -1080,26 +1097,26 @@ namespace Common.Migrations
 
             modelBuilder.Entity("Common.Context.Entities.NeighborInfo", b =>
                 {
-                    b.HasOne("Common.Context.Entities.Node", "NodeHeard")
+                    b.HasOne("Common.Context.Entities.Node", "Neighbor")
                         .WithMany("NeighborsFor")
-                        .HasForeignKey("NodeHeardId")
+                        .HasForeignKey("NeighborId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Common.Context.Entities.Position", "NodeHeardPosition")
+                    b.HasOne("Common.Context.Entities.Position", "NeighborPosition")
                         .WithMany()
-                        .HasForeignKey("NodeHeardPositionId")
+                        .HasForeignKey("NeighborPositionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Common.Context.Entities.Node", "NodeReceiver")
+                    b.HasOne("Common.Context.Entities.Node", "Node")
                         .WithMany("MyNeighbors")
-                        .HasForeignKey("NodeReceiverId")
+                        .HasForeignKey("NodeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Common.Context.Entities.Position", "NodeReceiverPosition")
+                    b.HasOne("Common.Context.Entities.Position", "NodePosition")
                         .WithMany()
-                        .HasForeignKey("NodeReceiverPositionId")
+                        .HasForeignKey("NodePositionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Common.Context.Entities.Packet", "Packet")
@@ -1107,13 +1124,13 @@ namespace Common.Migrations
                         .HasForeignKey("PacketId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("NodeHeard");
+                    b.Navigation("Neighbor");
 
-                    b.Navigation("NodeHeardPosition");
+                    b.Navigation("NeighborPosition");
 
-                    b.Navigation("NodeReceiver");
+                    b.Navigation("Node");
 
-                    b.Navigation("NodeReceiverPosition");
+                    b.Navigation("NodePosition");
 
                     b.Navigation("Packet");
                 });
@@ -1239,15 +1256,9 @@ namespace Common.Migrations
 
             modelBuilder.Entity("Common.Context.Entities.SignalHistory", b =>
                 {
-                    b.HasOne("Common.Context.Entities.Node", "NodeHeard")
+                    b.HasOne("Common.Context.Entities.Node", "From")
                         .WithMany()
-                        .HasForeignKey("NodeHeardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Common.Context.Entities.Node", "NodeReceiver")
-                        .WithMany()
-                        .HasForeignKey("NodeReceiverId")
+                        .HasForeignKey("FromId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1256,11 +1267,17 @@ namespace Common.Migrations
                         .HasForeignKey("PacketId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("NodeHeard");
+                    b.HasOne("Common.Context.Entities.Node", "To")
+                        .WithMany()
+                        .HasForeignKey("ToId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Navigation("NodeReceiver");
+                    b.Navigation("From");
 
                     b.Navigation("Packet");
+
+                    b.Navigation("To");
                 });
 
             modelBuilder.Entity("Common.Context.Entities.Telemetry", b =>

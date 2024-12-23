@@ -2,10 +2,10 @@ namespace Common.Models;
 
 public class TracerouteNodeRoute
 {
-    private double? _snr;
+    private float? _snr;
     public uint NodeId { get; set; }
 
-    public double? Snr
+    public float? Snr
     {
         get => _snr;
         set
@@ -13,7 +13,7 @@ public class TracerouteNodeRoute
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (value != -128)
             {
-                _snr = value / 4.0;
+                _snr = value / 4.0f;
             }
         }
     }

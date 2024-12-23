@@ -1,0 +1,186 @@
+@page "/signal-plotter/{node1Id:long}/{node2Id:long}"
+
+@using System.Globalization
+@using System.Text
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Extensions.Entities
+@using CsvHelper
+@using Google.Protobuf
+@using MeshtasticMqttExplorer.Models
+@using Microsoft.EntityFrameworkCore
+
+@implements IAsyncDisposable
+
+@inject IMessageService Message
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavigationManager
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Comparaison de signaux</PageTitle>
+
+<PageHeader Title="Comparaison de signaux">
+    <SubtitleTemplate>Entre @Node1?.FullName() et @Node2?.FullName()</SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button Disabled="@Loading" OnClick="ExportDataCsv">Exporter en CSV</Button>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Spin Spinning="Loading">
+    @if (Node1 == null || Node2 == null)
+    {
+        <Result Title="Nœud introuvable" Status="404"></Result>
+    }
+    else if (DataSnr.Count == 0)
+    {
+        <Empty></Empty>
+    }
+    else
+    {
+        <Card Title="SNR">
+            <ChildContent>
+                <AntDesign.Charts.Line Data="DataSnr" Config="_configSnr"/>
+            </ChildContent>
+        </Card>
+    
+        <Card Title="RSSI">
+            <ChildContent>
+                <AntDesign.Charts.Line Data="DataRssi" Config="_configRssi"/>
+            </ChildContent>
+        </Card>
+    }
+</Spin>
+
+@code {
+    private readonly LineConfig _configSnr = Utils.GetLineConfig("SNR", null, null, true);
+    private readonly LineConfig _configRssi = Utils.GetLineConfig("RSSI", null, null, true);
+
+    [Parameter]
+    public long Node1Id { get; set; }
+    
+    [Parameter]
+    public long Node2Id { get; set; }
+    
+    private bool Loading { get; set; } = true;
+    private DataContext Context { get; set; } = null!;
+    private Node? Node1 { get; set; }
+    private Node? Node2 { get; set; }
+    private List<DateChartData<float>> DataSnr { get; set; } = [];
+    private List<DateChartData<float>> DataRssi { get; set; } = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        FetchData();
+        
+        base.OnParametersSet();
+    }
+    
+    private void FetchData()
+    {
+        Loading = true;
+
+        Node1 = Context.Nodes.FindById(Node1Id);
+        Node2 = Context.Nodes.FindById(Node2Id);
+
+        if (Node1 == null || Node2 == null)
+        {
+            Loading = false;
+            return;
+        }
+        
+        var signalHistories = GetSignalHistories();
+        
+        DataSnr = signalHistories
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = $"{a.NodeHeard.OneName(true)} --> {a.NodeReceiver.OneName(true)}",
+                value = a.Snr
+            })
+            .ToList();
+        
+        DataRssi = signalHistories
+            .Where(a => a.Rssi.HasValue && a.Rssi != 0)
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = $"{a.NodeHeard.OneName(true)} --> {a.NodeReceiver.OneName(true)}",
+                value = a.Rssi!.Value
+            })
+            .ToList();
+        
+        Loading = false;
+    }
+
+    private async Task ExportDataCsv()
+    {
+        var memoryStream = new MemoryStream();
+        await using var writer = new StreamWriter(memoryStream);
+        await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
+        
+        await csv.WriteRecordsAsync(GetSignalHistories().Select(a => new DataSnrRssiCsv
+        {
+            DateTime = a.CreatedAt.ToString("o", CultureInfo.InvariantCulture),
+            NodeHeardId = a.NodeHeard.NodeIdAsString(),
+            NodeHeardName = a.NodeHeard.OneName(true),
+            NodeReceiverId = a.NodeReceiver.OneName(true),
+            NodeReceiverName = a.NodeReceiver.NodeIdAsString(),
+            Snr = a.Snr,
+            Rssi = a.Rssi != 0 && a.Rssi != null ? a.Rssi : null,
+            PacketUrl = a.PacketId != null ? $"{NavigationManager.BaseUri}packet/{a.PacketId}" : null
+        }));
+        
+        await csv.FlushAsync();
+
+        memoryStream.Seek(0, SeekOrigin.Begin);
+
+        await JsRuntime.InvokeVoidAsync("downloadFile", 
+            "data:text/csv;charset=utf-8", 
+            $"{Node1!.OneName(true)}_{Node2!.OneName(true)}_signal_export.csv",
+            Encoding.UTF8.GetString(memoryStream.ToArray())
+        );
+        
+        await Message.Info("CSV téléchargé !");
+    }
+
+    private List<SignalHistory> GetSignalHistories()
+    {
+        var minDate = DateTime.UtcNow.Date.AddDays(-3);
+
+        var packets = Context.SignalHistories
+        .Include(a => a.NodeReceiver)
+        .Include(a => a.NodeHeard)
+        .Where(a => (a.NodeReceiverId == Node1Id && a.NodeHeardId == Node2Id || a.NodeReceiverId == Node2Id && a.NodeHeardId == Node1Id) && a.CreatedAt >= minDate)
+        .OrderBy(a => a.CreatedAt)
+        .AsNoTrackingWithIdentityResolution()
+        .ToList();
+
+        return packets;
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+    
+    private class DataSnrRssiCsv
+    {
+        public required string DateTime { get; set; }
+        public required string NodeHeardId { get; set; } 
+        public required string NodeHeardName { get; set; } 
+        public required string NodeReceiverName { get; set; } 
+        public required string NodeReceiverId { get; set; } 
+        public required float Snr { get; set; } 
+        public required float? Rssi { get; set; } 
+        public required string PacketUrl { get; set; } 
+    }
+}

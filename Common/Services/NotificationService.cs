@@ -20,19 +20,24 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => !n.FromOrTo.HasValue 
                         || packet.From.NodeId == n.FromOrTo 
                         || packet.To.NodeId == n.FromOrTo)
-            .Where(n => !n.MqttServerId.HasValue 
-                        || packet.MqttServerId == n.MqttServerId || packet.From.MqttServerId == n.MqttServerId
+            .Where(n => !n.MqttServerId.HasValue
+                        || packet.MqttServerId == n.MqttServerId 
+                        || packet.From.MqttServerId == n.MqttServerId
+                        || packet.Gateway.MqttServerId == n.MqttServerId
                         || (packet.PacketDuplicated != null && packet.PacketDuplicated.MqttServerId == n.MqttServerId)
             )
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
             .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
             .AsEnumerable()
-            .Where(n => !n.DistanceAroundPositionKm.HasValue
-                        || (
-                            n is { Latitude: not null, Longitude: not null } 
-                            && packet.GatewayPosition != null && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value, packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <= n.DistanceAroundPositionKm)
-                        )
+            .Where(n => 
+                !n.DistanceAroundPositionKm.HasValue
+                || (
+                    n is { Latitude: not null, Longitude: not null } 
+                    && packet.GatewayPosition != null 
+                    && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value, packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <= n.DistanceAroundPositionKm
+                )
+            )
             .DistinctBy(n => n.Url)
             .ToList();
 

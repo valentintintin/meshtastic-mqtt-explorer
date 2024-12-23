@@ -21,6 +21,7 @@
         {
             @* <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> *@
         }
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderContent>
 </PageHeader>
 

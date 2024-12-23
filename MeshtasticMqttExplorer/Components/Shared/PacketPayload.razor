@@ -249,7 +249,7 @@
                                         @foreach (var route in TracerouteInfo!.Value.routes)
                                         {
                                             <TimelineItem Color="@(route.Hop == 0 ? "red" : route.Hop == TraceRoute!.Route.Count + 1 ? "blue" : "green")">
-                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.NodeId</a>
                                                 @if (route.Snr != null)
                                                 {
                                                     <br/>
@@ -272,7 +272,7 @@
                                         @foreach (var route in TracerouteInfo!.Value.routesBack)
                                         {
                                             <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.RouteBack.Count ? "red" : "green")">
-                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.NodeId</a>
                                                 @if (route.Snr != null)
                                                 {
                                                     <br/>

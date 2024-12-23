@@ -32,13 +32,12 @@ public class UserController(ILogger<AController> logger, UserManager<User> userM
         
         var user = await userManager.Users.SingleOrDefaultAsync(a => a.ExternalId == userExternalId);
 
+        var email = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+        var username = User.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
         var password = userService.GeneratePassword(10);
             
         if (user == null)
         {
-            var email = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
-            var username = User.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
-         
             Logger.LogInformation("Create new user for external ID {userExternalId} ", userExternalId);
 
             await userService.CreateUser(new UserCreateDto
@@ -52,6 +51,15 @@ public class UserController(ILogger<AController> logger, UserManager<User> userM
         else
         {
             Logger.LogInformation("Generate MQTT password for user#{id} external ID {userExternalId}", user.Id, userExternalId);
+
+            if (user.UserName != username || user.Email != email)
+            {
+                await userService.UpdateUser(user.Id, new UserUpdateDto
+                {
+                    Username = username,
+                    Email = email,
+                });
+            }
             
             await userService.ChangePassword(user.Id, password);
         }

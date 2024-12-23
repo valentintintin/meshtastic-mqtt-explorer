@@ -6,5 +6,8 @@ riderModule.iml
 published*/
 .idea
 MeshtasticMqttExplorer/appsettings.Production.json
-Recorder/appsettings.Production.json
+MeshtasticMqttExplorer/appsettings.Production.Gaulix.json
 MeshtasticMqttExplorer/wwwroot/mymap.pmtiles
+Recorder/appsettings.Production.json
+MqttRouter/appsettings.Production.json
+MqttRouter/appsettings.Production.Gaulix.json

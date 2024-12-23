@@ -26,6 +26,7 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
+    public required DbSet<SignalHistory> SignalHistories { get; set; }
     
     public required DbSet<MqttServer> MqttServers { get; set; }
     public required DbSet<Webhook> Webhooks { get; set; }
@@ -38,21 +39,8 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetAssembly(typeof(PacketConfiguration))!);
-        
-        modelBuilder.Entity<IdentityRole<long>>().ToTable("Roles", "router")
-            .HasData([
-                new IdentityRole<long>(SecurityConstants.RoleName.Client.ToString())
-                {
-                    Id = 1,
-                    NormalizedName = SecurityConstants.RoleName.Client.ToString().ToUpper(),
-                },
-                new IdentityRole<long>(SecurityConstants.RoleName.Admin.ToString())
-                {
-                    Id = 2,
-                    NormalizedName = SecurityConstants.RoleName.Admin.ToString().ToUpper(),
-                },
-            ]);
-        
+
+        modelBuilder.Entity<IdentityRole<long>>().ToTable("Roles", "router");
         modelBuilder.Entity<IdentityUserClaim<long>>().ToTable("UserClaims", "router");
         modelBuilder.Entity<IdentityUserRole<long>>().ToTable("UserRoles", "router");
         modelBuilder.Entity<IdentityUserLogin<long>>().ToTable("UserLogins", "router");

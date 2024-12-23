@@ -119,11 +119,11 @@
             .Include(n => n.MyNeighbors
                 .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
-            .ThenInclude(n => n.Neighbor)
+            .ThenInclude(n => n.NodeHeard)
             .Include(n => n.NeighborsFor
                 .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
-            .ThenInclude(n => n.Node)
+            .ThenInclude(n => n.NodeReceiver)
             .Include(n => n.Positions.OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.OrderBy(a => a.CreatedAt))
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))

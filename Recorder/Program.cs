@@ -99,8 +99,8 @@ try
         {
             try
             {
-                data.Node = data.Packet!.Gateway;
-                data.Neighbor = data.Packet.From;
+                data.NodeReceiver = data.Packet!.Gateway;
+                data.NodeHeard = data.Packet.From;
                 context.Update(data);
                 i++;
 

@@ -50,7 +50,7 @@ public class PurgeService : AService
         Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
         Context.RemoveRange(Context.Positions.Where(a => a.CreatedAt < minDate && a.Node == node));
         Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate && a.Node == node));
-        Context.RemoveRange(Context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.Node == node));
+        Context.RemoveRange(Context.NeighborInfos.Where(a => a.CreatedAt < minDate && a.NodeReceiver == node));
 
         await Context.SaveChangesAsync();
     }
@@ -65,6 +65,7 @@ public class PurgeService : AService
         Context.RemoveRange(Context.Positions.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.NeighborInfos.Where(a => a.CreatedAt < minDate));
+        Context.RemoveRange(Context.SignalHistories.Where(a => a.CreatedAt < minDate));
 
         await Context.SaveChangesAsync();
     }

@@ -26,6 +26,14 @@ public static class MeshtasticUtils
         return Math.Round(distance, 2);
     }
 
+    public static double[] GetMiddle(double x1, double y1, double x2, double y2)
+    {
+        return [
+            (x1 + x2) / 2,
+            (y1 + y2) / 2
+        ];
+    }
+
     private static double DegreesToRadians(double degrees)
     {
         return degrees * Math.PI / 180;

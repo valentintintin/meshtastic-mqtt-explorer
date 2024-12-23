@@ -2,9 +2,8 @@ namespace Common;
 
 public static class SecurityConstants
 {
-    public enum RoleName
+    public enum Claim
     {
-        Client,
-        Admin
+        ReceiveEveryPackets
     }
 }

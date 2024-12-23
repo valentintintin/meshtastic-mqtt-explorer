@@ -4,6 +4,7 @@ using AntDesign;
 using Blazored.LocalStorage;
 using Common.Context;
 using Common.Services;
+using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Services;

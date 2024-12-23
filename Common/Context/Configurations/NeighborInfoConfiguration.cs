@@ -12,27 +12,27 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
         builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => a.UpdatedAt);
         
-        builder.HasOne(a => a.Node)
+        builder.HasOne(a => a.NodeReceiver)
             .WithMany(a => a.MyNeighbors)
-            .HasForeignKey(a => a.NodeId);
+            .HasForeignKey(a => a.NodeReceiverId);
         
-        builder.HasOne(a => a.Neighbor)
+        builder.HasOne(a => a.NodeHeard)
             .WithMany(a => a.NeighborsFor)
-            .HasForeignKey(a => a.NeighborId);
+            .HasForeignKey(a => a.NodeHeardId);
         
         builder.HasOne(a => a.Packet)
             .WithMany()
             .HasForeignKey(a => a.PacketId)
             .OnDelete(DeleteBehavior.SetNull);
         
-        builder.HasOne(a => a.NodePosition)
+        builder.HasOne(a => a.NodeReceiverPosition)
             .WithMany()
-            .HasForeignKey(a => a.NodePositionId)
+            .HasForeignKey(a => a.NodeReceiverPositionId)
             .OnDelete(DeleteBehavior.SetNull);
         
-        builder.HasOne(a => a.NeighborPosition)
+        builder.HasOne(a => a.NodeHeardPosition)
             .WithMany()
-            .HasForeignKey(a => a.NeighborPositionId)
+            .HasForeignKey(a => a.NodeHeardPositionId)
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.Property(a => a.DataSource).EnumToString();
