@@ -4,7 +4,7 @@
 
 <PageTitle>Une erreur est survenue !</PageTitle>
 
-<Result Status="error" Title="Une erreur est survenue" SubTitle="@("Requête : " + RequestId)"></Result>
+<Result Status="ResultStatus.Error" Title="Une erreur est survenue" SubTitle="@("Requête : " + RequestId)"></Result>
 
 @code{
     [CascadingParameter] private HttpContext? HttpContext { get; set; }

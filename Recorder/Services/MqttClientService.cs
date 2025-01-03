@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
@@ -15,7 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Protocol;
 using User = Meshtastic.Protobufs.User;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
@@ -27,7 +25,6 @@ public class MqttClientService : BackgroundService
     public static readonly List<MqttClientAndConfiguration> MqttClientAndConfigurations  = [];
     private readonly ILogger<MqttClientService> _logger;
     private readonly IConfiguration _configuration;
-    private readonly IDbContextFactory<DataContext> _contextFactory;
     private readonly IHostEnvironment _environment;
     private readonly IServiceProvider _serviceProvider;
 
@@ -35,20 +32,18 @@ public class MqttClientService : BackgroundService
     {
         _logger = logger;
         _configuration = configuration;
-        _contextFactory = contextFactory;
         _environment = environment;
         _serviceProvider = serviceProvider;
         
         MqttClientAndConfigurations.AddRange(
             contextFactory.CreateDbContext().MqttServers
-            .Where(a => a.Enabled)
-            .ToList()
-            .Select(a => new MqttClientAndConfiguration
-            {
-                MqttServer = a,
-                // Client = new MqttClientFactory().CreateMqttClient()
-                Client = new MqttFactory().CreateMqttClient()
-            })
+                .Where(a => a.Enabled)
+                .ToList()
+                .Select(a => new MqttClientAndConfiguration
+                {
+                    MqttServer = a,
+                    Client = new MqttClientFactory().CreateMqttClient()
+                })
         );
         
         foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations)
@@ -76,27 +71,7 @@ public class MqttClientService : BackgroundService
                 var topic = e.ApplicationMessage.Topic;
                 _logger.LogInformation("Received from {name} on {topic} with id {guid}", mqttClientAndConfiguration.MqttServer.Name, topic, guid);
 
-                if (topic.Contains("json"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("paho")) // Bad guys on Meshtastic MQTT server
-                {
-                    return;
-                }
-
-                if (topic.Contains("stat"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("json"))
-                {
-                    return;
-                }
-
-                if (topic.Contains("RxCanaux")) // Gaulix filtre de Nivek
+                if (topic.Contains("paho") || topic.Contains("stat") || topic.Contains("json"))
                 {
                     return;
                 }
@@ -105,8 +80,12 @@ public class MqttClientService : BackgroundService
                 mqttClientAndConfiguration.LastPacketReceivedDate = DateTime.UtcNow;
 
                 var mqttService = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<MqttService>();
-                // var packet = await mqttService.DoReceive(topic, e.ApplicationMessage.Payload, mqttClientAndConfiguration.MqttServer);
-                var packet = await mqttService.DoReceive(topic, new ReadOnlySequence<byte>(e.ApplicationMessage.Payload), mqttClientAndConfiguration.MqttServer);
+                var packet = await mqttService.DoReceive(topic, e.ApplicationMessage.Payload, mqttClientAndConfiguration.MqttServer);
+
+                if (packet is { packet: not null, meshPacket: not null })
+                {
+                    await RelayToAnotherMqttServer(topic, packet.Value.packet, packet.Value.meshPacket, mqttClientAndConfiguration.MqttServer);
+                }
 
                 _logger.LogInformation("Received frame#{packetId} from {name} on {topic} with id {guid} done. Frame time {frameTime}", packet?.packet.Id, mqttClientAndConfiguration.MqttServer.Name, topic, guid, DateTimeOffset.FromUnixTimeSeconds(packet?.meshPacket.RxTime ?? 0));
             };
@@ -119,6 +98,27 @@ public class MqttClientService : BackgroundService
                 await ConnectMqtt();
             };
         }
+    }
+
+    private async Task RelayToAnotherMqttServer(string topic, Packet packet, MeshPacket meshPacket, MqttServer mqttServer)
+    {
+        List<Task> tasks = [];
+        
+        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(a => a.MqttServer != mqttServer && a.MqttServer.IsARelayType != null))
+        {
+            if (mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.All
+                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.MapReport && meshPacket!.Decoded?.Portnum == PortNum.MapReportApp
+                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.NodeInfoAndPosition && (meshPacket!.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp)
+                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.UseFull && (meshPacket!.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.NeighborinfoApp or PortNum.TracerouteApp)
+            )
+            {
+                _logger.LogInformation("Relay from MqttServer {name}, frame#{packetId} from {from} of type {portNum} to MqttServer {name} topic {topic}", mqttServer.Name, packet.Id, packet.From, meshPacket.Decoded?.Portnum, mqttClientAndConfiguration.MqttServer.Name, topic);
+
+                tasks.Add(mqttClientAndConfiguration.Client.PublishBinaryAsync(topic, meshPacket.ToByteArray()));
+            }
+        }
+        
+        await Task.WhenAll(tasks);
     }
     
     public async Task PublishMessage(PublishMessageDto dto)

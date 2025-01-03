@@ -67,7 +67,7 @@
                              Avatar="@message.From.HardwareModel.GetImageUrl()"
                              Content="@message.Message"
                              Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"
-                             Placement="@(message.To?.NodeId == MeshtasticService.NodeBroadcast ? "left" : "right")">
+                             Placement="@(message.To?.NodeId == MeshtasticService.NodeBroadcast ? CommentPlacement.Left : CommentPlacement.Right)">
                     </Comment>
                 }
                 
@@ -79,7 +79,7 @@
             }
             else
             {
-                <Result Title="Aucun canal" Status="warning"></Result>
+                <Result Title="Aucun canal" Status="ResultStatus.Warning"></Result>
             }
         </Content>
     </Layout>

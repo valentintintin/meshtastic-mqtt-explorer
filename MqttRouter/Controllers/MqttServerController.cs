@@ -51,10 +51,19 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
         _userIds.Add(eventArgs.ClientId, user.Id);
 
-        if (await userService.HasClaim(user, SecurityConstants.Claim.ReceiveEveryPackets))
+        try
         {
-            _logger.LogInformation("Client {username}#{userId} identified with id {clientId} has claim ReceiveEveryPackets", eventArgs.UserName, user.Id, eventArgs.ClientId);            
-            _clientIdsWithClaimEveryPacket.Add(eventArgs.ClientId);
+            if (await userService.HasClaim(user, SecurityConstants.Claim.ReceiveEveryPackets))
+            {
+                _logger.LogInformation(
+                    "Client {username}#{userId} identified with id {clientId} has claim ReceiveEveryPackets",
+                    eventArgs.UserName, user.Id, eventArgs.ClientId);
+                _clientIdsWithClaimEveryPacket.Add(eventArgs.ClientId);
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogCritical(e, "Error occured while trying to get claim ReceiveEveryPackets");
         }
 
         _logger.LogInformation("Client {username}#{userId} identified with id {clientId}", eventArgs.UserName, user.Id,
@@ -63,6 +72,16 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
     public async Task OnNewPacket(InterceptingPublishEventArgs eventArgs)
     {
+        if (!eventArgs.ApplicationMessage.Topic.Contains("msh/"))
+        {
+            return;
+        }
+        
+        if (_clientIdReceivers.ContainsKey(eventArgs.ClientId))
+        {
+            _clientIdReceivers.Remove(eventArgs.ClientId);
+        }
+        
         var services = serviceProvider.CreateScope().ServiceProvider;
         var context = services.GetRequiredService<DataContext>();
         var routingService = services.GetRequiredService<RoutingService>();
@@ -111,8 +130,6 @@ public class MqttServerController(IServiceProvider serviceProvider)
         if (eventArgs.ApplicationMessage.Topic.Contains("stat") || eventArgs.ApplicationMessage.Topic.Contains("json"))
         {
             eventArgs.ProcessPublish = false;
-            _logger.LogInformation("Client {clientId} and user#{userId} send packet {guid} on {topic} ignored",
-                eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic);
             return;
         }
         
@@ -133,8 +150,15 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
         if (packetAndMeshPacket.Value.packet.PacketDuplicated != null)
         {
-            _clientIdReceivers.Add(eventArgs.ClientId, receiverIds);
-            
+            if (receiverIds.Count > 0)
+            {
+                _clientIdReceivers.Add(eventArgs.ClientId, receiverIds);
+            }
+            else
+            {
+                eventArgs.ProcessPublish = false;
+            }
+
             _logger.LogInformation(
                 "Client {clientId} and user#{userId} send packet {guid} on {topic} refused because packet#{packetId} duplicated",
                 eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
@@ -173,6 +197,12 @@ public class MqttServerController(IServiceProvider serviceProvider)
                 "Client {clientId} and user#{userId} send packet {guid} on {topic} refused : {comment}",
                 eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
                 packetActivity.Comment);
+            
+            if (receiverIds.Count == 0)
+            {
+                eventArgs.ProcessPublish = false;
+                return;
+            }
         }
 
         if (receiverIds.Count > 0)
@@ -183,6 +213,11 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
     public Task BeforeSend(InterceptingClientApplicationMessageEnqueueEventArgs eventArgs)
     {
+        if (!eventArgs.ApplicationMessage.Topic.Contains("msh/"))
+        {
+            return Task.CompletedTask;
+        }
+        
         if (!_clientIdReceivers.TryGetValue(eventArgs.SenderClientId, out var receivers) ||
             receivers.Contains(eventArgs.ReceiverClientId))
         {
@@ -210,7 +245,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
         {
             _clientIdsWithClaimEveryPacket.Remove(eventArgs.ClientId);
         }
-
+        
         var services = serviceProvider.CreateScope().ServiceProvider;
         var context = services.GetRequiredService<DataContext>();
 
@@ -249,7 +284,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
         }
         
         var nodeConfiguration = await context.NodeConfigurations
-            .Include(nodeConfiguration => nodeConfiguration.Node)
+            .Include(a => a.Node)
             .FirstOrDefaultAsync(a => a.Node.NodeId == connectedNodeId);
         
         if (nodeConfiguration != null)

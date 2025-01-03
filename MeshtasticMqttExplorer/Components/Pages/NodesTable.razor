@@ -24,32 +24,32 @@
 
 <Table TItem="Node" DataSource="NodesQueryable" Responsive Locale="Utils.TableLocale">
     <ChildContent>
-        <PropertyColumn Property="c => c.AllNames" Title="ID - Nom" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
+        <PropertyColumn Property="c => c.AllNames" Title="ID - Nom" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable DefaultSortOrder="SortDirection.Ascending">
             <div style="width: 300px">
                 <a href="/node/@context.Id" target="_blank" rel="nofollow">@context.AllNames</a>
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable>
+        <PropertyColumn Property="c => c.LastSeen" Title="Vu dernière fois" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }">
             <div style="width: 130px">
                 <Date Value="context.LastSeen" Fallback="-"></Date>
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable Filters="Utils.RegionCodeFilters">
+        <PropertyColumn Property="c => c.RegionCode" Title="Bande" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filters="Utils.RegionCodeFilters">
             <div style="width: 50px">
                 @(context.RegionCode?.ToString() ?? "-")
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.ModemPreset" Title="Profil de modulation" Sortable Filters="Utils.ModemPresetFilters">
+        <PropertyColumn Property="c => c.ModemPreset" Title="Profil de modulation" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filters="Utils.ModemPresetFilters">
             <div style="width: 100px">
                 @(context.ModemPreset?.ToString() ?? "-")
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable Filters="Utils.RoleFilters">
+        <PropertyColumn Property="c => c.Role" Title="Rôle" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filters="Utils.RoleFilters">
             <div style="width: 100px">
                 @(context.Role?.ToString() ?? "-")
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable>
+        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }">
             <div style="width: 30px">
                 @(context.IsMqttGateway == true ? "Oui" : "Non")
             </div>

@@ -11,7 +11,7 @@ namespace MeshtasticMqttExplorer.Controllers;
 
 [ApiController]
 [Route("graph")]
-public class GraphController(ILogger<AController> logger, IDbContextFactory<DataContext> contextFactory) : AController(logger)
+public class GraphController(ILogger<GraphController> logger, IDbContextFactory<DataContext> contextFactory) : AController(logger)
 {
     [HttpGet]
     public async Task<GraphDto> GetGraph()

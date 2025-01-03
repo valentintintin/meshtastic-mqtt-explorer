@@ -91,7 +91,7 @@ else
                 <a href="/node/@context.GatewayId" target="_blank" rel="nofollow">@context.Gateway.AllNames</a>
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable Filterable DefaultSortOrder="SortDirection.Descending">
+        <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable DefaultSortOrder="SortDirection.Descending">
             <div style="width: 80px">
                 <Date Value="context.CreatedAt"></Date>
             </div>

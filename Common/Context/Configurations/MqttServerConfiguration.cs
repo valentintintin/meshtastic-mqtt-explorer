@@ -19,5 +19,7 @@ public class MqttServerConfiguration : IEntityTypeConfiguration<MqttServer>
         builder.Property(a => a.Password).HasMaxLength(128);
         
         builder.Property(a => a.Topics).ListOfString().HasMaxLength(128);
+        
+        builder.Property(a => a.IsARelayType).EnumToStringNotRequired(32);
     }
 }

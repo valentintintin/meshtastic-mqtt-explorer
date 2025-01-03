@@ -15,6 +15,9 @@
     <SubtitleTemplate>
         @Total nœuds MQTT dont @TotalConnected connectés
     </SubtitleTemplate>
+    <PageHeaderContent>
+        <Switch @bind-Checked="OnlyConnected" UnCheckedChildren="Tous les noeuds" CheckedChildren="Seulement les connectés" OnChange="value => SetShowOnlyConnected(value)"/>
+    </PageHeaderContent>
     <PageHeaderExtra>
         <Button OnClick="FetchData">Actualiser</Button>
     </PageHeaderExtra>
@@ -22,23 +25,23 @@
 
 <Table TItem="NodeConfiguration" DataSource="NodesQueryable" Responsive Locale="Utils.TableLocale">
     <ChildContent>
-        <PropertyColumn Property="c => c.Node.AllNames" Title="ID - Nom" Sortable Filterable DefaultSortOrder="SortDirection.Ascending">
+        <PropertyColumn Property="c => c.Node.AllNames" Title="ID - Nom" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable DefaultSortOrder="SortDirection.Ascending">
             <div style="width: 300px">
                 <a href="/node/@context.Node.Id" target="_blank" rel="nofollow">@context.Node.AllNames</a>
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.UpdatedAt" Title="Date de mise à jour" Sortable Filterable>
+        <PropertyColumn Property="c => c.UpdatedAt" Title="Date de mise à jour" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable>
             @context.UpdatedAt.ToFrench()
         </PropertyColumn>
-        <PropertyColumn Property="c => c.Department" Title="Département" Sortable Filterable>
+        <PropertyColumn Property="c => c.Department" Title="Département" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable>
             <div style="width: 100px">
                 @context.Department
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.MqttId" Title="MQTT client ID" Sortable Filterable>
+        <PropertyColumn Property="c => c.MqttId" Title="MQTT client ID" Filterable>
             @context.MqttId
         </PropertyColumn>
-        <PropertyColumn Property="c => c.UserId" Title="Utilisateur" Sortable Filterable>
+        <PropertyColumn Property="c => c.UserId" Title="Utilisateur">
             @if (context.User != null)
             {
                 <a href="mailto:@context.User.Email">@context.User.UserName - @context.User.Email</a>
@@ -57,6 +60,7 @@
     [Parameter]
     public long? Id { get; set; }
     
+    private bool OnlyConnected { get; set; }
     private int Total { get; set; }
     private int TotalConnected { get; set; }
     private IQueryable<NodeConfiguration> NodesQueryable { get; set; } = null!;
@@ -69,6 +73,7 @@
         NodesQueryable = Context.NodeConfigurations
             .Include(a => a.Node)
             .Include(a => a.User)
+            .Where(a => !OnlyConnected || !string.IsNullOrWhiteSpace(a.MqttId))
             .AsNoTrackingWithIdentityResolution();
         
         var localContext = await ContextFactory.CreateDbContextAsync();
@@ -92,6 +97,12 @@
             .AsNoTrackingWithIdentityResolution()
             .Count();
     }
+
+    private void SetShowOnlyConnected(bool value)
+    {
+        OnlyConnected = value;
+        FetchData();
+    } 
 
     public async ValueTask DisposeAsync()
     {

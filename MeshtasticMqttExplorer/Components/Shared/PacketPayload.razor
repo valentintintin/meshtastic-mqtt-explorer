@@ -200,25 +200,29 @@
                         break;
                     case PortNum.NeighborinfoApp:
                         <Descriptions Column="1">
-                            <DescriptionsItem Title="Dernier entendu">
-                                <a href="/node/by-nodeid/@NeighborInfo?.LastSentById.ToHexString()" target="_blank" rel="nofollow">@NeighborInfo?.LastSentById.ToHexString()</a>
-                            </DescriptionsItem>
                             <DescriptionsItem Title="Interval">
-                                <TimeElapsed Value="@(TimeSpan.FromSeconds(NeighborInfo?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
+                                <TimeElapsed Value="@(TimeSpan.FromSeconds(Neighbors?.NodeBroadcastIntervalSecs ?? 0))" Fallback="-"></TimeElapsed>
                             </DescriptionsItem>
                             <DescriptionsItem Title="Voisins">
-                                @if (NeighborInfo?.Neighbors?.Any() == true)
+                                @if (NeighborsInfo?.Any() == true)
                                 {
                                     <div style="display: flex; flex-wrap: wrap">
-                                        @foreach (var neighbor in NeighborInfo?.Neighbors ?? [])
+                                        @foreach (var neighbor in NeighborsInfo ?? [])
                                         {
                                             <Tag>
-                                                <a href="/node/by-nodeid/@neighbor.NodeId.ToHexString()" target="_blank" rel="nofollow">@neighbor.NodeId.ToHexString()</a>
-                                                (SNR : @neighbor.Snr)
-                                                @if (neighbor.LastRxTime > 0)
+                                                @if (neighbor.Node != null)
                                                 {
-                                                    <text>- Entendu la dernière fois @neighbor.LastRxTime</text>     
+                                                    <a href="/node/@neighbor.Node.Id" target="_blank" rel="nofollow">@neighbor.Node.FullName()</a>
                                                 }
+                                                else
+                                                {
+                                                    <a href="/node/by-nodeid/@neighbor.NodeId.ToHexString()" target="_blank" rel="nofollow">@neighbor.NodeId.ToHexString()</a>
+                                                }
+                                                (SNR : @neighbor.Snr)
+                                                @* @if (neighbor.LastRxTime > 0) *@
+                                                @* { *@
+                                                @*     <text>- Entendu la dernière fois @neighbor.LastRxTime</text>      *@
+                                                @* } *@
                                             </Tag>
                                         }
                                     </div>
@@ -248,13 +252,21 @@
                                     <Timeline>
                                         @foreach (var route in TracerouteInfo!.Value.routes)
                                         {
-                                            <TimelineItem Color="@(route.Hop == 0 ? "red" : route.Hop == TraceRoute!.Route.Count + 1 ? "blue" : "green")">
-                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.NodeId</a>
+                                            <TimelineItem Color="@(route.Hop == 0 ? TimelineDotColor.Red : route.Hop == TraceRoute!.Route.Count + 1 ? TimelineDotColor.Blue : TimelineDotColor.Green)">
                                                 @if (route.Snr != null)
                                                 {
+                                                    <text>Entendu avec un SNR de </text>
+                                                    <b>@route.Snr</b><text> par</text>
                                                     <br/>
-                                                    <text>SNR : </text>
-                                                    @route.Snr
+                                                }
+
+                                                @if (route.Node != null)
+                                                {
+                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName()</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
                                                 }
                                             </TimelineItem>
                                         }
@@ -271,13 +283,21 @@
                                     <Timeline>
                                         @foreach (var route in TracerouteInfo!.Value.routesBack)
                                         {
-                                            <TimelineItem Color="@(route.Hop == 0 ? "blue" : route.Hop == TraceRoute!.RouteBack.Count ? "red" : "green")">
-                                                <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.NodeId</a>
+                                            <TimelineItem Color="@(route.Hop == 0 ? TimelineDotColor.Blue : route.Hop == TraceRoute!.RouteBack.Count ? TimelineDotColor.Red : TimelineDotColor.Green)">
                                                 @if (route.Snr != null)
                                                 {
+                                                    <text>Entendu avec un SNR de </text>
+                                                    <b>@route.Snr</b><text> par</text>
                                                     <br/>
-                                                    <text>SNR : </text>
-                                                    @route.Snr
+                                                }
+                                                
+                                                @if (route.Node != null)
+                                                {
+                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName()</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
                                                 }
                                             </TimelineItem>
                                         }
@@ -434,7 +454,7 @@
     private Telemetry? Telemetry { get; set; }
     private User? User { get; set; }
     private Position? Position { get; set; }
-    private NeighborInfo? NeighborInfo { get; set; }
+    private NeighborInfo? Neighbors { get; set; }
     private MapReport? MapReport { get; set; }
     private RouteDiscovery? TraceRoute { get; set; }
     private Routing? Routing { get; set; }
@@ -444,7 +464,8 @@
     private string? RawJson { get; set; }
     private string? RawBase64 { get; set; }
     private string? PayloadJson { get; set; }
-    private (List<TracerouteNodeRoute> routes, List<TracerouteNodeRoute> routesBack)? TracerouteInfo { get; set; } 
+    private (List<NodeSnr> routes, List<NodeSnr> routesBack)? TracerouteInfo { get; set; } 
+    private List<NodeSnr>? NeighborsInfo { get; set; } 
     
     private Osm.Marker? Marker { get; set; }
 
@@ -487,7 +508,8 @@
 
                     break;
                 case PortNum.NeighborinfoApp:
-                    NeighborInfo = packetData.GetPayload<NeighborInfo>();
+                    Neighbors = packetData.GetPayload<NeighborInfo>();
+                    NeighborsInfo = MeshtasticService.GetNeighborsInfo(Neighbors?.Neighbors ?? []);
                     break;
                 case PortNum.MapReportApp:
                     MapReport = packetData.GetPayload<MapReport>();
@@ -506,7 +528,7 @@
                     break;
                 case PortNum.TracerouteApp:
                     TraceRoute = packetData.GetPayload<RouteDiscovery>();
-                    TracerouteInfo = MeshtasticService.GetTracerouteInfo(packetData.From, packetData.To, Packet.Gateway.NodeId, TraceRoute);
+                    TracerouteInfo = MeshtasticService.GetTracerouteInfo(packetData.From, packetData.To, TraceRoute, packetData.Decoded.RequestId > 0);
                     break;
                 case PortNum.RoutingApp:
                     Routing = packetData.GetPayload<Routing>();

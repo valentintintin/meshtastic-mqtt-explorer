@@ -9,6 +9,7 @@ using Common.Extensions.Entities;
 using Common.Models;
 using CS_AES_CTR;
 using Google.Protobuf;
+using Google.Protobuf.Collections;
 using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
@@ -91,9 +92,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         nodeFrom.LastSeen = DateTime.UtcNow;
         if (nodeFrom.Id == 0)
         {
-            Logger.LogInformation("New node (from) created {node}", nodeFrom);
             Context.Add(nodeFrom);
             await Context.SaveChangesAsync();
+            Logger.LogInformation("New node (from) created {node}", nodeFrom);
         }
         else
         {
@@ -121,8 +122,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeTo.Id == 0)
         {
             Context.Add(nodeTo);
-            Logger.LogInformation("New node (to) created {node}", nodeTo);
             await Context.SaveChangesAsync();
+            Logger.LogInformation("New node (to) created {node}", nodeTo);
         }
         
         var channel = await Context.Channels.FindByNameAsync(channelId) ?? new Context.Entities.Channel
@@ -410,7 +411,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
-        foreach (var neighbor in neighborInfoPayload.Neighbors)
+        var neighborsInfo = GetNeighborsInfo(neighborInfoPayload.Neighbors);
+
+        foreach (var neighbor in neighborsInfo)
         {
             var neighborNode = await Context.Nodes
                 .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
@@ -434,7 +437,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             var nodePosition = nodeFrom.Positions.FirstOrDefault();
             var neighborPosition = neighborNode.Positions.FirstOrDefault();
 
-            await SetNeighbor(Entities_NeighborInfo.Source.Neighbor, packet, nodeFrom, neighborNode, neighbor.Snr, null, nodePosition, neighborPosition);
+            await SetNeighbor(Entities_NeighborInfo.Source.Neighbor, packet, nodeFrom, neighborNode, neighbor.Snr ?? -999, null, nodePosition, neighborPosition);
         }
     }
 
@@ -508,80 +511,88 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
-        // On ne regarde que la réponse du traceroute qui PART du destinaire voulu pour arriver à l'expéditeur et donc contient la route en inversé 
-        if (packet.RequestId is null or 0)
-        {
-            return;
-        }
+        // On ne regarde que la réponse du traceroute qui PART du destinaire voulu pour arriver à l'expéditeur et donc contient la route en inversé
+        // TODO voir si on peut définitivement supprimer cette condition ? 
+        // if (packet.RequestId is null or 0)
+        // {
+            // return;
+        // }
 
-        var (routes, routesBack) = GetTracerouteInfo(nodeFrom.NodeId, nodeTo.NodeId, packet.Gateway.NodeId, payload);
-        var lastNode = nodeTo; // C'est inversé dans un traceroute
+        var (routes, routesBack) = GetTracerouteInfo(nodeFrom.NodeId, nodeTo.NodeId, payload, packet.RequestId > 0);
+        Node? heardNode = null;
 
         foreach (var route in routes)
         {
-            var node = await Context.Nodes
+            var nodeReceiver = await Context.Nodes
                 .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
                 .FindByNodeIdAsync(route.NodeId) ?? new Node
             {
                 NodeId = route.NodeId
             };
             
-            if (node.Id == 0)
+            if (nodeReceiver.Id == 0)
             {
-                Context.Add(node);
-                Logger.LogInformation("New node (traceroute) created {node}", node);
+                Context.Add(nodeReceiver);
                 await Context.SaveChangesAsync();
+                Logger.LogInformation("New node (traceroute) created {node}", nodeReceiver);
             }
 
-            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, node, lastNode, route.Snr ?? -999, 
-                null, node.Positions.FirstOrDefault(), lastNode.Positions.FirstOrDefault());
+            heardNode ??= nodeReceiver;
 
-            lastNode = node;
+            await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, nodeReceiver, heardNode, route.Snr ?? -999, 
+                null, nodeReceiver.Positions.FirstOrDefault(), heardNode.Positions.FirstOrDefault());
+
+            heardNode = nodeReceiver;
         }
 
-        if (packet.To == packet.Gateway)
+        if (routesBack.Count != 0)
         {
-            lastNode = nodeFrom;
-
+            heardNode = null;
+            
             foreach (var route in routesBack)
             {
-                var node = await Context.Nodes
+                var nodeReceiver = await Context.Nodes
                     .Include(n => n.Positions.OrderByDescending(p => p.UpdatedAt).Take(1))
                     .FindByNodeIdAsync(route.NodeId) ?? new Node
                 {
                     NodeId = route.NodeId
                 };
 
-                if (node.Id == 0)
+                if (nodeReceiver.Id == 0)
                 {
-                    Context.Add(node);
-                    Logger.LogInformation("New node (traceroute) created {node}", node);
+                    Context.Add(nodeReceiver);
                     await Context.SaveChangesAsync();
+                    Logger.LogInformation("New node (traceroute) created {node}", nodeReceiver);
                 }
+                
+                heardNode ??= nodeReceiver;
 
-                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, lastNode, node, route.Snr ?? -999,
-                    null, lastNode.Positions.FirstOrDefault(), node.Positions.FirstOrDefault());
+                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, heardNode, nodeReceiver, route.Snr ?? -999,
+                    null, heardNode.Positions.FirstOrDefault(), nodeReceiver.Positions.FirstOrDefault());
 
-                lastNode = node;
+                heardNode = nodeReceiver;
             }
         }
     }
 
-    public (List<TracerouteNodeRoute> routes, List<TracerouteNodeRoute> routesBack) GetTracerouteInfo(uint nodeFromId, uint nodeToId, uint nodeGatewayId, RouteDiscovery? payload)
+    public (List<NodeSnr> routes, List<NodeSnr> routesBack) GetTracerouteInfo(uint nodeFromId,
+        uint nodeToId, RouteDiscovery? payload, bool isBack)
     {
-        List<TracerouteNodeRoute> routes = [];
-        List<TracerouteNodeRoute> routesBack = [];
+        List<NodeSnr> routes = [];
+        List<NodeSnr> routesBack = [];
 
         if (payload != null)
         {
-            routes = new List<uint> { nodeToId }
+            routes = new List<uint> { isBack ? nodeToId : nodeFromId }
                 .Concat(payload.Route)
-                .Concat([nodeFromId])
-                .Select((n, i) => new TracerouteNodeRoute
+                .Concat([isBack ? nodeFromId : 0])
+                .Where(a => a > 0)
+                .Select((n, i) => new NodeSnr
                 {
                     NodeId = n,
+                    Node = Context.Nodes.FindByNodeId(n),
                     Hop = i,
-                    Snr = i < payload.SnrTowards.Count ? payload.SnrTowards[i] : null
+                    Snr = i > 0 && i < payload.SnrTowards.Count + 1 ? payload.SnrTowards[i - 1] : null
                 })
                 .ToList();
 
@@ -589,18 +600,28 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             {
                 routesBack = new List<uint> { nodeFromId }
                     .Concat(payload.RouteBack)
-                    // .Concat([nodeGatewayId])
-                    .Select((n, i) => new TracerouteNodeRoute
+                    .Select((n, i) => new NodeSnr
                     {
                         NodeId = n,
+                        Node = Context.Nodes.FindByNodeId(n),
                         Hop = i,
-                        Snr = i < payload.SnrBack.Count ? payload.SnrBack[i] : null
+                        Snr = i > 0 && i < payload.SnrBack.Count + 1 ? payload.SnrBack[i - 1] : null
                     })
                     .ToList();
             }
         }
 
         return (routes, routesBack);
+    }
+
+    public List<NodeSnr> GetNeighborsInfo(RepeatedField<Neighbor> neighbors)
+    {
+        return neighbors.Select(n => new NodeSnr
+        {
+            NodeId = n.NodeId,
+            Node = Context.Nodes.FindByNodeId(n.NodeId),
+            Snr = n.Snr
+        }).ToList();
     }
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)

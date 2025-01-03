@@ -1,9 +1,12 @@
+using Common.Context.Entities;
+
 namespace Common.Models;
 
-public class TracerouteNodeRoute
+public class NodeSnr
 {
     private float? _snr;
-    public uint NodeId { get; set; }
+    public required uint NodeId { get; set; }
+    public Node? Node { get; set; }
 
     public float? Snr
     {

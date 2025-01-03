@@ -19,7 +19,17 @@ public class MqttServer : IEntity
     public List<string> Topics { get; set; } = [];
     
     public bool Enabled { get; set; } = true;
+
+    public RelayType? IsARelayType { get; set; }
     
     public virtual ICollection<Packet> Packets { get; set; } = [];
     public virtual ICollection<Node> Nodes { get; set; } = [];
+    
+    public enum RelayType
+    {
+        MapReport,
+        NodeInfoAndPosition,
+        UseFull,
+        All
+    }
 }

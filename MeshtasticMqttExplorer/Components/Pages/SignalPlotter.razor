@@ -8,6 +8,7 @@
 @using Common.Extensions.Entities
 @using CsvHelper
 @using Google.Protobuf
+@using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Models
 @using Microsoft.EntityFrameworkCore
 
@@ -31,7 +32,7 @@
 <Spin Spinning="Loading">
     @if (Node1 == null || Node2 == null)
     {
-        <Result Title="Nœud introuvable" Status="404"></Result>
+        <Result Title="Nœud introuvable" Status="ResultStatus.Http404"></Result>
     }
     else if (DataSnr.Count == 0)
     {
@@ -97,7 +98,7 @@
             return;
         }
         
-        var signalHistories = GetSignalHistories();
+        var signalHistories = GetSignalHistories(DateTime.UtcNow.Date.AddDays(-3));
         
         DataSnr = signalHistories
             .Select(a => new DateChartData<float>
@@ -127,7 +128,7 @@
         await using var writer = new StreamWriter(memoryStream);
         await using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
         
-        await csv.WriteRecordsAsync(GetSignalHistories().Select(a => new DataSnrRssiCsv
+        await csv.WriteRecordsAsync(GetSignalHistories(DateTime.MinValue).Select(a => new DataSnrRssiCsv
         {
             DateTime = a.CreatedAt.ToString("o", CultureInfo.InvariantCulture),
             NodeHeardId = a.NodeHeard.NodeIdAsString(),
@@ -136,7 +137,8 @@
             NodeReceiverName = a.NodeReceiver.NodeIdAsString(),
             Snr = a.Snr,
             Rssi = a.Rssi != 0 && a.Rssi != null ? a.Rssi : null,
-            PacketUrl = a.PacketId != null ? $"{NavigationManager.BaseUri}packet/{a.PacketId}" : null
+            PacketUrl = a.PacketId != null ? $"{NavigationManager.BaseUri}packet/{a.PacketId}" : null,
+            PacketDetail = a.Packet != null ? $"[{a.Packet.PortNum}] #{a.Packet.PacketId} {(a.Packet.PortNum == PortNum.TextMessageApp ? a.Packet.PayloadJson : "")}" : null
         }));
         
         await csv.FlushAsync();
@@ -152,14 +154,13 @@
         await Message.Info("CSV téléchargé !");
     }
 
-    private List<SignalHistory> GetSignalHistories()
+    private List<SignalHistory> GetSignalHistories(DateTime fromDate)
     {
-        var minDate = DateTime.UtcNow.Date.AddDays(-3);
-
         var packets = Context.SignalHistories
         .Include(a => a.NodeReceiver)
         .Include(a => a.NodeHeard)
-        .Where(a => (a.NodeReceiverId == Node1Id && a.NodeHeardId == Node2Id || a.NodeReceiverId == Node2Id && a.NodeHeardId == Node1Id) && a.CreatedAt >= minDate)
+        .Include(a => a.Packet)
+        .Where(a => (a.NodeReceiverId == Node1Id && a.NodeHeardId == Node2Id || a.NodeReceiverId == Node2Id && a.NodeHeardId == Node1Id) && a.CreatedAt >= fromDate)
         .OrderBy(a => a.CreatedAt)
         .AsNoTrackingWithIdentityResolution()
         .ToList();
@@ -181,6 +182,7 @@
         public required string NodeReceiverId { get; set; } 
         public required float Snr { get; set; } 
         public required float? Rssi { get; set; } 
-        public required string PacketUrl { get; set; } 
+        public required string? PacketUrl { get; set; }
+        public string? PacketDetail { get; set; }
     }
 }

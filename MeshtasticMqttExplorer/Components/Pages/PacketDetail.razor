@@ -27,14 +27,14 @@
                     Subtitle="@Packet?.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"></PageHeader>
 
         <Timeline>
-            <TimelineItem Color="blue">
+            <TimelineItem Color="TimelineDotColor.Blue">
                 Expéditeur : <a href="/node/@Packet.FromId" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
             </TimelineItem>
-            <TimelineItem Color="red">
+            <TimelineItem Color="TimelineDotColor.Red">
                 Destinataire: <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
             </TimelineItem>
             
-            <TimelineItem Color="green">
+            <TimelineItem Color="TimelineDotColor.Green">
                 Passerelle MQTT : <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames</a>
                 <br />
                 Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts
@@ -75,7 +75,7 @@
     }
     else
     {
-        <Result Title="Paquet introuvable" Status="404"></Result>
+        <Result Title="Paquet introuvable" Status="ResultStatus.Http404"></Result>
     }
 </Spin>
 

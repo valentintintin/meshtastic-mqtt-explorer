@@ -7,7 +7,7 @@
 
 @if (NodeInfo != null)
 {
-    <GridRow Gutter="(16, 16)" Justify="center">
+    <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
         <GridCol Xs="24" Md="16">
             <Card Style="width:100%;" Title="Position">
                 @if (NodeInfo?.Latitude.HasValue == true && NodeInfo?.Longitude.HasValue == true)

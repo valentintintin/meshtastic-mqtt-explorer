@@ -21,12 +21,14 @@
         {
             @* <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> *@
         }
-        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
     </PageHeaderContent>
+    <PageHeaderExtra>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
 </PageHeader>
 
 <Spin Spinning="Loading">
-    <GridRow Gutter="(16, 16)" Justify="center">
+    <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
         <GridCol Xs="24" Lg="2">
             <Card Title="Noeuds">
                 <Statistic Value="@NbNodes"/>
@@ -66,7 +68,7 @@
     
     <Divider></Divider>
     
-    <GridRow Gutter="(16, 16)" Justify="center">
+    <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
         @* <GridCol Xs="24" Lg="12"> *@
         @*     <Card Title="Type de paquet (hors chiffrés)"> *@
         @*         <ChildContent> *@
@@ -194,7 +196,7 @@
                     @(context.PortNum?.ToString() ?? "Chiffrées")
                 </PropertyColumn>
 
-                <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable DefaultSortOrder="SortDirection.Descending">
+                <PropertyColumn Property="c => c.Nb" Title="Nombre" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" DefaultSortOrder="SortDirection.Descending">
                     <a href="/node/@context.NodeId/packets" target="_blank" rel="nofollow">@context.Nb</a>
                 </PropertyColumn>
             </Table>

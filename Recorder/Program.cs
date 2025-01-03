@@ -78,8 +78,6 @@ try
         .CreateDbContextAsync();
     await context.Database.MigrateAsync();
 
-    app.Services.GetRequiredService<PurgeService>(); // Instance to schedules
-
     if (false && app.Services.GetRequiredService<IHostEnvironment>().IsDevelopment())
     {
         using var scope = app.Services.CreateScope();
@@ -120,6 +118,8 @@ try
         Console.WriteLine("Ended");
         return;
     }
+    
+    app.Services.GetRequiredService<PurgeService>(); // Run cron
 
     Console.WriteLine("Started");
 

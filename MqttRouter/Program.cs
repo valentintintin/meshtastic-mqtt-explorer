@@ -96,6 +96,7 @@ try
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
+    builder.Services.AddSingleton<PurgeService>();
 
     builder.Services.AddHostedMqttServer(options => options.WithDefaultEndpoint());
     builder.Services.AddMqttConnectionHandler();
@@ -167,6 +168,8 @@ try
         context.Update(nodeConfiguration);
     }
     await context.SaveChangesAsync();
+    
+    app.Services.GetRequiredService<PurgeService>(); // Run cron
     
     Console.WriteLine("Started");
 

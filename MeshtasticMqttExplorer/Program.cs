@@ -56,6 +56,7 @@ try
     builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<NotificationService>();
+    builder.Services.AddSingleton<PurgeService>();
 
     if (!builder.Environment.IsDevelopment())
     {

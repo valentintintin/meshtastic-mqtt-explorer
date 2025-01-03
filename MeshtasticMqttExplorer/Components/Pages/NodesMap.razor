@@ -34,6 +34,15 @@
             </div>
 
             <div>
+                <Switch @bind-Checked="Settings.HideLinks" Disabled="@Loading" UnCheckedChildren="Afficher les liens" CheckedChildren="Cacher les liens" OnChange="value => SetHideLinks(value)"/>
+                
+                @if (!Settings.HideLinks)
+                {
+                    <Switch @bind-Checked="Settings.HideIncompleteLinks" Disabled="@Loading" UnCheckedChildren="Afficher tous les liens" CheckedChildren="Cacher les liens incomplets" OnChange="value => SetHideIncompleteLinks(value)"/>
+                }
+            </div>
+            
+            <div>
                 <NodeSearch></NodeSearch>
             </div>
         </div>
@@ -51,14 +60,14 @@
     
     @if (Settings.ShowLegend)
     {
-        <Card Title="Légende" Size="small" Bordered="true">
+        <Card Title="Légende" Size="CardSize.Small" Bordered="true">
             <TitleTemplate>
                 Légende
                 &nbsp;
                 <Switch @bind-Checked="Settings.ShowLegend" UnCheckedChildren="Afficher la légende" CheckedChildren="Cacher la légende" OnChange="value => SetShowLegend(value)"/>
             </TitleTemplate>
             <ChildContent>
-                <GridRow Gutter="(16, 16)" Justify="center">
+                <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
                     <GridCol Xs="24" Md="12">
                         <div class="legend">
                             <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
@@ -83,10 +92,14 @@
                             <span style="background-color: @Utils.Green" class="legend-bar"></span>
                             Lien radio fonctionnel entre 2 noeuds
                         </div>
-                        <div class="legend">
-                            <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                            Lien radio manquant entre 2 noeuds
-                        </div>
+                        
+                        @if (!Settings.HideIncompleteLinks)
+                        {
+                            <div class="legend">
+                                <span style="background-color: @Utils.Red" class="legend-bar"></span>
+                                Lien radio incomplet entre 2 noeuds
+                            </div>
+                        }
 
                         <div class="legend">
                             <span style="@GetIconStyleCss(Utils.Orange, null, 0)" class="legend-circle"></span>
@@ -110,7 +123,7 @@
         Longitude = 2.321139,
         Zoom = 5,
         ShowLegend = true,
-        CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868
+        CurrentRegionCode = Config.Types.LoRaConfig.Types.RegionCode.Eu868,
     };
     private int Total { get; set; }
     private int TotalAlive { get; set; }
@@ -125,7 +138,6 @@
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> { new(null, "Tous") } 
         .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
-    private List<SegmentedOption<long[]>> MqttServer { get; } = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -138,7 +150,9 @@
                 Settings.Longitude = settings.Longitude;
                 Settings.Zoom = settings.Zoom;
                 Settings.ShowLegend = settings.ShowLegend;
-                // Settings = settings; // Semble bugger sur le modem preset, region et frequence
+                Settings.HideLinks = settings.HideLinks;
+                Settings.HideIncompleteLinks = settings.HideIncompleteLinks;
+                // Settings = settings; // Semble bugger sur le modem preset et region
                 Logger.LogDebug("Utilisation de settings : {settings}", JsonSerializer.Serialize(settings));
             }
             
@@ -156,20 +170,6 @@
             {
                 if (node.Waypoints.Any())
                 {
-                    lines.AddRange(
-                        node.Waypoints
-                            .Select(n => new Osm.Line
-                            {
-                                Id = $"waypoint-{n.Id}->node-{node.Id}",
-                                Points = [
-                                    [node.Latitude!.Value, node.Longitude!.Value],
-                                    [n.Latitude, n.Longitude]
-                                ],
-                                Color = Utils.Orange,
-                                Popup = Utils.GetWaypointLinePopupHtml(node, n)
-                            })
-                    );
-                    
                     markers.AddRange(
                         node.Waypoints
                             .Select(n => new Osm.Marker
@@ -186,61 +186,69 @@
                 }
             }
 
-            foreach (var neighbor in Neighbors.Where(a => a.DataSource != NeighborInfo.Source.Unknown))
+            if (!Settings.HideLinks)
             {
-                var reverseNeighbor = Neighbors.FirstOrDefault(n => n.NodeHeard == neighbor.NodeReceiver && n.NodeReceiver == neighbor.NodeHeard && n.DataSource != NeighborInfo.Source.Unknown);
-                var isBidirectionnal = reverseNeighbor != null;
-                var reverseAlreadyDrawn = isBidirectionnal && lines.Exists(l => l.Id == $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}");
-
-                if (isBidirectionnal && reverseAlreadyDrawn)
+                foreach (var neighbor in Neighbors.Where(a => a.DataSource != NeighborInfo.Source.Unknown))
                 {
-                    continue;
-                }
+                    var reverseNeighbor = Neighbors.FirstOrDefault(n => n.NodeHeard == neighbor.NodeReceiver && n.NodeReceiver == neighbor.NodeHeard && n.DataSource != NeighborInfo.Source.Unknown);
+                    var isBidirectionnal = reverseNeighbor != null;
+                    var reverseAlreadyDrawn = isBidirectionnal && lines.Exists(l => l.Id == $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}");
 
-                double[] startPoint = [neighbor.NodeReceiver.Latitude!.Value, neighbor.NodeReceiver.Longitude!.Value];
-                double[] endPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
+                    if (!isBidirectionnal && Settings.HideIncompleteLinks)
+                    {
+                        continue;
+                    }
+                    
+                    if (isBidirectionnal && reverseAlreadyDrawn)
+                    {
+                        continue;
+                    }
 
-                endPoint = isBidirectionnal ? endPoint : MeshtasticUtils.GetMiddle(startPoint[0], startPoint[1], endPoint[0], endPoint[1]);
-                
-                lines.Add(new Osm.Line
-                {
-                    Id = $"node-{neighbor.NodeReceiver.Id}->node-{neighbor.NodeHeard.Id}",
-                    Points =
-                    [
-                        startPoint,
-                        endPoint
-                    ],
-                    Color = Utils.Green,
-                    Popup = Utils.GetNeighborLinePopupHtml(neighbor.NodeReceiver, neighbor, reverseNeighbor)
-                });
+                    double[] startPoint = [neighbor.NodeReceiver.Latitude!.Value, neighbor.NodeReceiver.Longitude!.Value];
+                    double[] endPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
 
-                if (!isBidirectionnal) // Il manque un côté donc on le fait artificiellement pour mettre une ligne rouge
-                {
-                    startPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
+                    endPoint = isBidirectionnal ? endPoint : MeshtasticUtils.GetMiddle(startPoint[0], startPoint[1], endPoint[0], endPoint[1]);
 
                     lines.Add(new Osm.Line
                     {
-                        Id = $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}",
+                        Id = $"node-{neighbor.NodeReceiver.Id}->node-{neighbor.NodeHeard.Id}",
                         Points =
                         [
                             startPoint,
                             endPoint
                         ],
-                        Color = Utils.Red,
-                        Popup = $"<p>" +
-                                $"<a href=\"/node/{neighbor.NodeHeard.Id}\" target=\"_blank\" rel=\"nofollow\">" +
-                                $"<b>{neighbor.NodeHeard.AllNames}</b>" +
-                                $"</a>" +
-                                $"</p>" +
-                                $"<p>" +
-                                $"N'entend pas" +
-                                $"</p>" +
-                                $"<p>" +
-                                $"<a href=\"/node/{neighbor.NodeReceiver.Id}\" target=\"_blank\" rel=\"nofollow\">" +
-                                $"<b>{neighbor.NodeReceiver.AllNames}</b>" +
-                                $"</a>" +
-                                $"</p>"
+                        Color = Utils.Green,
+                        Popup = Utils.GetNeighborLinePopupHtml(neighbor.NodeReceiver, neighbor, reverseNeighbor)
                     });
+
+                    if (!isBidirectionnal) // Il manque un côté donc on le fait artificiellement pour mettre une ligne rouge
+                    {
+                        startPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
+
+                        lines.Add(new Osm.Line
+                        {
+                            Id = $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}",
+                            Points =
+                            [
+                                startPoint,
+                                endPoint
+                            ],
+                            Color = Utils.Red,
+                            Popup = $"<p>" +
+                                    $"<a href=\"/node/{neighbor.NodeHeard.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                                    $"<b>{neighbor.NodeHeard.AllNames}</b>" +
+                                    $"</a>" +
+                                    $"</p>" +
+                                    $"<p>" +
+                                    $"N'entend pas" +
+                                    $"</p>" +
+                                    $"<p>" +
+                                    $"<a href=\"/node/{neighbor.NodeReceiver.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+                                    $"<b>{neighbor.NodeReceiver.AllNames}</b>" +
+                                    $"</a>" +
+                                    $"</p>"
+                        });
+                    }
                 }
             }
 
@@ -341,7 +349,6 @@
 
         if (RenderFinished)
         {
-            await SaveMapPosition();
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
             await FetchData();
         }
@@ -353,17 +360,36 @@
 
         if (RenderFinished)
         {
-            await SaveMapPosition();
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
             await FetchData();
+        }
+    }
+
+    private async Task SetHideLinks(bool value)
+    {
+        Settings.HideLinks = value;
+
+        if (RenderFinished)
+        {
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            HasRenderMapData = false;
+        }
+    }
+
+    private async Task SetHideIncompleteLinks(bool value)
+    {
+        Settings.HideIncompleteLinks = value;
+
+        if (RenderFinished)
+        {
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            HasRenderMapData = false;
         }
     }
 
     private async Task SetShowLegend(bool showLegend)
     {
         Settings.ShowLegend = showLegend;
-        await SaveMapPosition();
-        
         await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
     }
 
@@ -432,5 +458,8 @@
         public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; }
         
         public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; }
+
+        public bool HideLinks { get; set; }
+        public bool HideIncompleteLinks { get; set; }
     }
 }
