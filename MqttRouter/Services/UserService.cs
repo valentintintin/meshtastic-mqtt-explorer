@@ -88,7 +88,7 @@ public class UserService(
         if (!signInResult.Succeeded)
         {
             Logger.LogWarning("Login of {username}#{userId} KO. Wrong password : {password}", username, user.Id, password);
-            return null;
+            // return null;
         }
         
         Logger.LogInformation("Login of {username}#{userId} OK with IP {ip}", username, user.Id, ip);
