@@ -84,7 +84,7 @@
       </PackageReference>
       <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
-      <PackageReference Include="MQTTnet" Version="5.0.0.1405" />
+      <PackageReference Include="MQTTnet" Version="5.0.1.1416" />
       <PackageReference Include="NLog" Version="5.3.4" />
       <PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
