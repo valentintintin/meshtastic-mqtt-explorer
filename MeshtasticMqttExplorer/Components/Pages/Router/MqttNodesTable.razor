@@ -69,33 +69,28 @@
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
-        
-        NodesQueryable = Context.NodeConfigurations
-            .Include(a => a.Node)
-            .Include(a => a.User)
-            .Where(a => !OnlyConnected || !string.IsNullOrWhiteSpace(a.MqttId))
-            .AsNoTrackingWithIdentityResolution();
-        
-        var localContext = await ContextFactory.CreateDbContextAsync();
-        
-        Total = localContext.NodeConfigurations
-            .AsNoTrackingWithIdentityResolution()
-            .Count();
-        
-        TotalConnected = localContext.NodeConfigurations
-            .AsNoTrackingWithIdentityResolution()
-            .Count(a => !string.IsNullOrWhiteSpace(a.MqttId));
-        
-        await localContext.DisposeAsync();
+       
+        FetchData();
 
         await base.OnInitializedAsync();
     }
 
     private void FetchData()
     {
+        NodesQueryable = Context.NodeConfigurations
+            .Include(a => a.Node)
+            .Include(a => a.User)
+            .Where(a => !OnlyConnected || !string.IsNullOrWhiteSpace(a.MqttId))
+            .AsNoTrackingWithIdentityResolution();
+        
         Total = Context.NodeConfigurations
             .AsNoTrackingWithIdentityResolution()
             .Count();
+        
+        TotalConnected = Context.NodeConfigurations
+            .AsNoTrackingWithIdentityResolution()
+            .Count(a => !string.IsNullOrWhiteSpace(a.MqttId));
+
     }
 
     private void SetShowOnlyConnected(bool value)

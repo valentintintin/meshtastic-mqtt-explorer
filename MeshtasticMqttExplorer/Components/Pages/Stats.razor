@@ -4,6 +4,7 @@
 @using Common.Context
 @using Common.Context.Entities
 @using Common.Extensions
+@using Common.Services
 @using Meshtastic.Protobufs
 @using MeshtasticMqttExplorer.Models
 @using Microsoft.EntityFrameworkCore
@@ -376,7 +377,7 @@
         NbPacketsSent = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted)) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast)) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
             .AsNoTrackingWithIdentityResolution()
             .CountAsync();
 
@@ -385,7 +386,7 @@
         DataPaquetsTypes = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(a => a.PortNum != PortNum.MapReportApp && a.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast))
             .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
             {
                 type = portNum.ToString()!,
@@ -400,7 +401,7 @@
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
             .Where(a => a.MqttServer != null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast))
             .GroupBy(a => new
             {
                 MqttServerId = a.MqttServer!.Id,

@@ -253,7 +253,7 @@
             }
 
             await Map.AddPolylines(lines.DistinctBy(n => n.Id).ToList());
-            await Task.Delay(TimeSpan.FromMilliseconds(150)); // Marker devant les lignes
+            await Task.Delay(TimeSpan.FromMilliseconds(500)); // Marker devant les lignes
             await Map.AddMarkers(markers.DistinctBy(n => n.Id).ToList());
             HasRenderMapData = true;
             RenderFinished = !firstRender;
@@ -301,7 +301,7 @@
             .Include(a => a.NodeReceiver)
             .Include(a => a.NodeHeard)
             .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
-            .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.NodeHeard.Latitude.HasValue && a.NodeHeard.Longitude.HasValue)
+            .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.NodeHeard.Latitude.HasValue && a.NodeHeard.Longitude.HasValue && a.NodeReceiver.Latitude.HasValue && a.NodeReceiver.Longitude.HasValue)
             .Where(a => !a.NodeReceiver.Ignored && !a.NodeHeard.Ignored)
             .Where(a => a.NodeHeard.LastSeen.HasValue && a.NodeHeard.LastSeen >= MinDate && a.NodeReceiver.LastSeen.HasValue && a.NodeReceiver.LastSeen >= MinDate)
             .Where(n => Settings.CurrentRegionCode == null|| n.NodeReceiver.RegionCode == Settings.CurrentRegionCode)

@@ -14,7 +14,7 @@
 
 <PageHeader Title="Météo">
     <SubtitleTemplate>
-        @Telemetries.Count données depuis les dernières 2h
+        @Telemetries.Count données depuis les dernières 4h
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -64,7 +64,7 @@
             await Map.ClearMarkers();
         }
         
-        var twelveHours = DateTime.UtcNow.AddHours(-2);
+        var twelveHours = DateTime.UtcNow.AddHours(-4);
 
         Telemetries = await Context.Telemetries
             .Include(n => n.Node)

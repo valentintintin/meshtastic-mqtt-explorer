@@ -217,7 +217,6 @@ else
                 .Include(a => a.To)
                 .Include(a => a.AllDuplicatedPackets)
                 .ThenInclude(a => a.Gateway)
-                .Where(a => a.PacketDuplicated == null)
                 .AsNoTrackingWithIdentityResolution();
 
         var totalQueryable = Context.Packets
@@ -229,24 +228,47 @@ else
             switch (CurrentShowType)
             {
                 case ShowType.From:
-                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id);
-                    totalQueryable = totalQueryable.Where(a => a.FromId == Id);
-                    break;
-                case ShowType.Gateway:
-                    PacketsQueryable = PacketsQueryable.Where(a => a.GatewayId == Id);
-                    totalQueryable = totalQueryable.Where(a => a.GatewayId == Id);
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.FromId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    
+                    totalQueryable = totalQueryable
+                        .Where(a => a.FromId == Id)
+                        .Where(a => a.PacketDuplicated == null);
                     break;
                 case ShowType.To:
-                    PacketsQueryable = PacketsQueryable.Where(a => a.ToId == Id);
-                    totalQueryable = totalQueryable.Where(a => a.ToId == Id);
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.ToId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+
+                    totalQueryable = totalQueryable
+                        .Where(a => a.ToId == Id)
+                        .Where(a => a.PacketDuplicated == null);
                     break;
                 case ShowType.FromTo:
-                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id || a.ToId == Id);
-                    totalQueryable = totalQueryable.Where(a => a.FromId == Id || a.ToId == Id);
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.FromId == Id || a.ToId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    
+                    totalQueryable = totalQueryable
+                        .Where(a => a.FromId == Id || a.ToId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    break;
+                case ShowType.Gateway:
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.GatewayId == Id);
+                    
+                    totalQueryable = totalQueryable
+                        .Where(a => a.GatewayId == Id);
                     break;
                 case ShowType.All:
-                    PacketsQueryable = PacketsQueryable.Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id);
-                    totalQueryable = totalQueryable.Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id);
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    
+                    totalQueryable = totalQueryable
+                        .Where(a => a.FromId == Id || a.ToId == Id || a.GatewayId == Id)
+                        .Where(a => a.PacketDuplicated == null);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -254,8 +276,13 @@ else
         }
         else
         {
-            PacketsQueryable = PacketsQueryable.Where(a => a.PortNum != PortNum.MapReportApp);
-            totalQueryable = totalQueryable.Where(a => a.PortNum != PortNum.MapReportApp);
+            PacketsQueryable = PacketsQueryable
+                .Where(a => a.PortNum != PortNum.MapReportApp)
+                .Where(a => a.PacketDuplicated == null);
+            
+            totalQueryable = totalQueryable
+                .Where(a => a.PortNum != PortNum.MapReportApp)
+                .Where(a => a.PacketDuplicated == null);
         }
         
         Total = totalQueryable.Count();

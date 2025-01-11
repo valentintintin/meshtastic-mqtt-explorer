@@ -136,6 +136,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
         }
+        else
+        {
+            channel.UpdatedAt = DateTime.UtcNow;
+            Context.Update(channel);
+            await Context.SaveChangesAsync();
+        }
         
         var isEncrypted = meshPacket.Decoded == null;
         meshPacket.Decoded ??= Decrypt(meshPacket.Encrypted.ToByteArray(), "AQ==", meshPacket.Id, meshPacket.From);
@@ -235,44 +241,33 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         if (shouldCompute)
         {
+            Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
+            Context.RemoveRange(Context.SignalHistories.Where(p => p.Packet == packet));
+            
             switch (meshPacket.Decoded?.Portnum)
             {
                 case PortNum.MapReportApp:
-                    Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     nodeFromPosition = await DoMapReportingPacket(packet.From, meshPacket.GetPayload<MapReport>()) ?? nodeFromPosition;
                     break;
                 case PortNum.NodeinfoApp:
                     await DoNodeInfoPacket(packet.From, meshPacket.GetPayload<User>());
                     break;
                 case PortNum.PositionApp:
-                    Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     nodeFromPosition = await DoPositionPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Position>()) ?? nodeFromPosition;
                     break;
                 case PortNum.TelemetryApp:
-                    Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     await DoTelemetryPacket(packet.From, packet, meshPacket.GetPayload<Meshtastic.Protobufs.Telemetry>());
                     break;
                 case PortNum.NeighborinfoApp:
-                    Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     await DoNeighborInfoPacket(packet.From, packet, meshPacket.GetPayload<NeighborInfo>());
                     break;
                 case PortNum.TextMessageApp:
-                    Context.RemoveRange(Context.TextMessages.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     await DoTextMessagePacket(packet.From, packet.To, packet, meshPacket.GetPayload<string>());
                     break;
                 case PortNum.WaypointApp:
-                    Context.RemoveRange(Context.Waypoints.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     await DoWaypointPacket(packet.From, packet, meshPacket.GetPayload<Waypoint>());
                     break;
                 case PortNum.TracerouteApp:
-                    Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
-                    await Context.SaveChangesAsync();
                     await DoTraceroutePacket(packet.From, packet.To, packet, meshPacket.GetPayload<RouteDiscovery>());
                     break;
             }
@@ -370,6 +365,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             return;
         }
+        
+        Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
 
         var telemetry = new Telemetry
         {
@@ -441,13 +438,14 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
     }
 
-    public async Task DoTextMessagePacket(Node nodeFrom, Node nodeTo, Packet packet,
-        string? textMessagePayload)
+    public async Task DoTextMessagePacket(Node nodeFrom, Node nodeTo, Packet packet, string? textMessagePayload)
     {
         if (textMessagePayload == null)
         {
             return;
         }
+        
+        Context.RemoveRange(Context.TextMessages.Where(p => p.Packet == packet));
         
         Logger.LogInformation("New message {message} from {nodeFrom} to {nodeTo}", textMessagePayload, nodeFrom, nodeTo);
 
@@ -470,6 +468,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
+        Context.RemoveRange(Context.Waypoints.Where(p => p.Packet == packet));
+        
         var waypoint = await Context.Waypoints.FirstOrDefaultAsync(a => a.WaypointId == payload.Id) ??
                        new Context.Entities.Waypoint
                        {
@@ -626,6 +626,11 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public async Task<Position?> UpdatePosition(Node node, int latitude, int longitude, int altitude, Packet? packet)
     {
+        if (packet != null)
+        {
+            Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
+        }
+
         var decimalLatitude = latitude * 0.0000001; 
         var decimalLongitude = longitude * 0.0000001; 
         
@@ -804,6 +809,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             Context.Add(new SignalHistory
             {
+                CreatedAt = packet.CreatedAt,
+                UpdatedAt = packet.UpdatedAt,
                 NodeReceiver = nodeReceiver,
                 NodeHeard = heardNode,
                 Snr = snr,
