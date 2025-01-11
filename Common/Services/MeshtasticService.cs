@@ -381,6 +381,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Temperature = telemetryPayload.EnvironmentMetrics?.Temperature.IfNaNOrInfinityGetNull(),
             RelativeHumidity = telemetryPayload.EnvironmentMetrics?.RelativeHumidity.IfNaNOrInfinityGetNull(),
             BarometricPressure = telemetryPayload.EnvironmentMetrics?.BarometricPressure.IfNaNOrInfinityGetNull(),
+            GasResistance = telemetryPayload.EnvironmentMetrics?.GasResistance.IfNaNOrInfinityGetNull(),
+            Iaq = telemetryPayload.EnvironmentMetrics?.Iaq,
             Channel1Voltage = telemetryPayload.PowerMetrics?.Ch1Voltage.IfNaNOrInfinityGetNull(),
             Channel2Voltage = telemetryPayload.PowerMetrics?.Ch2Voltage.IfNaNOrInfinityGetNull(),
             Channel3Voltage = telemetryPayload.PowerMetrics?.Ch3Voltage.IfNaNOrInfinityGetNull(),

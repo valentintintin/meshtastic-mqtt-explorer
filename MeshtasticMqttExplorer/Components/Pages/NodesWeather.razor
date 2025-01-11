@@ -99,6 +99,11 @@
         {
             data.Add($"{telemetry.BarometricPressure}hPa");
         }
+
+        if (telemetry.Iaq.HasValue)
+        {
+            data.Add($"Qualité de l'air (IAQ) : {telemetry.Iaq}");
+        }
         
         return new Osm.Marker
         {
@@ -106,7 +111,7 @@
             Latitude = telemetry.Node.Latitude!.Value,
             Longitude = telemetry.Node.Longitude!.Value,
             Label = data.JoinString(" | "),
-            Popup = $"<p><a href=\"/node/{telemetry.Id}\" target=\"_blank\" rel=\"nofollow\"><b>{telemetry.Node.AllNames}</b></a></p><p>{data.JoinString(" | ")}</p>"
+            Popup = $"<p><a href=\"/node/{telemetry.NodeId}\" target=\"_blank\" rel=\"nofollow\"><b>{telemetry.Node.AllNames}</b></a></p><p>{data.JoinString(" | ")}</p>"
         };
     }
 

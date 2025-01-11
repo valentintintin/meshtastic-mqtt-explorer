@@ -22,6 +22,9 @@ public class Telemetry : IEntity
     public float? RelativeHumidity { get; set; }
     public float? BarometricPressure { get; set; }
     
+    public float? GasResistance { get; set; }
+    public uint? Iaq { get; set; }
+    
     public float? Channel1Voltage { get; set; }
     public float? Channel1Current { get; set; }
     

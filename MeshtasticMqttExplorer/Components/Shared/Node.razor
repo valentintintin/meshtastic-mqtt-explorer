@@ -142,6 +142,13 @@
                                 @(LastTelemetryEnvironment?.BarometricPressure?.ToString() ?? "-")hPa
                             </DescriptionsItem>
                         }
+                        
+                        @if (LastTelemetryEnvironment?.Iaq.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Qualité de l'air (IAQ)" ContentStyle="font-weight: bold">
+                                @(LastTelemetryEnvironment?.Iaq?.ToString() ?? "-")
+                            </DescriptionsItem>
+                        }
                     </Descriptions>
                 </ChildContent>
             </Card>
@@ -364,6 +371,17 @@
             </GridCol>
         }
 
+        @if (DataAirquality?.Any() == true)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Qualité de l'air (IAQ)">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataAirquality" Config="_configAirQuality"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
         @if (DataPowerMetricsVoltage1?.Any() == true)
         {
             <GridCol Xs="24" Md="12">
@@ -449,6 +467,7 @@
     private List<DateChartData<float>>? DataWeatherTemperature { get; set; }
     private List<DateChartData<float>>? DataWeatherHumidity { get; set; }
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
+    private List<DateChartData<float>>? DataAirquality { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage1 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsCurrent1 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage2 { get; set; }
@@ -463,6 +482,7 @@
     private readonly LineConfig _configTemperature = Utils.GetLineConfig("Température (°C)");
     private readonly LineConfig _configHumidity = Utils.GetLineConfig("Humidité (%)");
     private readonly LineConfig _configPressure = Utils.GetLineConfig("Pression atmosphérique (hPa)", 900);
+    private readonly LineConfig _configAirQuality = Utils.GetLineConfig("Qualité de l'air (IAQ)");
     private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)");
     private readonly LineConfig _configCurrent = Utils.GetLineConfig("Intensité (mA)");
     
@@ -676,6 +696,15 @@
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Pression",
                 value = a.BarometricPressure ?? 0
+            }).ToList();
+        
+        DataAirquality = NodeInfo?.Telemetries
+            .Where(a => a.Iaq > 0)
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Qualité de l'air (IAQ)",
+                value = a.Iaq ?? 0
             }).ToList();
         
         DataPowerMetricsVoltage1 = NodeInfo?.Telemetries
