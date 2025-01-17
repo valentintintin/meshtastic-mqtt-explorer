@@ -70,7 +70,7 @@
                 <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
                     <GridCol Xs="24" Md="12">
                         <div class="legend">
-                            <span style="@GetIconStyleCss(Utils.Green)" class="legend-circle"></span>
+                            <span style="@GetIconStyleCss(Utils.GreenLight)" class="legend-circle"></span>
                             En ligne | Passerelle MQTT
                         </div>
                         <div class="legend">
@@ -322,7 +322,7 @@
 
     private Osm.Marker GetMarker(Node node)
     {
-        var color = node.IsOffline() ? Utils.Red : node.IsMqttGateway == true ? Utils.Green : Utils.Blue;
+        var color = node.IsOffline() ? Utils.Red : node.IsMqttGateway == true ? Utils.GreenLight : Utils.Blue;
         
         return new Osm.Marker
         {

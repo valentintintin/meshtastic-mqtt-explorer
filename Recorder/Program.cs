@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Common.Context;
 using Common.Extensions;
+using Common.Extensions.Entities;
 using Common.Services;
 using Meshtastic.Protobufs;
 using Microsoft.AspNetCore.Builder;
@@ -50,11 +51,12 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
     
-    builder.Services.AddScoped<MeshtasticService>();
-    builder.Services.AddScoped<NotificationService>();
-    builder.Services.AddScoped<MqttService>();
+    builder.Services.AddSingleton<NotificationService>();
     builder.Services.AddSingleton<MqttClientService>();
     builder.Services.AddSingleton<PurgeService>();
+    builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<MqttService>();
+    
     builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
     
     if (!builder.Environment.IsDevelopment())
@@ -82,35 +84,42 @@ try
     {
         using var scope = app.Services.CreateScope();
         var meshtasticService = scope.ServiceProvider.GetRequiredService<MeshtasticService>();
+        meshtasticService.SetDbContext(context);
 
-        var allDatas = context.NeighborInfos
-            .Include(a => a.Packet)
-            .ThenInclude(a => a.Gateway)
-            .Include(a => a.Packet)
-            .ThenInclude(a => a.From)
-            .Where(a => a.DataSource == NeighborInfo.Source.Gateway)
-            .Where(a => a.Packet != null)
+        var allDatas = context.Packets
+            .Where(a => a.PortNum == PortNum.TracerouteApp && a.CreatedAt >= DateTime.UtcNow.AddDays(-3) && a.MqttServerId != 3)
+            .GroupBy(a => new { a.FromId, a.ToId }, (u, packets) => packets.OrderByDescending(a => a.CreatedAt).First())
             .ToList();
+        
+        Console.WriteLine($"Count {allDatas.Count}");
 
-        int i = 0;
-        foreach (var data in allDatas)
+        var i = 0;
+        foreach (var dataId in allDatas)
         {
+            var data = context.Packets
+                .Include(n => n.Channel)
+                .Include(n => n.MqttServer)
+                .Include(n => n.From)
+                .Include(n => n.To)
+                .Include(n => n.Gateway)
+                .Include(a => a.PacketDuplicated)
+                .Include(a => a.Position)
+                .FindById(dataId.Id);
+            
             try
             {
-                data.NodeReceiver = data.Packet!.Gateway;
-                data.NodeHeard = data.Packet.From;
-                context.Update(data);
+                await meshtasticService.DoReceive(data);
                 i++;
 
-                if (i % 10 == 0)
-                {
-                    Console.WriteLine($"Processed data {i} with ID #{data.Id}");
-                    await context.SaveChangesAsync();
-                }
+                // if (i % 10 == 0)
+                // {
+                    Console.WriteLine($"Processed data {i}/{allDatas.Count} with ID #{data.Id}");
+                    // await context.SaveChangesAsync();
+                // }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Error processing data #{data.Id}: {e}");
+                Console.WriteLine($"Error processing data #{data.Id}: {e} {e.StackTrace}");
             }
         }
         

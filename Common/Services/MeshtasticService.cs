@@ -569,48 +569,55 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 
                 heardNode ??= nodeReceiver;
 
-                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, heardNode, nodeReceiver, route.Snr ?? -999,
-                    null, heardNode.Positions.FirstOrDefault(), nodeReceiver.Positions.FirstOrDefault());
+                await SetNeighbor(Entities_NeighborInfo.Source.Traceroute, packet, nodeReceiver, heardNode, route.Snr ?? -999,
+                    null, nodeReceiver.Positions.FirstOrDefault(), heardNode.Positions.FirstOrDefault());
 
                 heardNode = nodeReceiver;
             }
         }
     }
 
-    public (List<NodeSnr> routes, List<NodeSnr> routesBack) GetTracerouteInfo(uint nodeFromId,
-        uint nodeToId, RouteDiscovery? payload, bool isBack)
+    public (List<NodeSnr> routes, List<NodeSnr> routesBack) GetTracerouteInfo(uint nodeFromId, uint nodeToId, RouteDiscovery? payload, bool isTowardsDestination)
     {
         List<NodeSnr> routes = [];
         List<NodeSnr> routesBack = [];
 
-        if (payload != null)
+        if (payload == null)
         {
-            routes = new List<uint> { isBack ? nodeToId : nodeFromId }
-                .Concat(payload.Route)
-                .Concat([isBack ? nodeFromId : 0])
+            return (routes, routesBack);
+        }
+
+        var context = ContextFactory.CreateDbContext();
+        
+        var origin = isTowardsDestination ? nodeToId : nodeFromId;
+        var dest = isTowardsDestination ? nodeFromId : nodeToId;
+        
+        routes = new List<uint> { origin }
+            .Concat(payload.Route)
+            .Concat([isTowardsDestination ? dest : 0])
+            .Where(a => a > 0)
+            .Select((n, i) => new NodeSnr
+            {
+                NodeId = n,
+                Node = context.Nodes.FindByNodeId(n),
+                Hop = i,
+                Snr = i > 0 && i < payload.SnrTowards.Count + 1 ? payload.SnrTowards[i - 1] : null
+            })
+            .ToList();
+
+        if (payload.RouteBack.Count != 0)
+        {
+            routesBack = new List<uint> { payload.SnrBack.Count != 0 ? nodeFromId : 0 }
+                .Concat(payload.RouteBack)
                 .Where(a => a > 0)
                 .Select((n, i) => new NodeSnr
                 {
                     NodeId = n,
-                    Node = Context.Nodes.FindByNodeId(n),
+                    Node = context.Nodes.FindByNodeId(n),
                     Hop = i,
-                    Snr = i > 0 && i < payload.SnrTowards.Count + 1 ? payload.SnrTowards[i - 1] : null
+                    Snr = i > 0 && i < payload.SnrBack.Count + 1 ? payload.SnrBack[i - 1] : null
                 })
                 .ToList();
-
-            if (payload.RouteBack.Count != 0 || payload.SnrBack.Count != 0)
-            {
-                routesBack = new List<uint> { nodeFromId }
-                    .Concat(payload.RouteBack)
-                    .Select((n, i) => new NodeSnr
-                    {
-                        NodeId = n,
-                        Node = Context.Nodes.FindByNodeId(n),
-                        Hop = i,
-                        Snr = i > 0 && i < payload.SnrBack.Count + 1 ? payload.SnrBack[i - 1] : null
-                    })
-                    .ToList();
-            }
         }
 
         return (routes, routesBack);
@@ -742,7 +749,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     public async Task<Entities_NeighborInfo?> SetNeighbor(Entities_NeighborInfo.Source source, Packet packet, 
         Node nodeReceiver, Node heardNode, 
         float snr, float? rssi,
-        Position? nodeFromPosition, Position? heardPosition)
+        Position? nodeReceiverPosition, Position? heardPosition)
     {
         if (nodeReceiver == heardNode 
             || packet.PortNum == PortNum.MapReportApp
@@ -755,8 +762,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
 
         double? distance = null;
-        var latitudeFrom = nodeFromPosition?.Latitude ?? nodeReceiver.Latitude;
-        var longitudeFrom = nodeFromPosition?.Longitude ?? nodeReceiver.Longitude;
+        var latitudeFrom = nodeReceiverPosition?.Latitude ?? nodeReceiver.Latitude;
+        var longitudeFrom = nodeReceiverPosition?.Longitude ?? nodeReceiver.Longitude;
         var latitudeNeighbor = heardPosition?.Latitude ?? heardNode.Latitude;
         var longitudeNeighbor = heardPosition?.Longitude ?? heardNode.Longitude;
 
@@ -768,7 +775,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         var neighborInfo = await Context.NeighborInfos.FirstOrDefaultAsync(n => n.NodeReceiver == nodeReceiver && n.NodeHeard == heardNode) ?? new Entities_NeighborInfo
         {
             NodeReceiver = nodeReceiver,
-            NodeReceiverPosition = nodeFromPosition,
+            NodeReceiverPosition = nodeReceiverPosition,
             Packet = packet,
             NodeHeard = heardNode,
             NodeHeardPosition = heardPosition,
@@ -800,7 +807,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 neighborInfo.Snr = snr;
                 neighborInfo.Rssi = rssi;
             }
-            neighborInfo.NodeReceiverPosition = nodeFromPosition;
+            neighborInfo.NodeReceiverPosition = nodeReceiverPosition;
             neighborInfo.NodeHeardPosition = heardPosition;
             neighborInfo.Distance = distance;
             neighborInfo.DataSource = source;

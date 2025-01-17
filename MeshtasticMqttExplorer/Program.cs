@@ -54,9 +54,9 @@ try
     });
 
     builder.Services.AddSingleton<RecorderService>();
-    builder.Services.AddScoped<MeshtasticService>();
-    builder.Services.AddScoped<NotificationService>();
+    builder.Services.AddSingleton<NotificationService>();
     builder.Services.AddSingleton<PurgeService>();
+    builder.Services.AddScoped<MeshtasticService>();
 
     if (!builder.Environment.IsDevelopment())
     {

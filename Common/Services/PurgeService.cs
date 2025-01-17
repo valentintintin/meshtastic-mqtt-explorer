@@ -32,20 +32,8 @@ public class PurgeService : AService
     {
         Logger.LogTrace("Purge des données");
         await PurgeOldData();
-        await PurgeOldPackets();
         await RefreshNodesGateway();
         Logger.LogInformation("Purge des données OK");
-    }
-
-    private async Task PurgeOldPackets()
-    {
-        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
-        
-        Logger.LogTrace("Delete packets if they are too old < {date}", minDate);
-        
-        Context.RemoveRange(Context.Packets.Where(a => a.CreatedAt < minDate));
-        
-        await Context.SaveChangesAsync();
     }
 
     private async Task PurgeOldData()
@@ -54,12 +42,18 @@ public class PurgeService : AService
         
         Logger.LogTrace("Delete old data if they are too old < {date}", minDate);
         
-        Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.Positions.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.NeighborInfos.Where(a => a.CreatedAt < minDate));
+        Context.RemoveRange(Context.Packets.Where(a => a.CreatedAt < minDate));
+        Context.RemoveRange(Context.NeighborInfos.Where(a => a.UpdatedAt < minDate));
+        Context.RemoveRange(Context.Positions.Where(a => a.UpdatedAt < minDate));
         Context.RemoveRange(Context.SignalHistories.Where(a => a.CreatedAt < minDate));
+        Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.TextMessages.Where(a => a.CreatedAt < minDate));
+        Context.RemoveRange(Context.Waypoints.Where(a => a.UpdatedAt < minDate));
+        
+        var nodesToDelete = Context.Nodes.Where(a => a.LastSeen < minDate).ToList();
+        var nodesIdToDelete = nodesToDelete.Select(a => a.Id).ToList();
+        Context.RemoveRange(Context.TextMessages.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId)));
+        Context.RemoveRange(nodesToDelete);
 
         await Context.SaveChangesAsync();
     }

@@ -262,11 +262,11 @@
 
                                                 @if (route.Node != null)
                                                 {
-                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName()</a>
+                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName() - @route.Node.NodeId</a>
                                                 }
                                                 else
                                                 {
-                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.Node.NodeId</a>
                                                 }
                                             </TimelineItem>
                                         }
@@ -293,11 +293,11 @@
                                                 
                                                 @if (route.Node != null)
                                                 {
-                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName()</a>
+                                                    <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName() - @route.Node.NodeId</a>
                                                 }
                                                 else
                                                 {
-                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString()</a>
+                                                    <a href="/node/by-nodeid/@route.NodeId.ToHexString()" target="_blank" rel="nofollow">@route.NodeId.ToHexString() - @route.Node.NodeId</a>
                                                 }
                                             </TimelineItem>
                                         }
@@ -468,6 +468,8 @@
     private List<NodeSnr>? NeighborsInfo { get; set; } 
     
     private Osm.Marker? Marker { get; set; }
+    
+    
 
     protected override void OnParametersSet()
     {
@@ -567,7 +569,7 @@
         try
         {
             await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
-            await Message.Info("JSON copié !");
+            await Message.Info("Copié !");
         }
         catch (Exception)
         {

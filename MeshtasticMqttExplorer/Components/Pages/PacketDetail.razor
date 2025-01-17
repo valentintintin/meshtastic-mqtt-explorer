@@ -13,6 +13,7 @@
 @using MeshtasticMqttExplorer.Components.Shared
 @using NotificationService = Common.Services.NotificationService
 
+@inject IJSRuntime JsRuntime
 @inject IDbContextFactory<DataContext> ContextFactory
 @inject IMessageService Message
 @inject MeshtasticService MeshtasticService
@@ -68,6 +69,9 @@
         
         <Button OnClick="() => ComputeAgain()">Traiter la trame</Button>
         <Button OnClick="() => Notify()">Notifier</Button>
+        <Popover ContentTemplate="@ContentNotificationText" Title="Texte notification">
+            <Button OnClick="() => CopyTextToClipboard(NotificationText)">Texte notification</Button>
+        </Popover>
     }
     else if (Loading)
     {
@@ -86,6 +90,9 @@
     
     [Parameter]
     public long? PacketId { get; set; }
+
+    private RenderFragment ContentNotificationText => @<div>@NotificationText</div>;
+    private string? NotificationText { get; set; }
 
     private bool Loading { get; set; } = true;
     private Packet? Packet { get; set; }
@@ -129,6 +136,8 @@
 
             return;
         }
+
+        NotificationText = NotificationService.GetPacketMessageToSend(Packet, Context);
         
         Loading = false;
     }
@@ -143,6 +152,19 @@
     {
         await NotificationService.SendNotification(Packet);
         await Message.Info("Notification envoyée !");
+    }
+
+    private async Task CopyTextToClipboard(string text)
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
+            await Message.Info("Copié !");
+        }
+        catch (Exception)
+        {
+            await Message.Error("Impossible d'accéder au presse-papier");
+        }
     }
 
     public async ValueTask DisposeAsync()

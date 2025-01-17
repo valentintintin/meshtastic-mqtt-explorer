@@ -29,7 +29,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
 
         try
         {
-            rootPacket.MergeFrom(data);
+            rootPacket.MergeFrom(data.ToArray());
 
             if (rootPacket.Packet == null)
             {

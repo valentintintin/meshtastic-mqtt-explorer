@@ -10,6 +10,7 @@ public class Webhook : IEntity
     
     public required string Name { get; set; }
     public required string Url { set; get; }
+    public string? UrlToEditMessage { set; get; }
 
     public bool Enabled { get; set; } = true;
     

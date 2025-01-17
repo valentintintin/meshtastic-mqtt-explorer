@@ -100,7 +100,7 @@
         </GridCol>
 
         <GridCol Xs="24" Md="8">
-            <Card Title="Télémétrie">
+            <Card Title="Télémétries">
                 <ChildContent>
                     <Descriptions Bordered="true" Column="1">
                         <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
@@ -147,6 +147,48 @@
                         {
                             <DescriptionsItem Title="Qualité de l'air (IAQ)" ContentStyle="font-weight: bold">
                                 @(LastTelemetryEnvironment?.Iaq?.ToString() ?? "-")
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel1Voltage.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Tension canal 1" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel1Voltage?.ToString() ?? "-")V
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel1Current.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Intensité canal 1" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel1Current?.ToString() ?? "-")mA
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel2Voltage.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Tension canal 2" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel2Voltage?.ToString() ?? "-")V
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel2Current.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Intensité canal 2" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel2Current?.ToString() ?? "-")mA
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel3Voltage.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Tension canal 3" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel3Voltage?.ToString() ?? "-")V
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (LastTelemetryPower?.Channel3Current.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Intensité canal 3" ContentStyle="font-weight: bold">
+                                @(LastTelemetryPower?.Channel3Current?.ToString() ?? "-")mA
                             </DescriptionsItem>
                         }
                     </Descriptions>
@@ -404,12 +446,12 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsVoltage1?.Any() == true)
+        @if (DataPowerMetricsVoltage2?.Any() == true)
         {
             <GridCol Xs="24" Md="12">
-                <Card Title="Tension canal 1">
+                <Card Title="Tension canal 2">
                     <ChildContent>
-                        <AntDesign.Charts.Line Data="DataPowerMetricsVoltage1" Config="_configVoltage"/>
+                        <AntDesign.Charts.Line Data="DataPowerMetricsVoltage2" Config="_configVoltage"/>
                     </ChildContent>
                 </Card>
             </GridCol>
@@ -460,6 +502,7 @@
 
     private Telemetry? LastTelemetryDevice { get; set; }
     private Telemetry? LastTelemetryEnvironment { get; set; }
+    private Telemetry? LastTelemetryPower { get; set; }
     
     private List<DateChartData<float>>? DataAirUtil { get; set; }
     private List<DateChartData<float>>? DataChannelUtil { get; set; }
@@ -643,9 +686,10 @@
     {
         LastTelemetryDevice = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics).MaxBy(a => a.CreatedAt);
         LastTelemetryEnvironment = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics).MaxBy(a => a.CreatedAt);
+        LastTelemetryPower = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics).MaxBy(a => a.CreatedAt);
         
         DataAirUtil = NodeInfo?.Telemetries
-            .Where(a => a.AirUtilTx > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.AirUtilTx  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -654,7 +698,7 @@
             }).ToList();
         
         DataChannelUtil = NodeInfo?.Telemetries
-            .Where(a => a.ChannelUtilization > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.ChannelUtilization  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -663,7 +707,7 @@
             }).ToList();
         
         DataVoltageBattery = NodeInfo?.Telemetries
-            .Where(a => a.Voltage > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.Voltage  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -672,7 +716,7 @@
             }).ToList();
         
         DataWeatherTemperature = NodeInfo?.Telemetries
-            .Where(a => a.Temperature > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.Temperature  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -681,7 +725,7 @@
             }).ToList();
         
         DataWeatherHumidity = NodeInfo?.Telemetries
-            .Where(a => a.RelativeHumidity > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.RelativeHumidity != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -690,7 +734,7 @@
             }).ToList();
         
         DataWeatherPressure = NodeInfo?.Telemetries
-            .Where(a => a.BarometricPressure > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.BarometricPressure  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -699,7 +743,7 @@
             }).ToList();
         
         DataAirquality = NodeInfo?.Telemetries
-            .Where(a => a.Iaq > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.Iaq  != null)
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -708,7 +752,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage1 = NodeInfo?.Telemetries
-            .Where(a => a.Channel1Voltage > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel1Voltage  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -716,7 +760,7 @@
             }).ToList();
         
         DataPowerMetricsCurrent1 = NodeInfo?.Telemetries
-            .Where(a => a.Channel1Current > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel1Current  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",
@@ -724,7 +768,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage2 = NodeInfo?.Telemetries
-            .Where(a => a.Channel2Voltage > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel2Voltage  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -732,7 +776,7 @@
             }).ToList();
         
         DataPowerMetricsCurrent2 = NodeInfo?.Telemetries
-            .Where(a => a.Channel2Current > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel2Current  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",
@@ -740,7 +784,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage3 = NodeInfo?.Telemetries
-            .Where(a => a.Channel3Voltage > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel3Voltage  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -748,7 +792,7 @@
             }).ToList();
         
         DataPowerMetricsCurrent3 = NodeInfo?.Telemetries
-            .Where(a => a.Channel3Current > 0)
+            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel3Current  != null)
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",

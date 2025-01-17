@@ -93,10 +93,10 @@ try
 
     builder.Services.AddScoped<UserService>();
     builder.Services.AddScoped<MqttService>();
-    builder.Services.AddScoped<NotificationService>();
+    builder.Services.AddSingleton<NotificationService>();
+    builder.Services.AddSingleton<PurgeService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
-    builder.Services.AddSingleton<PurgeService>();
 
     builder.Services.AddHostedMqttServer(options => options.WithDefaultEndpoint());
     builder.Services.AddMqttConnectionHandler();

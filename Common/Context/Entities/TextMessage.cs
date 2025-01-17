@@ -9,8 +9,8 @@ public class TextMessage : IEntity
     public long FromId { get; set; }
     public virtual Node From { get; set; } = null!;
     
-    public long? ToId { get; set; }
-    public virtual Node? To { get; set; }
+    public long ToId { get; set; }
+    public virtual Node To { get; set; }
     
     public long? PacketId { get; set; }
     public virtual Packet? Packet { get; set; }

@@ -1,17 +1,26 @@
+using System.Reactive.Concurrency;
+using System.Text.Json;
 using Common.Context;
 using Common.Context.Entities;
-using Meshtastic.Extensions;
+using Common.Extensions.Entities;
+using Common.Models;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Common.Services;
 
-public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
+public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IServiceProvider serviceProvider) : AService(logger, contextFactory)
 {
+    private Dictionary<uint, IDisposable> DisposableSchedulerForPacketId { get; } = new();
+    private Dictionary<(string url, uint packetId), string?> MessageIdForPacketId { get; } = new();
+    
     public async Task SendNotification(Packet packet)
     {
-        var notificationsCanalToSend = Context.Webhooks
+        var context = await ContextFactory.CreateDbContextAsync();
+        
+        var notificationsCanalToSend = context.Webhooks
             .Where(n => n.Enabled)
             .Where(n => !n.PortNum.HasValue || packet.PortNum == n.PortNum)
             .Where(n => !n.From.HasValue || packet.From.NodeId == n.From)
@@ -41,33 +50,78 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .DistinctBy(n => n.Url)
             .ToList();
 
-        var isText = packet.PortNum is PortNum.TextMessageApp;
-        var nbSauts = packet.HopStart - packet.HopLimit;
+        if (notificationsCanalToSend.Count == 0)
+        {
+            return;
+        }
         
+        if (DisposableSchedulerForPacketId.TryGetValue(packet.PacketId, out var disposable))
+        {
+            disposable.Dispose();
+            DisposableSchedulerForPacketId.Remove(packet.PacketId);
+        }
+        
+        DisposableSchedulerForPacketId.Add(packet.PacketId, serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>().ScheduleAsync(TimeSpan.FromSeconds(5), async (_, _) =>
+        {
+            var message = GetPacketMessageToSend(packet, context);
+
+            foreach (var notificationConfiguration in notificationsCanalToSend)
+            {
+                await MakeRequest(notificationConfiguration, message, packet);
+            }
+
+            DisposableSchedulerForPacketId.Remove(packet.PacketId);
+        }));
+    }
+
+    public static string GetPacketMessageToSend(Packet packet, DataContext context)
+    {
+        var isText = packet.PortNum is PortNum.TextMessageApp;
+
+        var allPackets = context.Packets
+            .Include(p => p.AllDuplicatedPackets)
+            .ThenInclude(p => p.Gateway)
+            .FindById(packet.Id)!
+            .AllDuplicatedPackets
+            .ToList()
+            .Concat([packet])
+            .DistinctBy(p => p.Id)
+            .OrderByDescending(p => p.HopLimit)
+            .ThenBy(p => p.RxSnr)
+            .ToList();
+
         var message = $"""
                        [{packet.Channel.Name}] {packet.From.AllNames}
-                       
+
                        Pour : {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? packet.To.AllNames : "tout le monde")}
+                       """ + '\n' + '\n';
 
-                       {(packet.Gateway != packet.From ? $"Via {packet.Gateway.AllNames}\n{packet.GatewayDistanceKm} Km, SNR {packet.RxSnr}, RSSI {packet.RxRssi}, {(nbSauts == 0 ? " reçu en direct" : $" {nbSauts} sauts")}" : "Via lui-même")}, {packet.HopLimit} sauts restants
-
-                       > {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}
-                       """;
-        
-        foreach (var notificationConfiguration in notificationsCanalToSend)
+        foreach (var aPacket in allPackets)
         {
-            await MakeRequest(notificationConfiguration, message, packet);
+            var nbHop = aPacket.HopStart - aPacket.HopLimit;
+            message += $"{(aPacket.Gateway != packet.From ? $"Via {aPacket.Gateway.AllNames}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, RSSI {aPacket.RxRssi}, {(nbHop == 0 ? " reçu en direct" : $" {nbHop} sauts")}" : "Via lui-même")}, {aPacket.HopLimit} sauts restants" + '\n' + '\n';
         }
+        
+        message += $"> {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}";
+        return message;
     }
-    
-    private async Task<string?> MakeRequest(Webhook webhook, string message, Packet packet) 
+
+    private async Task MakeRequest(Webhook webhook, string message, Packet packet) 
     {
         Logger.LogTrace("Send notification to {name} for packet #{packetId}", webhook.Name, packet.Id);
         
         using var client = new HttpClient();
 
         var encodedMessage = Uri.EscapeDataString(message);
-        var requestUrl = webhook.Url.Replace("{{message}}", encodedMessage);
+        var requestUrl = webhook.Url;
+
+        var cacheMessageIdKey = (webhook.Url, packet.PacketId);
+        if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && MessageIdForPacketId.TryGetValue(cacheMessageIdKey, out var messageId) && !string.IsNullOrWhiteSpace(messageId))
+        {
+            requestUrl = webhook.UrlToEditMessage.Replace("{{messageId}}", messageId);   
+        }
+
+        requestUrl = requestUrl.Replace("{{message}}", encodedMessage);
 
         try
         {
@@ -77,12 +131,23 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
             Logger.LogInformation("Send notification to {name} for packet #{packetId} OK", webhook.Name, packet.Id);
 
-            return await response.Content.ReadAsStringAsync();
+            var responseContent = await response.Content.ReadAsStringAsync();
+            
+            if (requestUrl.StartsWith("https://api.telegram.org/"))
+            {
+                messageId = GetMessageIdFromTelegramResponse(responseContent);
+                MessageIdForPacketId.Remove(cacheMessageIdKey);
+                MessageIdForPacketId.Add(cacheMessageIdKey, messageId);
+            }
         }
         catch (Exception e)
         {
             Logger.LogWarning(e, "Send notification to {name} for packet #{packetId} KO", webhook.Name, packet.Id);
-            return default;
         }
+    }
+    
+    private string? GetMessageIdFromTelegramResponse(string responseContent)
+    {
+        return JsonSerializer.Deserialize<TelegramAddEditMessageResponseDto>(responseContent)?.Result.MessageId.ToString();
     }
 }
