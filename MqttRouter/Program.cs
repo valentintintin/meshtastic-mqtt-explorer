@@ -1,9 +1,6 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+﻿using System.Text;
 using System.Text.Json.Serialization;
 using Common.Context;
-using Common.Context.Entities;
 using Common.Context.Entities.Router;
 using Common.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -19,12 +16,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using MQTTnet.AspNetCore;
 using MqttRouter.Controllers;
-using MqttRouter.Models;
 using MqttRouter.Services;
 using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
-using ILogger = Microsoft.Extensions.Logging.ILogger;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 Console.WriteLine("Starting");
@@ -94,7 +89,6 @@ try
     builder.Services.AddScoped<UserService>();
     builder.Services.AddScoped<MqttService>();
     builder.Services.AddSingleton<NotificationService>();
-    builder.Services.AddSingleton<PurgeService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
 
@@ -168,8 +162,6 @@ try
         context.Update(nodeConfiguration);
     }
     await context.SaveChangesAsync();
-    
-    app.Services.GetRequiredService<PurgeService>(); // Run cron
     
     Console.WriteLine("Started");
 

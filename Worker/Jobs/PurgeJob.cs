@@ -1,33 +1,17 @@
-using System.Reactive.Concurrency;
+using Common;
 using Common.Context;
+using Common.Jobs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
-namespace Common.Services;
+namespace Worker.Jobs;
 
-public class PurgeService : AService
+public class PurgeJob(
+    ILogger<PurgeJob> logger,
+    IDbContextFactory<DataContext> contextFactory,
+    IConfiguration configuration,
+    IServiceProvider serviceProvider)
+    : AJob(logger, contextFactory, serviceProvider)
 {
-    private readonly IConfiguration _configuration;
-
-    public PurgeService(ILogger<PurgeService> logger, IDbContextFactory<DataContext> contextFactory, IConfiguration configuration, IServiceProvider serviceProvider) : base(logger, contextFactory)
-    {
-        _configuration = configuration;
-
-        var scheduler = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>();
-        
-        scheduler.Schedule(TimeSpan.FromSeconds(15), async () =>
-        {
-            await RunPurge();
-        });
-        
-        scheduler.SchedulePeriodic(TimeSpan.FromHours(1), async () =>
-        {
-            await RunPurge();
-        });
-    }
-
     public async Task RunPurge()
     {
         Logger.LogTrace("Purge des données");
@@ -38,23 +22,26 @@ public class PurgeService : AService
 
     private async Task PurgeOldData()
     {
-        var minDate = DateTime.UtcNow.Date.AddDays(-_configuration.GetValue("PurgeDays", 3));
+        var minDate = DateTime.UtcNow.Date.AddDays(-configuration.GetValue("PurgeDays", 3));
         
         Logger.LogTrace("Delete old data if they are too old < {date}", minDate);
-        
-        Context.RemoveRange(Context.Packets.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.NeighborInfos.Where(a => a.UpdatedAt < minDate));
+
         Context.RemoveRange(Context.Positions.Where(a => a.UpdatedAt < minDate));
+        Context.RemoveRange(Context.NeighborInfos.Where(a => a.UpdatedAt < minDate));
         Context.RemoveRange(Context.SignalHistories.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.TextMessages.Where(a => a.CreatedAt < minDate));
         Context.RemoveRange(Context.Waypoints.Where(a => a.UpdatedAt < minDate));
-        
+        await Context.SaveChangesAsync();
+
+        Context.RemoveRange(Context.Packets.Where(a => a.CreatedAt < minDate));
+        await Context.SaveChangesAsync();
+
         var nodesToDelete = Context.Nodes.Where(a => a.LastSeen < minDate).ToList();
         var nodesIdToDelete = nodesToDelete.Select(a => a.Id).ToList();
         Context.RemoveRange(Context.TextMessages.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId)));
+        Context.RemoveRange(Context.Packets.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId) || nodesIdToDelete.Contains(a.GatewayId)));
         Context.RemoveRange(nodesToDelete);
-
         await Context.SaveChangesAsync();
     }
 

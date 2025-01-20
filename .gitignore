@@ -10,4 +10,5 @@ MeshtasticMqttExplorer/appsettings.Production.Gaulix.json
 MeshtasticMqttExplorer/wwwroot/mymap.pmtiles
 Recorder/appsettings.Production.json
 MqttRouter/appsettings.Production.json
+Worker/appsettings.Production.json
 MqttRouter/appsettings.Production.Gaulix.json

@@ -4,6 +4,8 @@ using AntDesign;
 using Blazored.LocalStorage;
 using Common.Context;
 using Common.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
@@ -39,6 +41,20 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
     builder.Services.AddBlazoredLocalStorage();
+    builder.Services.AddHangfire(action =>
+    {
+        action
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(options =>
+            {
+                options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default"));
+            }, new PostgreSqlStorageOptions
+            {
+                SchemaName = "hangfire_worker"
+            });
+    });
 
     builder.Services.AddDbContextFactory<DataContext>(option =>
     {
@@ -55,7 +71,6 @@ try
 
     builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddSingleton<NotificationService>();
-    builder.Services.AddSingleton<PurgeService>();
     builder.Services.AddScoped<MeshtasticService>();
 
     if (!builder.Environment.IsDevelopment())
@@ -90,6 +105,13 @@ try
 
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
+
+    app.UseHangfireDashboard("/worker", new DashboardOptions
+    {
+        DashboardTitle = "Meshtastic Explorer Worker Dashboard",
+        Authorization = [],
+        IgnoreAntiforgeryToken = true
+    });
 
     LocaleProvider.DefaultLanguage = "fr-FR";
     LocaleProvider.SetLocale(LocaleProvider.DefaultLanguage);

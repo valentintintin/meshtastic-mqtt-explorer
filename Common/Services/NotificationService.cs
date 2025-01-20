@@ -11,10 +11,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Common.Services;
 
-public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IServiceProvider serviceProvider) : AService(logger, contextFactory)
+public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
 {
-    private Dictionary<uint, IDisposable> DisposableSchedulerForPacketId { get; } = new();
     private Dictionary<(string url, uint packetId), string?> MessageIdForPacketId { get; } = new();
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
     
     public async Task SendNotification(Packet packet)
     {
@@ -30,10 +30,12 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
                         || packet.From.NodeId == n.FromOrTo 
                         || packet.To.NodeId == n.FromOrTo)
             .Where(n => !n.MqttServerId.HasValue
-                        || packet.MqttServerId == n.MqttServerId 
-                        || packet.From.MqttServerId == n.MqttServerId
-                        || packet.Gateway.MqttServerId == n.MqttServerId
-                        || (packet.PacketDuplicated != null && packet.PacketDuplicated.MqttServerId == n.MqttServerId)
+                        || !n.OnlyWhenDifferentMqttServer && (packet.MqttServerId == n.MqttServerId 
+                                                              || packet.From.MqttServerId == n.MqttServerId
+                                                              || packet.Gateway.MqttServerId == n.MqttServerId
+                                                              || (packet.PacketDuplicated != null && packet.PacketDuplicated.MqttServerId == n.MqttServerId)
+                        )
+                        || (n.OnlyWhenDifferentMqttServer && packet.From.MqttServerId != n.MqttServerId && packet.FromId != packet.GatewayId)
             )
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
@@ -54,24 +56,17 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         {
             return;
         }
+
+        // await _semaphore.WaitAsync();
         
-        if (DisposableSchedulerForPacketId.TryGetValue(packet.PacketId, out var disposable))
+        var message = GetPacketMessageToSend(packet, context);
+
+        foreach (var notificationConfiguration in notificationsCanalToSend)
         {
-            disposable.Dispose();
-            DisposableSchedulerForPacketId.Remove(packet.PacketId);
+            await MakeRequest(notificationConfiguration, message, packet);
         }
-        
-        DisposableSchedulerForPacketId.Add(packet.PacketId, serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>().ScheduleAsync(TimeSpan.FromSeconds(5), async (_, _) =>
-        {
-            var message = GetPacketMessageToSend(packet, context);
 
-            foreach (var notificationConfiguration in notificationsCanalToSend)
-            {
-                await MakeRequest(notificationConfiguration, message, packet);
-            }
-
-            DisposableSchedulerForPacketId.Remove(packet.PacketId);
-        }));
+        // _semaphore.Release();
     }
 
     public static string GetPacketMessageToSend(Packet packet, DataContext context)
@@ -79,31 +74,43 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
         var allPackets = context.Packets
-            .Include(p => p.AllDuplicatedPackets)
-            .ThenInclude(p => p.Gateway)
-            .FindById(packet.Id)!
-            .AllDuplicatedPackets
+            .Include(p => p.Gateway)
+            .Include(p => p.MqttServer)
+            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId)
             .ToList()
-            .Concat([packet])
-            .DistinctBy(p => p.Id)
             .OrderByDescending(p => p.HopLimit)
-            .ThenBy(p => p.RxSnr)
+            .ThenByDescending(p => p.RxSnr)
             .ToList();
 
         var message = $"""
-                       [{packet.Channel.Name}] {packet.From.AllNames}
+                       [{packet.Channel.Name}]
+                       {packet.From.AllNames}
 
                        Pour : {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? packet.To.AllNames : "tout le monde")}
-                       """ + '\n' + '\n';
-
-        foreach (var aPacket in allPackets)
+                       
+                       > {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}
+                       """;
+        
+        if (allPackets.Count != 0)
         {
-            var nbHop = aPacket.HopStart - aPacket.HopLimit;
-            message += $"{(aPacket.Gateway != packet.From ? $"Via {aPacket.Gateway.AllNames}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, RSSI {aPacket.RxRssi}, {(nbHop == 0 ? " reçu en direct" : $" {nbHop} sauts")}" : "Via lui-même")}, {aPacket.HopLimit} sauts restants" + '\n' + '\n';
+            message += "" + '\n' + '\n';
         }
         
-        message += $"> {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}";
-        return message;
+        foreach (var aPacketData in allPackets.GroupBy(a => a.HopStart - a.HopLimit))
+        {
+            var nbHop = aPacketData.Key;
+
+            message += "-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --" + '\n' + '\n';
+            
+            foreach (var aPacket in aPacketData)
+            {
+                message +=
+                    $"--> {aPacket.Gateway.Name()}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}" +
+                    '\n' + '\n';
+            }
+        }
+        
+        return message.TrimEnd();
     }
 
     private async Task MakeRequest(Webhook webhook, string message, Packet packet) 

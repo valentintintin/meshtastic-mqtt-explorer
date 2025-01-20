@@ -1,8 +1,9 @@
 ﻿using System.Text.Json.Serialization;
 using Common.Context;
-using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Meshtastic.Protobufs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -14,9 +15,7 @@ using Microsoft.Extensions.Logging;
 using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
-using Recorder.Services;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
-using NeighborInfo = Common.Context.Entities.NeighborInfo;
 
 Console.WriteLine("Starting");
 
@@ -37,7 +36,20 @@ try
     builder.Services.AddResponseCompression();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
-    
+
+    builder.Services.AddHangfire(action =>
+    {
+        action.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(
+                options => { options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default")); },
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = "hangfire_worker"
+                });
+    });
+
     builder.Services.AddDbContextFactory<DataContext>(option =>
     {
         option.UseNpgsql(
@@ -53,7 +65,7 @@ try
     
     builder.Services.AddSingleton<NotificationService>();
     builder.Services.AddSingleton<MqttClientService>();
-    builder.Services.AddSingleton<PurgeService>();
+    builder.Services.AddSingleton<IBackgroundJobClient, BackgroundJobClient>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<MqttService>();
     
@@ -113,8 +125,8 @@ try
 
                 // if (i % 10 == 0)
                 // {
-                    Console.WriteLine($"Processed data {i}/{allDatas.Count} with ID #{data.Id}");
-                    // await context.SaveChangesAsync();
+                Console.WriteLine($"Processed data {i}/{allDatas.Count} with ID #{data.Id}");
+                // await context.SaveChangesAsync();
                 // }
             }
             catch (Exception e)
@@ -128,8 +140,6 @@ try
         return;
     }
     
-    app.Services.GetRequiredService<PurgeService>(); // Run cron
-
     Console.WriteLine("Started");
 
     await app.RunAsync();

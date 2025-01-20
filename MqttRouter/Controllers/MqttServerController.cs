@@ -1,3 +1,4 @@
+using System.Buffers;
 using Common;
 using Common.Context;
 using Common.Context.Entities.Router;
@@ -137,7 +138,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
             user?.Id, guid, eventArgs.ApplicationMessage.Topic);
         
         var packetAndMeshPacket = await mqttService.DoReceive(eventArgs.ApplicationMessage.Topic,
-            eventArgs.ApplicationMessage.Payload, _mqttServer!);
+            eventArgs.ApplicationMessage.Payload.ToArray(), _mqttServer!);
 
         if (packetAndMeshPacket?.packet == null)
         {

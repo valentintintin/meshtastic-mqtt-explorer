@@ -20,7 +20,7 @@ window.initializeLeafletMap = (where) => {
     const courbeNiveau = L.geoportalLayer.WMTS({
         layer: "ELEVATION.SLOPES",
     }, {
-        opacity: 0.4
+        opacity: 0.1
     });
 
     const proto = protomapsL.leafletLayer({

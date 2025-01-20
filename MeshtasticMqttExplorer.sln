@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Recorder", "Recorder\Record
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MqttRouter", "MqttRouter\MqttRouter.csproj", "{7EE570BC-7010-4EFE-94E5-90829E5903B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Worker", "Worker\Worker.csproj", "{19254E2E-F53A-4635-9465-E9390D35E144}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7EE570BC-7010-4EFE-94E5-90829E5903B6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{19254E2E-F53A-4635-9465-E9390D35E144}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19254E2E-F53A-4635-9465-E9390D35E144}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19254E2E-F53A-4635-9465-E9390D35E144}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19254E2E-F53A-4635-9465-E9390D35E144}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

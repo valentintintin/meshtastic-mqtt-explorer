@@ -16,6 +16,7 @@ public class Webhook : IEntity
     
     public bool AllowDuplication { get; set; }
     public bool AllowByHimSelf { get; set; }
+    public bool OnlyWhenDifferentMqttServer { get; set; }
     
     public PortNum? PortNum { get; set; }
     public uint? From { get; set; }

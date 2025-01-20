@@ -75,21 +75,23 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PackageReference Include="Hangfire.Core" Version="1.8.17" />
+      <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.1" />
       <PackageReference Include="MQTTnet" Version="5.0.1.1416" />
       <PackageReference Include="NLog" Version="5.3.4" />
       <PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
       <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.15" />
-      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.2" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.1-dev-00124" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>
@@ -100,6 +102,19 @@
 
     <ItemGroup>
       <EmbeddedResource Remove="Properties\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Hangfire.NetCore">
+        <HintPath>..\..\..\..\..\.nuget\packages\hangfire.netcore\1.8.17\lib\netstandard2.1\Hangfire.NetCore.dll</HintPath>
+      </Reference>
+      <Reference Include="Microsoft.EntityFrameworkCore">
+        <HintPath>..\..\..\..\..\.nuget\packages\microsoft.entityframeworkcore\9.0.0\lib\net8.0\Microsoft.EntityFrameworkCore.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Services\" />
     </ItemGroup>
 
 </Project>

@@ -15,8 +15,8 @@ namespace MeshtasticMqttExplorer.Components;
 public static class Utils
 {
     public static readonly string Red = Color.DarkRed.Name.ToLower();
-    public static readonly string Green = Color.ForestGreen.Name.ToLower();
-    public static readonly string GreenLight = Color.YellowGreen.Name.ToLower();
+    public static readonly string GreenLight = Color.LimeGreen.Name.ToLower();
+    public static readonly string Green = Color.DarkGreen.Name.ToLower();
     public static readonly string Gold = Color.Goldenrod.Name.ToLower();
     public static readonly string Blue = Color.DodgerBlue.Name.ToLower();
     public static readonly string Gray = Color.DarkGray.Name.ToLower();
@@ -146,7 +146,7 @@ public static class Utils
                 Visible = legend
             },
             SeriesField = nameof(DateChartData<object>.type),
-            Color = new [] { Blue, Red, Orange, Green, Gray }
+            Color = new [] { Blue, Red, Orange, GreenLight, Gray }
         };
     }
 

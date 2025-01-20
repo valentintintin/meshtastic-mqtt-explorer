@@ -15,7 +15,7 @@ namespace Common.Services;
 
 public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
 {
-    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(string topic, ReadOnlySequence<byte> data, MqttServer mqttServer)
+    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(string topic, byte[] data, MqttServer mqttServer)
     {
         var topicSegments = topic.Split("/");
 
@@ -29,7 +29,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
 
         try
         {
-            rootPacket.MergeFrom(data.ToArray());
+            rootPacket.MergeFrom(data);
 
             if (rootPacket.Packet == null)
             {
@@ -50,14 +50,14 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
         {
             logger.LogWarning(ex,
                 "Received from {name} on {topic} but packet incorrect. Packet Raw : {packetRaw} | {rawString}",
-                mqttServer.Name, topic, Convert.ToBase64String(data.ToArray()), Encoding.UTF8.GetString(data));
+                mqttServer.Name, topic, Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
         }
         catch (Exception ex)
         {
             logger.LogError(ex,
                 "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw} | {rawString}",
                 mqttServer.Name, topic, JsonSerializer.Serialize(rootPacket),
-                Convert.ToBase64String(data.ToArray()), Encoding.UTF8.GetString(data));
+                Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
         }
 
         return null;
