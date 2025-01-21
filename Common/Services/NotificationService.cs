@@ -105,7 +105,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             foreach (var aPacket in aPacketData)
             {
                 message +=
-                    $"--> {aPacket.Gateway.Name()}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}" +
+                    $"--> {aPacket.Gateway.Name()}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, RSSI {aPacket.RxRssi}, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}" +
                     '\n' + '\n';
             }
         }
