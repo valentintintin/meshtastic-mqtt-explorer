@@ -112,11 +112,10 @@ public class MqttServerController(IServiceProvider serviceProvider)
                 eventArgs.ApplicationMessage.Topic);
             return;
         }
-        
-        NodeConfiguration? nodeConfiguration;
+
         try
         {
-            nodeConfiguration = await GetAndUpdateNodeConfiguration(eventArgs.ClientId,
+            var nodeConfiguration = await GetAndUpdateNodeConfiguration(eventArgs.ClientId,
                 eventArgs.ApplicationMessage.Topic, context, user);
             _logger.LogInformation("Client {clientId} send packet {guid} on {topic}. Node configuration #{nodeConfigurationId}", eventArgs.ClientId, guid,
                 eventArgs.ApplicationMessage.Topic, nodeConfiguration?.Id);

@@ -233,10 +233,12 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             Node = node
         };
 
-        if (node.LongName?.Length >= 2)
+        nodeConfiguration.Department = node.LongName?.Length switch
         {
-            nodeConfiguration.Department = node.LongName[..2];
-        }
+            >= 3 when char.IsDigit(node.LongName[2]) => node.LongName[..3],
+            >= 2 when char.IsDigit(node.LongName[0]) => node.LongName[..2],
+            _ => nodeConfiguration.Department
+        };
 
         if (nodeConfiguration.Id == 0)
         {
