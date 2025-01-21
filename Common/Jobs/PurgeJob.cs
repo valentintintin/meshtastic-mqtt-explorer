@@ -1,9 +1,9 @@
-using Common;
 using Common.Context;
-using Common.Jobs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
-namespace Worker.Jobs;
+namespace Common.Jobs;
 
 public class PurgeJob(
     ILogger<PurgeJob> logger,

@@ -6,8 +6,6 @@ using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using NLog;
 using NLog.Extensions.Logging;
-using Worker;
-using Worker.Jobs;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 Console.WriteLine("Starting");
@@ -52,7 +50,8 @@ try {
     builder.Services.AddHangfireServer(action =>
     {
         action.ServerName = "Meshtastic Explorer Worker";
-        action.SchedulePollingInterval = TimeSpan.FromSeconds(5);
+        action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
+        action.WorkerCount = 1;
     });
     
     var app = builder.Build();
