@@ -50,6 +50,9 @@
         <Content Include="Dockerfile">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Update="appsettings.Production.Gaulix.json">
+          <DependentUpon>appsettings.json</DependentUpon>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>
