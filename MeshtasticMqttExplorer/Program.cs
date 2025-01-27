@@ -6,11 +6,11 @@ using Common.Context;
 using Common.Services;
 using Hangfire;
 using Hangfire.PostgreSql;
-using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer;
 using MeshtasticMqttExplorer.Components;
 using MeshtasticMqttExplorer.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using NetDaemon.Extensions.Scheduler;
 using NLog;
@@ -55,6 +55,22 @@ try
                 SchemaName = "hangfire_worker"
             });
     });
+    
+    builder.Services.AddIdentity<Common.Context.Entities.Router.User, IdentityRole<long>>(options =>
+        {
+            options.Lockout.AllowedForNewUsers = false;
+            
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequiredLength = 1;
+            options.Password.RequiredUniqueChars = 1;
+
+            options.User.RequireUniqueEmail = true;
+        })
+        .AddEntityFrameworkStores<DataContext>()
+        .AddDefaultTokenProviders(); // token for reset password etc
 
     builder.Services.AddDbContextFactory<DataContext>(option =>
     {
@@ -72,6 +88,7 @@ try
     builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddSingleton<NotificationService>();
     builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<UserService>();
 
     if (!builder.Environment.IsDevelopment())
     {

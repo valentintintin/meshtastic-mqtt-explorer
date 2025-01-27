@@ -30,8 +30,8 @@
                 <a href="/node/@context.Node.Id" target="_blank" rel="nofollow">@context.Node.AllNames</a>
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.UpdatedAt" Title="Date de mise à jour" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable>
-            @context.UpdatedAt.ToFrench()
+        <PropertyColumn Property="c => c.LastSeenOnMqtt" Title="Date de mise à jour" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable>
+            @context.LastSeenOnMqtt!.Value.ToFrench()
         </PropertyColumn>
         <PropertyColumn Property="c => c.Department" Title="Département" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable>
             <div style="width: 100px">
@@ -80,12 +80,13 @@
         NodesQueryable = Context.NodeConfigurations
             .Include(a => a.Node)
             .Include(a => a.User)
+            .Where(a => a.LastSeenOnMqtt.HasValue)
             .Where(a => !OnlyConnected || !string.IsNullOrWhiteSpace(a.MqttId))
             .AsNoTrackingWithIdentityResolution();
         
         Total = Context.NodeConfigurations
             .AsNoTrackingWithIdentityResolution()
-            .Count();
+            .Count(a => a.LastSeenOnMqtt.HasValue);
         
         TotalConnected = Context.NodeConfigurations
             .AsNoTrackingWithIdentityResolution()

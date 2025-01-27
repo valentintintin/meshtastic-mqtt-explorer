@@ -81,6 +81,7 @@
         Context = await ContextFactory.CreateDbContextAsync();
         
         NodesQueryable = Context.Nodes
+            .Include(a => a.MqttServer)
             .Where(a => a.LastSeen.HasValue && MeshtasticService.NodesIgnored.All(b => b != a.NodeId))
             .AsNoTrackingWithIdentityResolution();
         

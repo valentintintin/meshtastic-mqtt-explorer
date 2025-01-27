@@ -1,4 +1,3 @@
-using System.Text;
 using AntDesign;
 using AntDesign.Charts;
 using Common;
@@ -7,7 +6,6 @@ using Common.Extensions;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Models;
 using Color = System.Drawing.Color;
-using NeighborInfo = Meshtastic.Protobufs.NeighborInfo;
 using Waypoint = Common.Context.Entities.Waypoint;
 
 namespace MeshtasticMqttExplorer.Components;

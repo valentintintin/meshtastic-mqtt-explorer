@@ -4,6 +4,7 @@ using Common.Context.Entities.Router;
 using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
+using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using static Meshtastic.Protobufs.PortNum;
@@ -12,7 +13,7 @@ namespace MqttRouter.Services;
 
 public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
 {
-    public async Task<PacketActivity> Route(string clientId, long? userId, Packet packet)
+    public async Task<PacketActivity> Route(string clientId, long? userId, Packet packet, MeshPacket meshPacket)
     {
         await UpdateNodeConfiguration(packet.From);
         await UpdateNodeConfiguration(packet.Gateway);
@@ -28,7 +29,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         if (!MeshtasticService.NodesIgnored.Contains(packet.To.NodeId)) // Message direct
         {
             await UpdateNodeConfiguration(packet.To);
-            await DoWhenPacketIsNotBroadcast(clientId, userId, packet, receivers, packetActivity);
+            await DoWhenPacketIsNotBroadcast(clientId, userId, packet, receivers, packetActivity, meshPacket);
         }
         else
         {
@@ -36,6 +37,9 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             {
                 case TextMessageApp:
                     DoWhenTextMessage(clientId, userId, packet, packetActivity);
+                    break;
+                case WaypointApp:
+                    DoWhenWaypoint(clientId, userId, packet, packetActivity);
                     break;
                 case NodeinfoApp:
                     await DoWhenNodeInfo(clientId, userId, packet, packetActivity);
@@ -70,21 +74,23 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
 
             packetActivity.Accepted = true;
+            packetActivity.HopLimit = 1;
             packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus d'une heure";
         }
     }
 
     private async Task DoWhenPositionOrTelemetryForLocalOnly(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
-        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddMinutes(-15));
+        const int maxMinutes = 30;
+        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddMinutes(-maxMinutes));
 
         if (hasPacketTypeBeforeDate != null)
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there are some packets of this type during the 15 minutes",
-                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there are some packets of this type during the {minutes} minutes",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, maxMinutes);
             
-            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée frequemment : {hasPacketTypeBeforeDate.Value.ToFrench()}";
+            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée il y a moins de {maxMinutes} minutes : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
         else
         {
@@ -98,12 +104,12 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             {
                 packetActivity.Accepted = true;
                 packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).Distinct().ToList());
-                packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de 15 minutes donc seulement pour les {localNodes.Count} locaux";
+                packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de {maxMinutes} minutes donc seulement pour les {localNodes.Count} locaux";
             }
             else
             {
                 packetActivity.Accepted = false;
-                packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car la dernière date de plus de 15 minuteset aucun noeud local trouvé";
+                packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car la dernière date de plus de {maxMinutes} minutes et aucun noeud local trouvé";
             }
         }
     }
@@ -120,9 +126,9 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         
         if (position != null)
         {
-            var rayonKm = 100;
-            var rayonLatitude = rayonKm / 111.0;
-            var rayonLongitude = rayonKm / 78.477;
+            const int rayonKm = 50;
+            const double rayonLatitude = rayonKm / 111.0;
+            const double rayonLongitude = rayonKm / 78.477;
             minLatitude = position.Latitude - rayonLatitude;
             maxLatitude = position.Latitude + rayonLatitude;
             minLongitude = position.Longitude - rayonLongitude;
@@ -168,11 +174,12 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         else
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last hour",
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last 4 hours",
                 packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
             
             packetActivity.Accepted = true;
-            packetActivity.Comment = "Trame autorisée et la dernière date de plus d'une heure";
+            packetActivity.HopLimit = 1;
+            packetActivity.Comment = "Trame autorisée et la dernière date de plus de 4 heures";
         }
     }
 
@@ -183,15 +190,27 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
                     
         packetActivity.Accepted = true;
+        packetActivity.HopLimit = packet.HopLimit ?? 1;
         packetActivity.Comment = "C'est un message";
     }
 
-    private async Task DoWhenPacketIsNotBroadcast(string clientId, long? userId, Packet packet, List<string> receivers, PacketActivity packetActivity)
+    private void DoWhenWaypoint(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
+    {
+        logger.LogInformation(
+            "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because important",
+            packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
+                    
+        packetActivity.Accepted = true;
+        packetActivity.HopLimit = packet.HopLimit ?? 1;
+        packetActivity.Comment = "C'est un point d'intérêt";
+    }
+
+    private async Task DoWhenPacketIsNotBroadcast(string clientId, long? userId, Packet packet, List<string> receivers, PacketActivity packetActivity, MeshPacket meshPacket)
     {
         var nodeToConfiguration = await Context.NodeConfigurations.FirstOrDefaultAsync(a => a.Node == packet.To && !string.IsNullOrWhiteSpace(a.MqttId) && a.Node.LastSeen >= DateTime.UtcNow.AddDays(-1));
         
         logger.LogInformation("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId})", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId);
-            
+        
         if (nodeToConfiguration != null)
         {
             receivers.Add(nodeToConfiguration.MqttId!);
@@ -200,7 +219,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         }
         else
         {
-            if (packet.PortNum is TextMessageApp or AdminApp)
+            if (packet.PortNum is TextMessageApp or AdminApp || meshPacket.PkiEncrypted)
             {
                 var localNodes = await GetNodesAround(packet.To);
 
@@ -215,7 +234,8 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 else
                 {
                     packetActivity.Accepted = true;
-                    packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais envoyé à tout le monde car pas connecté ni entourage";
+                    packetActivity.HopLimit = 1;
+                    packetActivity.Comment = $"Trame autorisée avec {packet.HopLimit} car elle a de l'importance mais aucun destinataire trouvé : {packet.To}";
                 }
             }
             else

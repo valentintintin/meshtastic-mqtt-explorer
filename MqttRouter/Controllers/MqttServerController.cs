@@ -1,11 +1,14 @@
 using System.Buffers;
 using Common;
 using Common.Context;
+using Common.Context.Entities;
 using Common.Context.Entities.Router;
 using Common.Exceptions;
 using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
+using Google.Protobuf;
+using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,7 +25,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
     private readonly ILogger<MqttServerController> _logger =
         serviceProvider.GetRequiredService<ILogger<MqttServerController>>();
 
-    private readonly Dictionary<string, List<string>> _clientIdReceivers = new();
+    private readonly Dictionary<string, MessagePublishInfo> _clientIdMessagePublishInfos = new();
     private readonly Dictionary<string, long> _userIds = new();
     private readonly List<string> _clientIdsWithClaimEveryPacket = [];
     private MqttServer? _mqttServer;
@@ -78,9 +81,9 @@ public class MqttServerController(IServiceProvider serviceProvider)
             return;
         }
         
-        if (_clientIdReceivers.ContainsKey(eventArgs.ClientId))
+        if (_clientIdMessagePublishInfos.ContainsKey(eventArgs.ClientId))
         {
-            _clientIdReceivers.Remove(eventArgs.ClientId);
+            _clientIdMessagePublishInfos.Remove(eventArgs.ClientId);
         }
         
         var services = serviceProvider.CreateScope().ServiceProvider;
@@ -88,43 +91,42 @@ public class MqttServerController(IServiceProvider serviceProvider)
         var routingService = services.GetRequiredService<RoutingService>();
         var mqttService = services.GetRequiredService<MqttService>();
 
-        var guid = Guid.NewGuid();
-        var receiverIds = _clientIdsWithClaimEveryPacket.ToList();
+        var publishInfo = new MessagePublishInfo();
+        publishInfo.ReceiverClientIds.AddRange(_clientIdsWithClaimEveryPacket);
+        _clientIdMessagePublishInfos.Add(eventArgs.ClientId, publishInfo);
 
         routingService.SetDbContext(context);
         mqttService.SetDbContext(context);
         _mqttServer ??= await context.MqttServers.FirstAsync(a =>
             a.Name == serviceProvider.GetRequiredService<IConfiguration>().GetValue<string>("MqttServerName"));
 
-        _logger.LogInformation("Client {clientId} send packet {guid} on {topic}", eventArgs.ClientId, guid,
+        _logger.LogInformation("Client {clientId} send packet {guid} on {topic}", eventArgs.ClientId, publishInfo.Guid,
             eventArgs.ApplicationMessage.Topic);
 
-        User? user;
+        User? user = null;
         try
         {
             user = await GetAndUpdateUserFromClientId(eventArgs.ClientId, context);
-            _logger.LogInformation("Client {clientId} send packet {guid} on {topic}. User #{userId}", eventArgs.ClientId, guid,
+            _logger.LogInformation("Client {clientId} send packet {guid} on {topic}. User #{userId}", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic, user?.Id);
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Client {clientId} send packet {guid} on {topic} KO. User issue", eventArgs.ClientId, guid,
+            _logger.LogError(e, "Client {clientId} send packet {guid} on {topic} KO. User issue", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic);
-            return;
         }
 
         try
         {
             var nodeConfiguration = await GetAndUpdateNodeConfiguration(eventArgs.ClientId,
                 eventArgs.ApplicationMessage.Topic, context, user);
-            _logger.LogInformation("Client {clientId} send packet {guid} on {topic}. Node configuration #{nodeConfigurationId}", eventArgs.ClientId, guid,
+            _logger.LogInformation("Client {clientId} send packet {guid} on {topic}. Node configuration #{nodeConfigurationId}", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic, nodeConfiguration?.Id);
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Client {clientId} send packet {guid} on {topic} KO. Node configuration issue", eventArgs.ClientId, guid,
+            _logger.LogError(e, "Client {clientId} send packet {guid} on {topic} KO. Node configuration issue", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic);
-            return;
         }
         
         if (eventArgs.ApplicationMessage.Topic.Contains("stat") || eventArgs.ApplicationMessage.Topic.Contains("json"))
@@ -134,7 +136,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
         }
         
         _logger.LogInformation("Client {clientId} and user#{userId} send packet {guid} on {topic}", eventArgs.ClientId,
-            user?.Id, guid, eventArgs.ApplicationMessage.Topic);
+            user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic);
         
         var packetAndMeshPacket = await mqttService.DoReceive(eventArgs.ApplicationMessage.Topic,
             eventArgs.ApplicationMessage.Payload.ToArray(), _mqttServer!);
@@ -144,71 +146,57 @@ public class MqttServerController(IServiceProvider serviceProvider)
             eventArgs.ProcessPublish = false;
             _logger.LogWarning(
                 "Client {clientId} and user#{userId} send packet {guid} on {topic} refused because packet error",
-                eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic);
+                eventArgs.ClientId, user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic);
             return;
         }
 
-        if (packetAndMeshPacket.Value.packet.PacketDuplicated != null)
+        publishInfo.Packet = packetAndMeshPacket.Value.packet;
+        publishInfo.MeshPacket = packetAndMeshPacket.Value.meshPacket;
+
+        if (publishInfo.Packet.PacketDuplicated == null)
         {
-            if (receiverIds.Count > 0)
+            publishInfo.PacketActivity = await routingService.Route(eventArgs.ClientId, user?.Id, packetAndMeshPacket.Value.packet, packetAndMeshPacket.Value.meshPacket);
+
+            if (publishInfo.PacketActivity.Accepted)
             {
-                _clientIdReceivers.Add(eventArgs.ClientId, receiverIds);
+                if (publishInfo.PacketActivity.ReceiverIds.Count != 0)
+                {
+                    publishInfo.ReceiverClientIds.AddRange(publishInfo.PacketActivity.ReceiverIds);
+
+                    _logger.LogInformation(
+                        "Client {clientId} and user#{userId} send packet {guid} on {topic} accepted for {nbReceivers} : {comment}",
+                        eventArgs.ClientId, user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic,
+                        publishInfo.PacketActivity.ReceiverIds.Count, publishInfo.PacketActivity.Comment);
+                    _logger.LogTrace("Receivers for packet {guid} : {receivers}", publishInfo.Guid,
+                        publishInfo.PacketActivity.ReceiverIds.JoinString());
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Client {clientId} and user#{userId} send packet {guid} on {topic} accepted : {comment}",
+                        eventArgs.ClientId, user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic,
+                        publishInfo.PacketActivity.Comment);
+
+                    await Task.Delay(TimeSpan.FromSeconds(5)); // Trouver un meilleur endroid ?
+                }
             }
             else
             {
-                eventArgs.ProcessPublish = false;
-            }
-
-            _logger.LogInformation(
-                "Client {clientId} and user#{userId} send packet {guid} on {topic} refused because packet#{packetId} duplicated",
-                eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
-                packetAndMeshPacket.Value.packet.Id);
-            return;
-        }
-
-        var packetActivity =
-            await routingService.Route(eventArgs.ClientId, user?.Id, packetAndMeshPacket.Value.packet);
-
-        if (packetActivity.Accepted)
-        {
-            if (packetActivity.ReceiverIds.Count != 0)
-            {
-                receiverIds.AddRange(packetActivity.ReceiverIds);
                 _logger.LogInformation(
-                    "Client {clientId} and user#{userId} send packet {guid} on {topic} accepted for {nbReceivers} : {comment}",
-                    eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
-                    packetActivity.ReceiverIds.Count, packetActivity.Comment);
-                _logger.LogTrace("Receivers for packet {guid} : {receivers}", guid,
-                    packetActivity.ReceiverIds.JoinString());
-            }
-            else
-            {
-                receiverIds.Clear();
-
-                _logger.LogInformation(
-                    "Client {clientId} and user#{userId} send packet {guid} on {topic} accepted : {comment}",
-                    eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
-                    packetActivity.Comment);
+                    "Client {clientId} and user#{userId} send packet {guid} on {topic} refused : {comment}",
+                    eventArgs.ClientId, user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic,
+                    publishInfo.PacketActivity.Comment);
             }
         }
         else
         {
             _logger.LogInformation(
-                "Client {clientId} and user#{userId} send packet {guid} on {topic} refused : {comment}",
-                eventArgs.ClientId, user?.Id, guid, eventArgs.ApplicationMessage.Topic,
-                packetActivity.Comment);
-            
-            if (receiverIds.Count == 0)
-            {
-                eventArgs.ProcessPublish = false;
-                return;
-            }
+                "Client {clientId} and user#{userId} send packet {guid} on {topic} refused because packet#{packetId} duplicated",
+                eventArgs.ClientId, user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic,
+                publishInfo.Packet.Id);
         }
 
-        if (receiverIds.Count > 0)
-        {
-            _clientIdReceivers.Add(eventArgs.ClientId, receiverIds);
-        }
+        eventArgs.ProcessPublish = publishInfo.ReceiverClientIds.Count > 0;
     }
 
     public Task BeforeSend(InterceptingClientApplicationMessageEnqueueEventArgs eventArgs)
@@ -217,12 +205,56 @@ public class MqttServerController(IServiceProvider serviceProvider)
         {
             return Task.CompletedTask;
         }
-        
-        if (!_clientIdReceivers.TryGetValue(eventArgs.SenderClientId, out var receivers) ||
-            receivers.Contains(eventArgs.ReceiverClientId))
+
+        _clientIdMessagePublishInfos.TryGetValue(eventArgs.SenderClientId, out var publishInfo);
+
+        if (publishInfo == null)
         {
-            _logger.LogInformation("Packet from client {senderId} on {topic} sent to {receiverId}",
+            eventArgs.AcceptEnqueue = false;
+            
+            _logger.LogWarning(
+                "Packet from client {senderId} on {topic} not sent to {receiverId} because we do not have publish info",
                 eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic, eventArgs.ReceiverClientId);
+            
+            return Task.CompletedTask;
+        }
+
+        if (publishInfo.ReceiverClientIds.Contains(eventArgs.ReceiverClientId))
+        {
+            var hopLimit = publishInfo.MeshPacket.HopLimit;
+            var hopStart = publishInfo.MeshPacket.HopStart;
+
+            if (_clientIdsWithClaimEveryPacket.Contains(eventArgs.ReceiverClientId))
+            {
+                _logger.LogInformation(
+                    "Packet#{id} {guid} from client {senderId} on {topic} sent to {receiverId} because he has claim ReceiveEveryPackets",
+                    publishInfo.Packet.Id, publishInfo.Guid, eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic,
+                    eventArgs.ReceiverClientId);
+            }  
+            else if (publishInfo.PacketActivity != null)
+            {
+                hopLimit = hopStart = (uint) publishInfo.PacketActivity.HopLimit;
+
+                _logger.LogInformation(
+                    "Packet#{id} {guid} from client {senderId} on {topic} sent to {receiverId} with hop set to {hopRequired}",
+                    publishInfo.Packet.Id, publishInfo.Guid, eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic,
+                    eventArgs.ReceiverClientId, hopLimit);
+            }
+            
+            try
+            {
+                var meshPacket = new ServiceEnvelope();
+                meshPacket.MergeFrom(eventArgs.ApplicationMessage.Payload.ToArray());
+                meshPacket.Packet.HopLimit = hopLimit;
+                meshPacket.Packet.HopStart = hopStart;
+                eventArgs.ApplicationMessage.Payload = new ReadOnlySequence<byte>(meshPacket.ToByteArray());
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e,
+                    "Impossible to change hop to {hopLimit}/{hopStart} for the packet from client {senderId} on {topic}",
+                    hopLimit, hopStart, eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic);
+            }
         }
         else
         {
@@ -291,6 +323,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
         {
             nodeConfiguration.User = user;
             nodeConfiguration.MqttId = clientId;
+            nodeConfiguration.LastSeenOnMqtt = DateTime.UtcNow;
             nodeConfiguration.Node.IsMqttGateway = !nodeConfiguration.Forbidden;
             context.Update(nodeConfiguration);
             context.Update(nodeConfiguration.Node);
@@ -372,5 +405,18 @@ public class MqttServerController(IServiceProvider serviceProvider)
         }
 
         return connectedNodeId;
+    }
+    
+    private class MessagePublishInfo
+    {
+        public Guid Guid { get; }= Guid.NewGuid();
+        
+        public List<string> ReceiverClientIds { get; set; } = [];
+        
+        public Packet Packet { get; set; } = null!;
+
+        public MeshPacket MeshPacket { get; set; } = null!;
+        
+        public PacketActivity? PacketActivity { get; set; }
     }
 }

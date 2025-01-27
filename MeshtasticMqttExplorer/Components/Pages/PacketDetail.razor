@@ -27,43 +27,83 @@
         <PageHeader Title="@($"Trame #{Packet?.PacketId} {Packet?.PortNum} du noeud {Packet?.From.NodeIdString} pour {Packet?.To.NodeIdString}")" 
                     Subtitle="@Packet?.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"></PageHeader>
 
-        <Timeline>
-            <TimelineItem Color="TimelineDotColor.Blue">
-                Expéditeur : <a href="/node/@Packet.FromId" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
-            </TimelineItem>
-            <TimelineItem Color="TimelineDotColor.Red">
-                Destinataire: <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
-            </TimelineItem>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+            <div style="flex: 1">
+                <Timeline>
+                    <TimelineItem Color="TimelineDotColor.Blue">
+                        Expéditeur : <a href="/node/@Packet.FromId" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
+                    </TimelineItem>
+                    <TimelineItem Color="TimelineDotColor.Red">
+                        Destinataire: <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
+                    </TimelineItem>
+
+                    <TimelineItem Color="TimelineDotColor.Green">
+                        Passerelle MQTT @Packet.MqttServer?.Name : <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames</a>
+                        <br/>
+                        Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts | SNR : <b>@Packet.RxSnr</b> | RSSI : <b>@Packet.RxRssi</b>
+                    </TimelineItem>
+                </Timeline>
+
+                <div>
+                    @if (Packet.RequestId > 0)
+                    {
+                        <p>
+                            <text>Réponse à la requête </text><a href="/packet/by-packetid/@Packet.RequestId" target="_blank" rel="nofollow">#@Packet.RequestId</a>
+                        </p>
+                    }
+
+                    @if (Packet.ReplyId > 0)
+                    {
+                        <p>
+                            <text>Réponse à la trame </text><a href="/packet/by-packetid/@Packet.ReplyId" target="_blank" rel="nofollow">#@Packet.ReplyId</a>
+                        </p>
+                    }
+                    
+                    @if (Packet.PacketDuplicatedId != null)
+                    {
+                        <p>
+                            <a href="/packet/@Packet.PacketDuplicatedId" target="_blank" rel="nofollow">Voir la trame originale</a>
+                        </p>
+                    }
+                </div>
+            </div>
             
-            <TimelineItem Color="TimelineDotColor.Green">
-                Passerelle MQTT : <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames</a>
-                <br />
-                Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts
-                <br />
-                SNR : <b>@Packet.RxSnr</b> | RSSI : <b>@Packet.RxRssi</b>
-            </TimelineItem>
-        </Timeline>
-        
-        @if (Packet.PacketDuplicated != null)
-        {
-            <p>
-                <text>Doublon avec </text><a href="/packet/@Packet.PacketDuplicatedId" target="_blank" rel="nofollow">un autre</a>
-            </p>
-        }
-        
-        @if (Packet.RequestId > 0)
-        {
-            <p>
-                <text>Réponse à la requête </text><a href="/packet/by-packetid/@Packet.RequestId" target="_blank" rel="nofollow">#@Packet.RequestId</a>
-            </p>
-        }
-        
-        @if (Packet.ReplyId > 0)
-        {
-            <p>
-                <text>Réponse au paquet </text><a href="/packet/by-packetid/@Packet.ReplyId" target="_blank" rel="nofollow">#@Packet.ReplyId</a>
-            </p>
-        }
+            @if (AllDuplicatedPackets.Any())
+            {
+                <div style="flex: 1">
+                    @foreach (var duplicatedPacketData in AllDuplicatedPackets)
+                    {
+                        <p>
+                            <b>
+                                @if (duplicatedPacketData.Key == 0)
+                                {
+                                    <text>Reçu en direct</text>
+                                }
+                                else
+                                {
+                                    <text>Saut </text>
+                                    @duplicatedPacketData.Key<text>/</text>
+                                    @Packet.HopStart
+                                }
+                            </b>
+                        </p>
+                        
+                        <Timeline>
+                            @foreach (var duplicatedPacket in duplicatedPacketData)
+                            {
+                                <TimelineItem Color="duplicatedPacket.HopLimit == duplicatedPacket.HopStart ? TimelineDotColor.Green : TimelineDotColor.Blue">
+                                    Passerelle MQTT @duplicatedPacket.MqttServer?.Name : <a href="/node/@duplicatedPacket.GatewayId" target="_blank" rel="nofollow">@duplicatedPacket.Gateway.AllNames</a>
+                                    <br/>
+                                    Distance de <b>@Math.Round(duplicatedPacket.GatewayDistanceKm ?? 0, 2) Km</b> | SNR : <b>@duplicatedPacket.RxSnr</b> | RSSI : <b>@duplicatedPacket.RxRssi</b>
+                                    <br />
+                                    <a target="_blank" href="/packet/@duplicatedPacket.Id"><i>Voir la trame</i></a>
+                                </TimelineItem>
+                            }
+                        </Timeline>
+                    }
+                </div>
+            }
+        </div>
         
         <PacketPayload Packet="Packet" ShowJson="true"></PacketPayload>
         
@@ -96,6 +136,7 @@
 
     private bool Loading { get; set; } = true;
     private Packet? Packet { get; set; }
+    private List<IGrouping<int, Packet>> AllDuplicatedPackets { get; set; } = [];
     private DataContext Context { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
@@ -117,7 +158,6 @@
             .Include(n => n.From)
             .Include(n => n.To)
             .Include(n => n.Gateway)
-            .Include(a => a.PacketDuplicated)
             .AsNoTrackingWithIdentityResolution()
         ;
 
@@ -136,6 +176,8 @@
 
             return;
         }
+
+        AllDuplicatedPackets = Context.Packets.GetAllPacketForPacketIdGroupedByHops(Packet);
 
         NotificationText = NotificationService.GetPacketMessageToSend(Packet, Context);
         

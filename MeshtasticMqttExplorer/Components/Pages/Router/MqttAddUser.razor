@@ -1,0 +1,51 @@
+﻿@page "/router/user/add"
+@using Common.Models
+@using Common.Services
+
+@inject IMessageService MessageService
+@inject UserService UserService
+
+<PageTitle>Ajout d'un utilisateur MQTT</PageTitle>
+
+<PageHeader Title="Ajout d'un utilisateur MQTT"></PageHeader>
+
+<Form Model="@_model"
+      OnFinish="OnFinish"
+      LabelColSpan="8"
+      WrapperColSpan="16">
+    <FormItem Label="Identifiant">
+        <Input @bind-Value="@context.Username" />
+    </FormItem>
+    <FormItem Label="Adresse mail">
+        <Input @bind-Value="@context.Email" Type="InputType.Email" />
+    </FormItem>
+    <FormItem Label="Mot de passe">
+        <Input @bind-Value="@context.Password" Type="InputType.Password" />
+    </FormItem>
+    <FormItem Label="Autoriser à recevoir même les trames refusées">
+        <Checkbox @bind-Value="@context.CanReceiveEverything"></Checkbox>
+    </FormItem>
+    <FormItem WrapperColOffset="8" WrapperColSpan="16">
+        <Button Type="@ButtonType.Primary" HtmlType="submit">
+            Ajouter l'utilisateur
+        </Button>
+    </FormItem>
+</Form>
+
+@code
+{
+    private readonly UserCreateDto _model = new();
+    
+    private async Task OnFinish(EditContext editContext)
+    {
+        try
+        {
+            await UserService.CreateUser(_model);
+            await MessageService.Success("Utilisateur créé !");
+        }
+        catch (Exception e)
+        {
+            await MessageService.Error($"Erreur : {e}");
+        }
+    }
+}

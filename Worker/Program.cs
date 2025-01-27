@@ -52,9 +52,14 @@ try {
         action.ServerName = "Meshtastic Explorer Worker";
         action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
         action.WorkerCount = 1;
+        action.Queues = ["packet", "default"];
     });
     
     var app = builder.Build();
+
+    var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()
+        .CreateDbContextAsync();
+    await context.Database.MigrateAsync();
     
     app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<PurgeJob>("purgeJob", (a) => a.RunPurge(), Cron.Hourly);
 

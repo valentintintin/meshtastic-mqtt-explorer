@@ -275,7 +275,7 @@ public class MqttClientService(
 
                 if (configuration.GetValue("UseWorker", false))
                 {
-                    backgroundJobClient.Enqueue<MqttReceiveJob>((a) => a.ExecuteAsync(topic,
+                    backgroundJobClient.Enqueue<MqttReceiveJob>("packet", a => a.ExecuteAsync(topic,
                         e.ApplicationMessage.Payload.ToArray(), mqttClientAndConfiguration.MqttServer.Id, guid));
                 }
                 else

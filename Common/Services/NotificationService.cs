@@ -6,15 +6,15 @@ using Common.Extensions.Entities;
 using Common.Models;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Common.Services;
 
-public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
+public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IConfiguration configuration) : AService(logger, contextFactory)
 {
     private Dictionary<(string url, uint packetId), string?> MessageIdForPacketId { get; } = new();
-    private readonly SemaphoreSlim _semaphore = new(1, 1);
     
     public async Task SendNotification(Packet packet)
     {
@@ -57,38 +57,27 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             return;
         }
 
-        // await _semaphore.WaitAsync();
-        
         var message = GetPacketMessageToSend(packet, context);
 
         foreach (var notificationConfiguration in notificationsCanalToSend)
         {
             await MakeRequest(notificationConfiguration, message, packet);
         }
-
-        // _semaphore.Release();
     }
 
-    public static string GetPacketMessageToSend(Packet packet, DataContext context)
+    public string GetPacketMessageToSend(Packet packet, DataContext context)
     {
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
-        var allPackets = context.Packets
-            .Include(p => p.Gateway)
-            .Include(p => p.MqttServer)
-            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId)
-            .ToList()
-            .OrderByDescending(p => p.HopLimit)
-            .ThenByDescending(p => p.RxSnr)
-            .ToList();
+        var allPackets = context.Packets.GetAllPacketForPacketIdGroupedByHops(packet);
 
         var message = $"""
                        [{packet.Channel.Name}]
-                       {packet.From.AllNames}
+                       <b>{packet.From.AllNames}</b>
 
                        Pour : {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? packet.To.AllNames : "tout le monde")}
                        
-                       > {(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}
+                       > <b>{(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}</b>
                        """;
         
         if (allPackets.Count != 0)
@@ -96,21 +85,23 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             message += "" + '\n' + '\n';
         }
         
-        foreach (var aPacketData in allPackets.GroupBy(a => a.HopStart - a.HopLimit))
+        foreach (var aPacketData in allPackets)
         {
             var nbHop = aPacketData.Key;
 
-            message += "-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --" + '\n' + '\n';
-            
+            message += "<b>-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --</b>" + '\n' + '\n';
+
             foreach (var aPacket in aPacketData)
             {
                 message +=
-                    $"--> {aPacket.Gateway.Name()}\n{aPacket.GatewayDistanceKm} Km, SNR {aPacket.RxSnr}, RSSI {aPacket.RxRssi}, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}" +
-                    '\n' + '\n';
+                    $"--> <b>{aPacket.Gateway.Name()}</b>\n{aPacket.GatewayDistanceKm} Km, SNR <b>{aPacket.RxSnr}</b>, RSSI <b>{aPacket.RxRssi}</b>, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}"
+                    + '\n' + '\n';
             }
         }
+
+        message = message.TrimEnd() + '\n' + '\n' + $"{configuration.GetValue<string>("FrontUrl")}/packet/{packet.PacketDuplicatedId ?? packet.Id}";
         
-        return message.TrimEnd();
+        return message;
     }
 
     private async Task MakeRequest(Webhook webhook, string message, Packet packet) 

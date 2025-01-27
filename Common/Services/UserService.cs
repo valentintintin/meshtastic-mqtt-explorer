@@ -1,16 +1,15 @@
+using System.Security.Claims;
 using System.Text;
-using Common;
 using Common.Context;
 using Common.Context.Entities.Router;
 using Common.Exceptions;
 using Common.Extensions;
-using Common.Services;
+using Common.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MqttRouter.Models;
 
-namespace MqttRouter.Services;
+namespace Common.Services;
 
 public class UserService(
     ILogger<UserService> logger,
@@ -23,7 +22,7 @@ public class UserService(
     
     public async Task<User> CreateUser(UserCreateDto createDto)
     {
-        Utils.ValidateModel(createDto);
+        ModelUtils.ValidateModel(createDto);
         
         Logger.LogInformation("Create new user {mail}", createDto.Email);
 
@@ -40,12 +39,18 @@ public class UserService(
         
         Logger.LogInformation("Create new user#{id} {mail} OK", user.Id, createDto.Email);
 
+        if (createDto.CanReceiveEverything)
+        {
+            userResult = await userManager.AddClaimAsync(user, new Claim(SecurityConstants.Claim.ReceiveEveryPackets.ToString(), "1"));
+            userResult.IsSucceedOrThrow();
+        }
+
         return user;
     }
 
     public async Task UpdateUser(long userId, UserUpdateDto updateDto)
     {
-        Utils.ValidateModel(updateDto);
+        ModelUtils.ValidateModel(updateDto);
         
         Logger.LogInformation("Update user#{id}", userId);
 

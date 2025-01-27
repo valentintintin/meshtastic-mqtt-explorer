@@ -43,6 +43,13 @@ public class PurgeJob(
         Context.RemoveRange(Context.Packets.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId) || nodesIdToDelete.Contains(a.GatewayId)));
         Context.RemoveRange(nodesToDelete);
         await Context.SaveChangesAsync();
+        
+        var channelsToDelete = Context.Channels.Where(a => a.UpdatedAt < minDate).ToList();
+        var channelsIdToDelete = nodesToDelete.Select(a => a.Id).ToList();
+        Context.RemoveRange(Context.TextMessages.Where(a => channelsIdToDelete.Contains(a.ChannelId)));
+        Context.RemoveRange(Context.Packets.Where(a => channelsIdToDelete.Contains(a.ToId)));
+        Context.RemoveRange(channelsToDelete);
+        await Context.SaveChangesAsync();
     }
 
     private async Task RefreshNodesGateway()

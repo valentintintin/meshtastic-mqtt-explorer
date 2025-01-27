@@ -13,5 +13,9 @@ public class PacketActivity : IEntity
 
     public List<string> ReceiverIds { get; set; } = [];
     
+    public bool IsBroadcast { get; set; }
+
+    public int HopLimit { get; set; }
+
     public string? Comment { get; set; }
 }

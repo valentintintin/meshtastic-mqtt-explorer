@@ -3,6 +3,8 @@ using System.Text.Json.Serialization;
 using Common.Context;
 using Common.Context.Entities.Router;
 using Common.Services;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -48,6 +50,19 @@ try
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddNetDaemonScheduler();
     
+    builder.Services.AddHangfire(action =>
+    {
+        action.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UsePostgreSqlStorage(
+                options => { options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default")); },
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = "hangfire_worker"
+                });
+    });
+    
     builder.Services.AddIdentity<User, IdentityRole<long>>(options =>
         {
             options.Lockout.AllowedForNewUsers = false;
@@ -86,9 +101,10 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
+    builder.Services.AddSingleton<NotificationService>();
+    builder.Services.AddSingleton<IBackgroundJobClient, BackgroundJobClient>();
     builder.Services.AddScoped<UserService>();
     builder.Services.AddScoped<MqttService>();
-    builder.Services.AddSingleton<NotificationService>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
 

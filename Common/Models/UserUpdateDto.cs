@@ -1,17 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace MqttRouter.Models;
+namespace Common.Models;
 
-public class UserCreateDto
+public class UserUpdateDto
 {
     [MinLength(1)]
     public required string Username { get; set; }
     
     [MinLength(1)]
     public required string Email { get; set; }
-    
-    [MinLength(1)]
-    public required string Password { get; set; }
-    
-    public string? ExternalId { get; set; }
 }

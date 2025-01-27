@@ -34,6 +34,14 @@
     text-overflow: unset;
 }
 
+.ant-timeline-item:last-of-type {
+    padding-bottom: 0;
+}
+
+.ant-timeline-item-last > .ant-timeline-item-content:last-of-type {
+    min-height: auto;
+}
+
 .leaflet-container a {
     word-wrap: break-word;
 }

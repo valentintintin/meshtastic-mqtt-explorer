@@ -47,7 +47,7 @@
                 <Statistic Value="@NbPacketsSent"/>
             </Card>
         </GridCol>
-
+        
         <GridCol Xs="24" Lg="3">
             <Card Title="Paquets / minutes">
                 <Statistic Value="@NbPacketsSentMinutes" Precision="1" />
@@ -210,7 +210,6 @@
     private DateTime MinDate { get; set; } = DateTime.UtcNow;
     private bool Loading { get; set; } = true;
     private bool ShowOnlyRouterAccepted { get; set; }
-    private bool IncludeOnlyBroadcast { get; set; } = true;
     private DataContext Context { get; set; } = null!;
     private int NbNodes { get; set; }
     private int NbNodesLastHour { get; set; }
@@ -377,7 +376,7 @@
         NbPacketsSent = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast)) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0))) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
             .AsNoTrackingWithIdentityResolution()
             .CountAsync();
 
@@ -386,7 +385,7 @@
         DataPaquetsTypes = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(a => a.PortNum != PortNum.MapReportApp && a.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0)))
             .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
             {
                 type = portNum.ToString()!,
@@ -401,7 +400,7 @@
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
             .Where(a => a.MqttServer != null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && n.To.NodeId != MeshtasticService.NodeBroadcast))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0)))
             .GroupBy(a => new
             {
                 MqttServerId = a.MqttServer!.Id,

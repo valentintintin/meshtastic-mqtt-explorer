@@ -5,15 +5,19 @@ using Common.Context;
 using Common.Context.Entities;
 using Common.Extensions;
 using Common.Extensions.Entities;
+using Common.Jobs;
 using Common.Models;
 using Google.Protobuf;
+using Hangfire;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Common.Services;
 
-public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
+public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, 
+    MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
 {
     public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(string topic, byte[] data, MqttServer mqttServer)
     {

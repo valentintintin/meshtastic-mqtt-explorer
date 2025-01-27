@@ -7,6 +7,8 @@ public class NodeConfiguration : IEntity
     public DateTime UpdatedAt { get; set; }
     
     public string? MqttId { get; set; }
+    
+    public DateTime? LastSeenOnMqtt { get; set; }
 
     public bool Forbidden { get; set; }
     

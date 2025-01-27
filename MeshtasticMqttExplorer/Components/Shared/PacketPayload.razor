@@ -399,9 +399,13 @@
 
                         @if (Marker != null)
                         {
-                            <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude/@Marker.Longitude" target="_blank">Carte</a>
-                        }
+                            <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
 
+                            @if (ShowJson)
+                            {
+                                <Osm Height="350px" @ref="Map" Latitude="Marker.Latitude" Longitude="Marker.Longitude" Zoom="15" OneMarker="Marker"></Osm>
+                            }
+                        }
                         break;
                 }
             </div>

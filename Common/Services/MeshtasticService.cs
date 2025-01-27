@@ -186,6 +186,18 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo)
         };
 
+        // Check if owner send multiple time same packet
+        if (packet.PacketDuplicated != null 
+            && await Context.Packets
+                        .Where(a => a.PortNum != PortNum.MapReportApp)
+                        .AnyAsync(a =>
+                            a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo &&
+                            a.Gateway == nodeGateway)
+            )
+        {
+            return null;
+        }
+        
         Context.Add(packet);
         await Context.SaveChangesAsync();
         

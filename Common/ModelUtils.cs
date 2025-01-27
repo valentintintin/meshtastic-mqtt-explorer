@@ -1,14 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using Common.Extensions;
 
-namespace MqttRouter;
+namespace Common;
 
-public static class Utils
+public static class ModelUtils
 {
     public static void ValidateModel(object model)
     {
         ValidationContext context = new(model, null, null);
-        List<ValidationResult> results = new();
+        List<ValidationResult> results = [];
 
         if (!Validator.TryValidateObject(model, context, results, true))
         {

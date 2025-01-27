@@ -87,6 +87,10 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
                     logger.LogError(e, "Error while saving allNames in SaveChanges for node #{node}", node.Id);
                 }
             }
+            else if (entityEntry.Entity is PacketActivity packetActivity)
+            {
+                packetActivity.IsBroadcast = packetActivity.ReceiverIds.Count == 0;
+            }
             
             if (entityEntry.Entity is IEntity entity)
             {
