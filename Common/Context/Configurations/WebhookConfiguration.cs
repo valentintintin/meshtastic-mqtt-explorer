@@ -10,6 +10,7 @@ public class WebhookConfiguration : IEntityTypeConfiguration<Webhook>
     {
         builder.Property(a => a.Name).HasMaxLength(64);
         builder.Property(a => a.Url).HasMaxLength(1024);
+        builder.Property(a => a.UrlToEditMessage).HasMaxLength(1024);
         builder.Property(a => a.Channel).HasMaxLength(128);
         
         builder.HasOne(a => a.MqttServer)

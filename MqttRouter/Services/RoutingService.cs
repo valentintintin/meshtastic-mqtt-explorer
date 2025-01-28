@@ -13,6 +13,8 @@ namespace MqttRouter.Services;
 
 public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<DataContext> contextFactory) : AService(logger, contextFactory)
 {
+    private const int CoolHopLimit = 2;
+    
     public async Task<PacketActivity> Route(string clientId, long? userId, Packet packet, MeshPacket meshPacket)
     {
         await UpdateNodeConfiguration(packet.From);
@@ -190,7 +192,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
                     
         packetActivity.Accepted = true;
-        packetActivity.HopLimit = packet.HopLimit ?? 1;
+        packetActivity.HopLimit = CoolHopLimit;
         packetActivity.Comment = "C'est un message";
     }
 
@@ -201,7 +203,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
                     
         packetActivity.Accepted = true;
-        packetActivity.HopLimit = packet.HopLimit ?? 1;
+        packetActivity.HopLimit = CoolHopLimit;
         packetActivity.Comment = "C'est un point d'intérêt";
     }
 

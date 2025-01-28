@@ -46,7 +46,7 @@ else
        PaginationPosition="bottomRight" Locale="Utils.TableLocale">
     <ChildContent>
         <PropertyColumn Property="c => c.PacketId" Title="ID" Filterable>
-            <div style="width: 130px">
+            <div style="width: 90px">
                 <a href="/packet/@context.Id" target="_blank" rel="nofollow">@context.PacketId</a>
                 @foreach (var duplicated in context.AllDuplicatedPackets.OrderBy(a => a.CreatedAt))
                 {
@@ -78,17 +78,35 @@ else
         </PropertyColumn>
         <PropertyColumn Property="c => c.From.AllNames" Title="Expéditeur" Filterable>
             <div style="width: 150px">
-                <a href="/node/@context.FromId" target="_blank" rel="nofollow">@context.From.AllNames</a>
+                <a href="/node/@context.FromId" target="_blank" rel="nofollow">
+                    @context.From.NodeIdString
+                    <br />
+                    @context.From.ShortName
+                    <br />
+                    @context.From.LongName
+                </a>
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.To.AllNames" Title="Destinataire" Filterable>
             <div style="width: 150px">
-                <a href="/node/@context.ToId" target="_blank" rel="nofollow">@context.To.AllNames</a>
+                <a href="/node/@context.ToId" target="_blank" rel="nofollow">
+                    @context.To.NodeIdString
+                    <br />
+                    @context.To.ShortName
+                    <br />
+                    @context.To.LongName
+                </a>
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.Gateway.AllNames" Title="Passerelle" Filterable>
             <div style="width: 150px">
-                <a href="/node/@context.GatewayId" target="_blank" rel="nofollow">@context.Gateway.AllNames</a>
+                <a href="/node/@context.GatewayId" target="_blank" rel="nofollow">
+                    @context.Gateway.NodeIdString
+                    <br />
+                    @context.Gateway.ShortName
+                    <br />
+                    @context.Gateway.LongName
+                </a>
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.CreatedAt" Title="Date" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }" Filterable DefaultSortOrder="SortDirection.Descending">
@@ -97,7 +115,7 @@ else
             </div>
         </PropertyColumn>
         <PropertyColumn Property="c => c.HopStart - c.HopLimit" Title="RX">
-            <div style="width: 70px">
+            <div style="width:100px">
                 @if (context.Gateway == context.From)
                 {
                     <text>Via MQTT</text>
@@ -150,12 +168,9 @@ else
         </PropertyColumn>
         <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
                         Class="@(context is { Encrypted: true, PortNum: null } ? "red" : "")">
-            <div style="width: 80px">
-                @(context.PortNum?.ToString().Replace("App", string.Empty) ?? "Chiffrée")
-            </div>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.PayloadJson" Title="Contenu">
-            <div style="max-height: 150px; width: 300px; overflow-y: scroll;">
+            <div style="max-height: 150px; min-width: 300px; overflow-y: auto">
+                <b>@(context.PortNum?.ToString().Replace("App", string.Empty) ?? "Chiffrée")</b>
+                <br />
                 <PacketPayload Packet="context"></PacketPayload>
             </div>
         </PropertyColumn>
@@ -215,8 +230,8 @@ else
                 .Include(a => a.Gateway)
                 .Include(a => a.From)
                 .Include(a => a.To)
-                .Include(a => a.AllDuplicatedPackets)
-                .ThenInclude(a => a.Gateway)
+                // .Include(a => a.AllDuplicatedPackets)
+                // .ThenInclude(a => a.Gateway)
                 .AsNoTrackingWithIdentityResolution();
 
         var totalQueryable = Context.Packets

@@ -91,6 +91,8 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
             
             if (packet.From == packet.Gateway || packet.From.MqttServer == null)
             {
+                logger.LogInformation("Change MQTT Server for node #{node} to {mqttServer}", packet.From, packet.MqttServer?.Name);
+                
                 packet.From.MqttServer = packet.MqttServer;
                 Context.Update(packet.From);
                 await Context.SaveChangesAsync();

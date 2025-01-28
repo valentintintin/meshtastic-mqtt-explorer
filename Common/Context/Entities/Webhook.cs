@@ -14,6 +14,8 @@ public class Webhook : IEntity
 
     public bool Enabled { get; set; } = true;
     
+    public bool IncludeHopsDetails { get; set; } = true;
+    
     public bool AllowDuplication { get; set; }
     public bool AllowByHimSelf { get; set; }
     public bool OnlyWhenDifferentMqttServer { get; set; }

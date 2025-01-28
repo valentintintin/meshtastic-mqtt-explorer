@@ -85,10 +85,14 @@ try
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
-    builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddSingleton<NotificationService>();
+    builder.Services.AddSingleton<MqttClientService>();
+    builder.Services.AddSingleton<RecorderService>();
     builder.Services.AddScoped<MeshtasticService>();
+    builder.Services.AddScoped<MqttService>();
     builder.Services.AddScoped<UserService>();
+    
+    builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
 
     if (!builder.Environment.IsDevelopment())
     {

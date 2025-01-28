@@ -5,7 +5,7 @@
 
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IConfiguration Configuration
-@inject MqttService MqttService
+@inject MqttClientService MqttClientService
 @inject IMessageService Message
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
@@ -15,7 +15,7 @@
 
 @if (!_allowed)
 {
-    <Result Title="Fonctionnalité désactivée" Status="403"></Result>
+    <Result Title="Fonctionnalité désactivée" Status="ResultStatus.Http403"></Result>
 }
 else
 {
@@ -27,11 +27,7 @@ else
         <Collapse DefaultActiveKey="@(new[] { "1" })" Accordion>
             <Panel Header="Informations de base" Key="1">
                 <FormItem Label="Mon Id">
-                    @if (!_allowedAnyId)
-                    {
-                        <b>Non modifiable car vous êtes sur un serveur public. L'ID est votre IPv4</b>
-                    }
-                    <Input @bind-Value="@context.NodeFromId" ReadOnly="@(!_allowedAnyId)" MaxLength="9"/>
+                    <Input @bind-Value="@context.NodeFromId" MaxLength="9"/>
                 </FormItem>
                 <FormItem Label="Id destinataire (vide si tout le monde)">
                     <Input @bind-Value="@context.NodeToId" MaxLength="9" />
@@ -41,9 +37,9 @@ else
                 </FormItem>
                 <FormItem Label="Serveur MQTT">
                     <Select DataSource="@MqttConfigurations"
-                            @bind-Value="@context.MqttServer"
-                            ItemValue="c => c.Name"
-                            ItemLabel="c => c.Name"
+                            @bind-Value="@context.MqttServerId"
+                            ItemValue="c => c.MqttServer.Id"
+                            ItemLabel="c => c.MqttServer.Name"
                             Style="width:120px">
                     </Select>
                 </FormItem>
@@ -132,18 +128,14 @@ else
 @code
 {
     private bool _allowed;
-    private bool _allowedAnyId;
     private PublishMessageDto _model = null!;
-    private List<MqttConfiguration> MqttConfigurations { get; set; } = [];
+    private List<MqttClientService.MqttClientAndConfiguration> MqttConfigurations { get; set; } = [];
 
     protected override void OnInitialized()
     {
         _allowed = Configuration.GetValue("AllowSend", true);
-        _allowedAnyId = Configuration.GetValue("AllowSendFromAnyId", false);
-        
-        MqttConfigurations = (Configuration.GetSection("Mqtt").Get<List<MqttConfiguration>>() ?? throw new KeyNotFoundException("Mqtt"))
-            .Where(c => c.Enabled)
-            .ToList();
+
+        MqttConfigurations = MqttClientService.MqttClientAndConfigurations;
         
         base.OnInitialized();
     }
@@ -153,20 +145,18 @@ else
         if (firstRender)
         {
             _model = await LocalStorage.GetItemAsync<PublishMessageDto>("lastSentDto") ?? new PublishMessageDto();
-            _model.MqttServer = MqttConfigurations.First().Name;
-
-            if (!_allowedAnyId)
-            {
-                try
-                {
-                    _model.NodeFromId = IpAddressToInt(GetIpAddress()).ToHexString();
-                }
-                catch (Exception)
-                {
-                    _model.NodeFromId = "!12345678";
-                }
-            }
             
+            var mqttClientAndConfiguration = MqttConfigurations.FirstOrDefault();
+
+            if (mqttClientAndConfiguration == null)
+            {
+                _allowed = false;
+            }
+            else
+            {
+                _model.MqttServerId = mqttClientAndConfiguration.MqttServer.Id;
+            }
+
             await InvokeAsync(StateHasChanged);
         }
 
@@ -177,7 +167,7 @@ else
     {
         try
         {
-            await MqttService.PublishMessage(_model);
+            await MqttClientService.PublishMessage(_model);
             await Message.Success("Trame bien envoyée !");
             await LocalStorage.SetItemAsync("lastSentDto", _model);
         }

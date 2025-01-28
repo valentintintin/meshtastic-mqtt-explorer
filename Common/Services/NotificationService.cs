@@ -56,16 +56,15 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         {
             return;
         }
-
-        var message = GetPacketMessageToSend(packet, context);
-
+        
         foreach (var notificationConfiguration in notificationsCanalToSend)
         {
+            var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails);
             await MakeRequest(notificationConfiguration, message, packet);
         }
     }
 
-    public string GetPacketMessageToSend(Packet packet, DataContext context)
+    public string GetPacketMessageToSend(Packet packet, DataContext context, bool includeHopsDetails = true)
     {
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
@@ -74,32 +73,41 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         var message = $"""
                        [{packet.Channel.Name}]
                        <b>{packet.From.AllNames}</b>
-
-                       Pour : {(packet.To.NodeId != MeshtasticService.NodeBroadcast ? packet.To.AllNames : "tout le monde")}
-                       
-                       > <b>{(isText ? "" : $"{packet.PortNum} :\n")} {packet.PayloadJson?.Trim('"')}</b>
                        """;
-        
-        if (allPackets.Count != 0)
+
+        if (packet.To.NodeId != MeshtasticService.NodeBroadcast)
         {
-            message += "" + '\n' + '\n';
+            message += "" + '\n' + '\n' + $"Pour : {packet.To.AllNames}";
         }
-        
-        foreach (var aPacketData in allPackets)
+
+        if (includeHopsDetails)
         {
-            var nbHop = aPacketData.Key;
-
-            message += "<b>-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --</b>" + '\n' + '\n';
-
-            foreach (var aPacket in aPacketData)
+            if (allPackets.Count != 0)
             {
-                message +=
-                    $"--> <b>{aPacket.Gateway.Name()}</b>\n{aPacket.GatewayDistanceKm} Km, SNR <b>{aPacket.RxSnr}</b>, RSSI <b>{aPacket.RxRssi}</b>, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}"
-                    + '\n' + '\n';
+                message += "" + '\n' + '\n';
+            }
+
+            foreach (var aPacketData in allPackets)
+            {
+                var nbHop = aPacketData.Key;
+
+                message += "<b>-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --</b>" +
+                           '\n' + '\n';
+
+                foreach (var aPacket in aPacketData)
+                {
+                    message +=
+                        $"--> <b>{aPacket.Gateway.Name()}</b>\n{aPacket.GatewayDistanceKm} Km, SNR <b>{aPacket.RxSnr}</b>, RSSI <b>{aPacket.RxRssi}</b>, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}"
+                        + '\n' + '\n';
+                }
             }
         }
 
-        message = message.TrimEnd() + '\n' + '\n' + $"{configuration.GetValue<string>("FrontUrl")}/packet/{packet.PacketDuplicatedId ?? packet.Id}";
+        message = message.TrimEnd()
+                  + '\n' + '\n' 
+                  + $"> <b>{(isText ? "" : $"{packet.PortNum} :\n")}{packet.PayloadJson?.Trim('"')}</b>"
+                  + '\n' + '\n'
+                  + $"{configuration.GetValue<string>("FrontUrl")}/packet/{packet.PacketDuplicatedId ?? packet.Id}";
         
         return message;
     }

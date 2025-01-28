@@ -31,7 +31,8 @@ try {
     builder.Services.AddSingleton<IRecurringJobManager, RecurringJobManager>();
     builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<MqttService>();
-    builder.Services.AddSingleton<MqttReceiveJob>();
+    
+    builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
 
     builder.Services.AddHangfire(action =>
     {

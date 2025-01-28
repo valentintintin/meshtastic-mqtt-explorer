@@ -52,6 +52,9 @@
         <Content Update="appsettings.Production.Gaulix.json">
           <DependentUpon>appsettings.json</DependentUpon>
         </Content>
+        <Content Update="nlog.Production.Gaulix.config">
+          <DependentUpon>nlog.config</DependentUpon>
+        </Content>
     </ItemGroup>
 
     <ItemGroup>

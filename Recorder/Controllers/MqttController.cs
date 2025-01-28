@@ -20,10 +20,4 @@ public class MqttController(ILogger<AController> logger, MqttClientService clien
             LastPacketReceivedDate = c.LastPacketReceivedDate,
         });
     }
-
-    [HttpPost("send/{server}")]
-    public bool Send(string server, [FromBody] string dataBase64)
-    {
-        throw new NotImplementedException();
-    }
 }
