@@ -19,7 +19,7 @@ namespace Common.Services;
 public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, 
     MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
 {
-    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(string topic, byte[] data, MqttServer mqttServer)
+    public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] data, MqttServer mqttServer)
     {
         var topicSegments = topic.Split("/");
 
@@ -29,26 +29,26 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
             return null;
         }
 
-        var rootPacket = new ServiceEnvelope();
+        var serviceEnvelope = new ServiceEnvelope();
 
         try
         {
-            rootPacket.MergeFrom(data);
+            serviceEnvelope.MergeFrom(data);
 
-            if (rootPacket.Packet == null)
+            if (serviceEnvelope.Packet == null)
             {
                 logger.LogWarning("Received from {name} on {topic} but packet null", mqttServer.Name, topic);
                 return null;
             }
 
-            var packetAndMeshPacket = await DoReceivePacket(rootPacket, mqttServer.Id, topicSegments);
+            var packetAndMeshPacket = await DoReceivePacket(serviceEnvelope, mqttServer.Id, topicSegments);
 
             if (packetAndMeshPacket != null)
             {
                 await notificationService.SendNotification(packetAndMeshPacket.Value.packet);
-            }
 
-            return packetAndMeshPacket;
+                return (packetAndMeshPacket.Value.packet, serviceEnvelope);
+            }
         }
         catch (InvalidProtocolBufferException ex)
         {
@@ -60,7 +60,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
         {
             logger.LogError(ex,
                 "Error for a received MQTT message from {name} on {topic}. Packet : {packet}. Packet Raw : {packetRaw} | {rawString}",
-                mqttServer.Name, topic, JsonSerializer.Serialize(rootPacket),
+                mqttServer.Name, topic, JsonSerializer.Serialize(serviceEnvelope),
                 Convert.ToBase64String(data), Encoding.UTF8.GetString(data));
         }
 

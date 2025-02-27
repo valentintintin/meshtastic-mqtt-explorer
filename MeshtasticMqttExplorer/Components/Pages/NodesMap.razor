@@ -38,7 +38,7 @@
                 
                 @if (!Settings.HideLinks)
                 {
-                    <Switch @bind-Checked="Settings.HideIncompleteLinks" Disabled="@Loading" UnCheckedChildren="Afficher tous les liens" CheckedChildren="Cacher les liens incomplets" OnChange="value => SetHideIncompleteLinks(value)"/>
+                    <Switch @bind-Checked="Settings.ShowIncompleteLinks" Disabled="@Loading" UnCheckedChildren="Cacher les liens incomplets" CheckedChildren="Afficher tous les liens" OnChange="value => SetHideIncompleteLinks(value)"/>
                 }
             </div>
             
@@ -93,7 +93,7 @@
                             Lien radio fonctionnel entre 2 noeuds
                         </div>
                         
-                        @if (!Settings.HideIncompleteLinks)
+                        @if (Settings.ShowIncompleteLinks)
                         {
                             <div class="legend">
                                 <span style="background-color: @Utils.Red" class="legend-bar"></span>
@@ -151,7 +151,7 @@
                 Settings.Zoom = settings.Zoom;
                 Settings.ShowLegend = settings.ShowLegend;
                 Settings.HideLinks = settings.HideLinks;
-                Settings.HideIncompleteLinks = settings.HideIncompleteLinks;
+                Settings.ShowIncompleteLinks = settings.ShowIncompleteLinks;
                 // Settings = settings; // Semble bugger sur le modem preset et region
                 Logger.LogDebug("Utilisation de settings : {settings}", JsonSerializer.Serialize(settings));
             }
@@ -194,7 +194,7 @@
                     var isBidirectionnal = reverseNeighbor != null;
                     var reverseAlreadyDrawn = isBidirectionnal && lines.Exists(l => l.Id == $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}");
 
-                    if (!isBidirectionnal && Settings.HideIncompleteLinks)
+                    if (!isBidirectionnal && !Settings.ShowIncompleteLinks)
                     {
                         continue;
                     }
@@ -292,7 +292,7 @@
             .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => Settings.CurrentRegionCode == null|| n.RegionCode == Settings.CurrentRegionCode)
+            .Where(n => Settings.CurrentRegionCode == null || n.RegionCode == Settings.CurrentRegionCode || n.RegionCode == null)
             .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
@@ -378,7 +378,7 @@
 
     private async Task SetHideIncompleteLinks(bool value)
     {
-        Settings.HideIncompleteLinks = value;
+        Settings.ShowIncompleteLinks = value;
 
         if (RenderFinished)
         {
@@ -460,6 +460,6 @@
         public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; }
 
         public bool HideLinks { get; set; }
-        public bool HideIncompleteLinks { get; set; }
+        public bool ShowIncompleteLinks { get; set; }
     }
 }

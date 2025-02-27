@@ -1,0 +1,375 @@
+@page "/monitor/{mqttServerId:long}"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Services
+@using Meshtastic.Protobufs
+@using Microsoft.EntityFrameworkCore
+@using MeshtasticMqttExplorer.Components.Shared
+@using Channel = Common.Context.Entities.Channel
+@using Node = Common.Context.Entities.Node
+@using Waypoint = Common.Context.Entities.Waypoint
+@implements IAsyncDisposable
+
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<Layout Style="gap: 16px">
+    <Sider>
+        <Card Title="Canaux et Noeuds">
+            <ChildContent>
+                <div Style="height: 700px; overflow-y: scroll">
+                <Tabs TabPosition="TabPosition.Right" Size="TabSize.Small"
+                      ActiveKey="@CurrentMessageSelectedKey" OnChange="OnTabMessageChange">
+                    @foreach (var channel in Channels)
+                    {
+                        <TabPane Key="@("channel-" + channel.Id)">
+                            <TabTemplate>
+                                <Icon Type="wechat"/>
+                                @channel.Name
+
+                                @if (UnReadMessagesForChannel.TryGetValue(channel, out var messageCount))
+                                {
+                                    <Badge Count="@messageCount"></Badge>
+                                }
+                            </TabTemplate>
+                        </TabPane>
+                    }
+
+                    @foreach (var node in Nodes)
+                    {
+                        <TabPane Key="@("node-" + node.Id)">
+                            <TabTemplate>
+                                @if (node.Role is Config.Types.DeviceConfig.Types.Role.Client or Config.Types.DeviceConfig.Types.Role.ClientMute or Config.Types.DeviceConfig.Types.Role.ClientHidden)
+                                {
+                                    <Icon Type="user"/>
+                                }
+                                else
+                                {
+                                    <Icon Type="deployment-unit"/>
+                                }
+                                @node.OneName(true)
+
+                                @if (UnReadMessagesForNode.TryGetValue(node, out var messageCount))
+                                {
+                                    <Badge Count="@messageCount"></Badge>
+                                }
+
+                                @* <br/> *@
+                                @* <i><TimeElapsed Value="DateTime.UtcNow - node.LastSeen"></TimeElapsed></i> *@
+                            </TabTemplate>
+                        </TabPane>
+                    }
+                </Tabs>
+                </div>
+            </ChildContent>
+        </Card>
+    </Sider>
+    
+    <Layout>
+        <Content Style="display: flex; flex-direction: column; gap: 16px">
+            <GridRow Gutter="(16, 16)">
+                <GridCol Xs="24" Xl="16" Xxl="14">
+                    <Card Title="@("Messages pour " + (CurrentChannelSelected?.Name ?? CurrentNodeSelected?.AllNames ?? "inconnu"))">
+                        <ChildContent>
+                            <div>
+                                @foreach (var message in TextMessages)
+                                {
+                                    <Comment Author="@(message.From.OneName() + " pour " + message.To?.OneName())"
+                                             Avatar="@message.From.HardwareModel.GetImageUrl()"
+                                             Content="@message.Message"
+                                             Datetime="@message.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture)"
+                                             Placement="@(message.To?.NodeId == MeshtasticService.NodeBroadcast ? CommentPlacement.Left : CommentPlacement.Right)"></Comment>
+                                }
+                            </div>
+                            
+                            <div>
+                                <div style="text-align: right; margin-bottom: 16px">
+                                    <Pagination Size="PaginationSize.Small" Simple
+                                                PageSize="@MessagePageSize"
+                                                Current="CurrentMessagePageIndex" Total="TotalMessageChannel"
+                                                OnChange="OnPaginationMessageChange"/>
+                                </div>
+                                
+                                <Form Model="@Model" OnFinish="OnFinish">
+                                    <FormItem>
+                                        <TextArea ShowCount MaxLength="200" @bind-Value="@context.Message"></TextArea>
+                                    </FormItem>
+                                </Form>
+                            </div>
+                        </ChildContent>
+                    </Card>
+                </GridCol>
+                
+                <GridCol Xs="24" Xl="8" Xxl="10">
+                    <Card Title="Carte">
+                        <ChildContent>
+                            <Osm Latitude="DefaultMapPosition.Latitude" Longitude="DefaultMapPosition.Longitude" Zoom="DefaultMapPosition.Zoom" Height="500px" @ref="Map"></Osm>
+                        </ChildContent>
+                    </Card>
+                </GridCol>
+            </GridRow>
+        </Content>
+    </Layout>
+</Layout>
+
+@code {
+    [Parameter]
+    public long? MqttServerId { get; set; }
+
+    private List<Node> Nodes { get; set; } = [];
+    private List<Channel> Channels { get; set; } = [];
+    private List<TextMessage> TextMessages { get; set; } = [];
+    private List<Waypoint> Waypoints { get; set; } = [];
+    private Dictionary<Channel, int> TotalTextMessagesForChannel { get; set; } = new();
+    private Dictionary<Node, int> TotalTextMessagesForNode { get; set; } = new();
+    private Dictionary<Channel, int> UnReadMessagesForChannel { get; set; } = [];
+    private Dictionary<Node, int> UnReadMessagesForNode { get; set; } = [];
+    private List<Osm.Marker> NodeMarkers { get; set; } = [];
+    private List<Osm.Marker> WaypointMarkers { get; set; } = [];
+
+    private FormDto Model { get; set; } = new();
+    private DataContext Context { get; set; } = null!;
+
+    private int CurrentMessagePageIndex { get; set; } = 1;
+    private int TotalMessageChannel { get; set; }
+    private int MessagePageSize { get; set; } = 5;
+    private string? CurrentMessageSelectedKey { get; set; }
+    private Node? CurrentNodeSelected { get; set; }
+    private Channel? CurrentChannelSelected { get; set; }
+    
+    private bool HasRenderMapData { get; set; }
+    private Osm? Map { get; set; }
+
+    private static readonly Osm.LatitudeLongitudeZoom DefaultMapPosition = new()
+    {
+        Latitude = 46.199144,
+        Longitude = 2.321139,
+        Zoom = 6
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Map != null && !HasRenderMapData)
+        {
+            await Map.AddMarkers(NodeMarkers.DistinctBy(n => n.Id).ToList());
+            await Map.AddMarkers(WaypointMarkers.DistinctBy(n => n.Id).ToList());
+            
+            HasRenderMapData = true;
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        UnReadMessagesForChannel.Clear();
+        UnReadMessagesForNode.Clear();
+        NodeMarkers.Clear();
+        WaypointMarkers.Clear();
+        TextMessages.Clear();
+        TotalTextMessagesForChannel.Clear();
+        TotalTextMessagesForNode.Clear();
+        TotalMessageChannel = 0;
+        
+        Nodes = await Context.Nodes
+            // .Where(a => a.MqttServerId == MqttServerId)
+            .Where(a => !MeshtasticService.NodesIgnored.Contains(a.NodeId))
+            .OrderByDescending(a => a.LastSeen ?? DateTime.MinValue)
+            .Take(100)
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
+        Waypoints = await Context.Waypoints
+            .Where(w => w.ExpiresAt >= DateTime.UtcNow)
+            .OrderByDescending(a => a.UpdatedAt)
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
+        Channels = await Context.Channels
+            .Where(a => a.Name != "PKI" && a.Name != "admin")
+            .OrderByDescending(a => a.UpdatedAt)
+            .AsNoTrackingWithIdentityResolution()
+            .Take(10)
+            .ToListAsync();
+        TotalTextMessagesForChannel = await Context.TextMessages
+            .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
+            .Where(a => a.Channel.Name != "PKI" && a.Channel.Name != "admin")
+            .GroupBy(t => t.Channel)
+            .AsNoTrackingWithIdentityResolution()
+            .ToDictionaryAsync(a => a.Key, messages => messages.Count());
+        TotalTextMessagesForNode = await Context.TextMessages
+            .Where(a => a.Channel.Name != "PKI" && a.Channel.Name != "admin")
+            .GroupBy(t => t.To)
+            .AsNoTrackingWithIdentityResolution()
+            .ToDictionaryAsync(a => a.Key, messages => messages.Count());
+
+        if (Channels.Any())
+        {
+            await OnTabMessageChange($"channel-{Channels.First().Id}");
+        }
+        else if (Nodes.Any())
+        {
+            await OnTabMessageChange($"node-{Nodes.First().Id}");
+        }
+
+        foreach (var channel in Channels)
+        {
+            UnReadMessagesForChannel.Add(channel, 0);
+        }
+
+        foreach (var node in Nodes)
+        {
+            UnReadMessagesForNode.Add(node, 0);
+        }
+        
+        foreach (var node in Nodes.Where(n => n is { Latitude: not null, Longitude: not null }))
+        {
+            NodeMarkers.Add(new Osm.Marker
+            {
+                Id = $"node-{node.Id}",
+                Latitude = node.Latitude!.Value,
+                Longitude = node.Longitude!.Value,
+                Color = "blue",
+                Label = node.AllNames,
+                PopupOnHover = true
+            });
+        }
+        
+        foreach (var waypoint in Waypoints)
+        {
+            WaypointMarkers.Add(new Osm.Marker
+            {
+                Id = $"waypoint-{waypoint.Id}",
+                Latitude = waypoint.Latitude,
+                Longitude = waypoint.Longitude,
+                Color = "orange",
+                Label = waypoint.Name,
+                Popup = !string.IsNullOrWhiteSpace(waypoint.Description) ? $"<p><b>{waypoint.Name}</b></p><p>{waypoint.Description}</p>" : null,
+                PopupOnHover = true
+            });
+        }
+
+        await RefreshTextMessages();
+        
+        await base.OnParametersSetAsync();
+    }
+
+    private async Task OnPaginationMessageChange(PaginationEventArgs args)
+    {
+        CurrentMessagePageIndex = args.Page;
+        await RefreshTextMessages();
+    }
+
+    private void OnFinish(EditContext editContext)
+    {
+        
+    }
+
+    private async Task RefreshTextMessages()
+    {
+        if (CurrentChannelSelected != null)
+        {
+            TextMessages = await Context.TextMessages
+                .Include(a => a.From)
+                .Include(a => a.To)
+                .Where(a => a.Channel == CurrentChannelSelected)
+                .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
+                .OrderByDescending(a => a.CreatedAt)
+                .Skip((CurrentMessagePageIndex - 1) * MessagePageSize).Take(MessagePageSize)
+                .AsNoTrackingWithIdentityResolution()
+                .ToListAsync();
+            TotalMessageChannel = TotalTextMessagesForChannel.TryGetValue(CurrentChannelSelected, out var total) ? total : 0;
+        }
+        else if (CurrentNodeSelected != null)
+        {
+            TextMessages = await Context.TextMessages
+                .Include(a => a.From)
+                .Include(a => a.To)
+                .Where(a => a.To == CurrentNodeSelected)
+                // .Where(a => a.From.NodeId == XXX) // TODO
+                .OrderByDescending(a => a.CreatedAt)
+                .Skip((CurrentMessagePageIndex - 1) * MessagePageSize).Take(MessagePageSize)
+                .AsNoTrackingWithIdentityResolution()
+                .ToListAsync();
+            TotalMessageChannel = TotalTextMessagesForNode.TryGetValue(CurrentNodeSelected, out var total) ? total : 0;
+        }
+        else
+        {
+            TextMessages.Clear();
+            TotalMessageChannel = 0;
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task OnTabMessageChange(string key)
+    {
+        CurrentMessageSelectedKey = null;
+        CurrentChannelSelected = null;
+        CurrentNodeSelected = null;
+        
+        if (Map != null)
+        {
+            await Map.SetLatitudeLongitudeZoom(DefaultMapPosition);
+        }
+        
+        if (!string.IsNullOrWhiteSpace(key))
+        {
+            if (key.StartsWith("node"))
+            {
+                CurrentNodeSelected = Nodes.FirstOrDefault(a => $"node-{a.Id}" == key);
+
+                if (CurrentNodeSelected != null)
+                {
+                    CurrentMessageSelectedKey = key;
+
+                    if (Map != null)
+                    {
+                        if (CurrentNodeSelected.Latitude.HasValue && CurrentNodeSelected.Longitude.HasValue)
+                        {
+                            await Map.SetLatitudeLongitudeZoom(new Osm.LatitudeLongitudeZoom
+                            {
+                                Latitude = CurrentNodeSelected.Latitude!.Value,
+                                Longitude = CurrentNodeSelected.Longitude!.Value,
+                                Zoom = 12
+                            });
+                        }
+                    }
+                }
+            }
+            else if (key.StartsWith("channel"))
+            {
+                CurrentChannelSelected = Channels.FirstOrDefault(a => $"channel-{a.Id}" == key);
+
+                if (CurrentChannelSelected != null)
+                {
+                    CurrentMessageSelectedKey = key;
+                }
+            }
+        }
+
+        await RefreshTextMessages();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Context != null)
+        {
+            await Context.DisposeAsync();
+        }
+    }
+    
+    private class FormDto
+    {
+        [Length(0, 200)] 
+        public string Message { get; set; } = null!;
+    }
+}

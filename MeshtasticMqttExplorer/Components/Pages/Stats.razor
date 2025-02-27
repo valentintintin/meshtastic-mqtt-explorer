@@ -376,7 +376,7 @@
         NbPacketsSent = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(n => n.PortNum != PortNum.MapReportApp && n.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0))) // && (!IncludeOnlyBroadcast || n.PacketActivity.ReceiverIds.ToString() == "[]")))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.HopLimit > 0))
             .AsNoTrackingWithIdentityResolution()
             .CountAsync();
 
@@ -385,7 +385,7 @@
         DataPaquetsTypes = await Context.Packets
             .Where(n => n.CreatedAt >= today)
             .Where(a => a.PortNum != PortNum.MapReportApp && a.PacketDuplicatedId == null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0)))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.HopLimit > 0))
             .GroupBy(a => a.PortNum, (portNum, packets) => new ChartData<int>
             {
                 type = portNum.ToString()!,
@@ -400,7 +400,7 @@
             .Where(a => a.PortNum != PortNum.MapReportApp)
             .Where(a => a.CreatedAt.Date >= yesterday)
             .Where(a => a.MqttServer != null)
-            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.Accepted && (n.PacketActivity.IsBroadcast || n.PacketActivity.HopLimit > 0)))
+            .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.HopLimit > 0))
             .GroupBy(a => new
             {
                 MqttServerId = a.MqttServer!.Id,

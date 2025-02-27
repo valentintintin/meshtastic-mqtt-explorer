@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -126,9 +127,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Logger.LogInformation("New node (to) created {node}", nodeTo);
         }
         
+        var isEncrypted = meshPacket.Decoded == null;
+        
         var channel = await Context.Channels.FindByNameAsync(channelId) ?? new Context.Entities.Channel
         {
-            Name = channelId
+            Name = channelId,
+            Index = isEncrypted ? 0 : meshPacket.Channel
         };
         if (channel.Id == 0)
         {
@@ -139,11 +143,14 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         else
         {
             channel.UpdatedAt = DateTime.UtcNow;
+            if (!isEncrypted)
+            {
+                channel.Index = meshPacket.Channel;
+            }
             Context.Update(channel);
             await Context.SaveChangesAsync();
         }
         
-        var isEncrypted = meshPacket.Decoded == null;
         meshPacket.Decoded ??= Decrypt(meshPacket.Encrypted.ToByteArray(), "AQ==", meshPacket.Id, meshPacket.From);
 
         var isOnPrimaryChannel = meshPacket.Decoded?.Portnum != null && meshPacket.Decoded?.Portnum != PortNum.TextMessageApp;
@@ -153,7 +160,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Update(nodeFrom);
             await Context.SaveChangesAsync();
         }
-        
+
+        var intervalDuplicated = TimeSpan.FromHours(1);
         var payload = meshPacket.GetPayload();
 
         var packet = new Packet
@@ -183,7 +191,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PacketDuplicated = await Context.Packets
                 .OrderBy(a => a.CreatedAt)
                 .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo)
+                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo && DateTime.UtcNow - a.CreatedAt <= intervalDuplicated)
         };
 
         // Check if owner send multiple time same packet
@@ -191,8 +199,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             && await Context.Packets
                         .Where(a => a.PortNum != PortNum.MapReportApp)
                         .AnyAsync(a =>
-                            a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo &&
-                            a.Gateway == nodeGateway)
+                            a.PacketId == meshPacket.Id
+                            && a.From == nodeFrom && a.To == nodeTo
+                            && a.Gateway == nodeGateway
+                            && DateTime.UtcNow - a.CreatedAt <= intervalDuplicated)
             )
         {
             return null;
@@ -641,7 +651,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             NodeId = n.NodeId,
             Node = Context.Nodes.FindByNodeId(n.NodeId),
-            Snr = n.Snr
+            RawSnr = n.Snr
         }).ToList();
     }
 
@@ -768,6 +778,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             || NodesIgnored.Contains(nodeReceiver.NodeId) 
             || NodesIgnored.Contains(heardNode.NodeId)
             || packet.ViaMqtt == true
+            || packet is { RxSnr: 0, RxRssi: 0 }
         )
         {
             return null;
@@ -845,30 +856,134 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         return neighborInfo;
     }
 
-    public MeshPacket CreateMeshPacket(uint nodeToId, uint nodeFromId, string channel, Data data, uint hopLimit = 3, string? key = null)
+    public MeshPacket CreateMeshPacketFromDto(SentPacketDto dto)
     {
         var packetId = (uint)Random.Shared.Next();
+
+        var channel = char.IsDigit(dto.Channel[0]) ? null : Context.Channels.FindByName(dto.Channel);
         
+        // MQTT use it perhaps: GenerateHash(dto.Channel, dto.Key)
+
+        uint channelIndex = 0;
+
+        if (channel != null)
+        {
+            channelIndex = channel.Index;
+            dto.Channel = channel.Name;
+        }
+        else
+        {
+            try
+            {
+                channelIndex = (uint)dto.Channel.ToLong();
+            }
+            catch (ArgumentException)
+            {
+                // Ignored
+            }
+        }
+
         var packet = new MeshPacket
         {
             Id = packetId,
-            To = nodeToId,
-            From = nodeFromId,
-            Channel = GenerateHash(channel, key),
-            WantAck = false,
-            HopLimit = hopLimit
+            To = dto.NodeToId.ToInteger(),
+            From = dto.NodeFromId.ToInteger(),
+            Channel = channelIndex,
+            WantAck = dto.Type == SentPacketDto.MessageType.Message.ToString() || dto.WantAck,
+            HopLimit = dto.HopLimit
         };
+
+        var data = CreateDataPacketFromDto(dto);
         
-        if (string.IsNullOrWhiteSpace(key))
+        if (string.IsNullOrWhiteSpace(dto.Key))
         {
             packet.Decoded = data;
         }
         else
         {
-            packet.Encrypted = ByteString.CopyFrom(Encrypt(data.ToByteArray(), key, packetId, nodeFromId));
+            packet.Encrypted = ByteString.CopyFrom(Encrypt(data.ToByteArray(), dto.Key, packetId, dto.NodeFromId.ToInteger()));
         }
 
         return packet;
+    }
+    
+    private Data CreateDataPacketFromDto(SentPacketDto dto)
+    {
+        var data = new Data();
+
+        switch (Enum.Parse<SentPacketDto.MessageType>(dto.Type))
+        {
+            case SentPacketDto.MessageType.Message:
+                if (string.IsNullOrWhiteSpace(dto.Message))
+                {
+                    throw new ValidationException("Le message est vide");
+                }
+
+                data.Portnum = PortNum.TextMessageApp;
+                data.Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(dto.Message!));
+                break;
+            case SentPacketDto.MessageType.NodeInfo:
+                if (string.IsNullOrWhiteSpace(dto.ShortName))
+                {
+                    throw new ValidationException("Le nom court est vide");
+                }
+
+                if (string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    throw new ValidationException("Le nom long est vide");
+                }
+
+                data.Portnum = PortNum.NodeinfoApp;
+                data.Payload = ByteString.CopyFrom(new User
+                {
+                    Id = dto.NodeFromId,
+                    ShortName = dto.ShortName,
+                    LongName = dto.Name
+                }.ToByteArray());
+                break;
+            case SentPacketDto.MessageType.Position:
+                data.Portnum = PortNum.PositionApp;
+                data.Payload = ByteString.CopyFrom(new Meshtastic.Protobufs.Position
+                {
+                    LongitudeI = (int)(dto.Longitude / 0.0000001),
+                    LatitudeI = (int)(dto.Latitude / 0.0000001),
+                    Altitude = dto.Altitude
+                }.ToByteArray());
+                break;
+            case SentPacketDto.MessageType.Waypoint:
+                if (string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    throw new ValidationException("Le nom est vide");
+                }
+
+                data.Portnum = PortNum.WaypointApp;
+                data.Payload = ByteString.CopyFrom(new Waypoint
+                {
+                    Id = dto.Id ?? (uint)Random.Shared.NextInt64(),
+                    Name = dto.Name,
+                    Description = dto.Description,
+                    Expire = (uint)new DateTimeOffset(dto.Expires).ToUnixTimeSeconds(),
+                    LongitudeI = (int)(dto.Longitude / 0.0000001),
+                    LatitudeI = (int)(dto.Latitude / 0.0000001)
+                }.ToByteArray());
+                break;
+            case SentPacketDto.MessageType.Raw:
+                if (string.IsNullOrWhiteSpace(dto.RawBase64))
+                {
+                    throw new ValidationException("La payload est vide");
+                }
+
+                if (!dto.PortNum.HasValue)
+                {
+                    throw new ValidationException("Aucun PortNum");
+                }
+
+                data.Portnum = dto.PortNum.Value;
+                data.Payload = ByteString.FromBase64(dto.RawBase64);
+                break;
+        }
+
+        return data;
     }
     
     public Data? Decrypt(byte[] input, string key, ulong packetId, uint nodeFromId)

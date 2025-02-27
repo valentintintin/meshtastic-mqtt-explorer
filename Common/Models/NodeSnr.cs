@@ -4,19 +4,21 @@ namespace Common.Models;
 
 public class NodeSnr
 {
-    private float? _snr;
+    public float? RawSnr;
+    private readonly float? _snr;
     public required uint NodeId { get; set; }
     public Node? Node { get; set; }
 
     public float? Snr
     {
-        get => _snr;
-        set
+        get => _snr ?? RawSnr;
+        init
         {
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (value != -128)
             {
-                _snr = value / 4.0f;
+                RawSnr = value;
+                _snr = RawSnr / 4.0f;
             }
         }
     }

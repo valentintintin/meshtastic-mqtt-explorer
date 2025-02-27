@@ -30,7 +30,7 @@
       <PackageReference Include="NLog" Version="5.3.4" />
       <PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
-      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.14" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.15" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.1-dev-00124" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
@@ -61,6 +61,9 @@
       </Content>
       <Content Update="appsettings.Production.Gaulix.json">
         <DependentUpon>appsettings.json</DependentUpon>
+      </Content>
+      <Content Update="nlog.Production.Gaulix.config">
+        <DependentUpon>nlog.config</DependentUpon>
       </Content>
     </ItemGroup>
 

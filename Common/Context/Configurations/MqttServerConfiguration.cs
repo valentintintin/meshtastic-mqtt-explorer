@@ -21,5 +21,7 @@ public class MqttServerConfiguration : IEntityTypeConfiguration<MqttServer>
         builder.Property(a => a.Topics).ListOfString().HasMaxLength(1024);
         
         builder.Property(a => a.IsARelayType).EnumToStringNotRequired(32);
+        
+        builder.Property(a => a.Type).EnumToStringNotRequired(32);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json.Serialization;
+using Common;
 using Common.Context;
 using Common.Context.Entities.Router;
 using Common.Services;
@@ -19,107 +20,29 @@ using Microsoft.IdentityModel.Tokens;
 using MQTTnet.AspNetCore;
 using MqttRouter.Controllers;
 using MqttRouter.Services;
-using NetDaemon.Extensions.Scheduler;
 using NLog;
 using NLog.Web;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 Console.WriteLine("Starting");
 
-var logger = ConfigureNlogFile();
+var logger = Init.ConfigureNlogFile();
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
     
-    builder.Logging.ClearProviders().SetMinimumLevel(LogLevel.Trace);
-    builder.Host.UseNLog();
+    builder.Configure();
 
     builder.WebHost.UseKestrel(o =>
     {
         o.ListenAnyIP(1883, l => l.UseMqtt());
         o.ListenAnyIP(5192); // Default HTTP pipeline
     });
-    
-    builder.Services.AddControllers().AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
 
-    builder.Services.AddResponseCompression();
-    builder.Services.AddHttpContextAccessor();
-    builder.Services.AddNetDaemonScheduler();
-    
-    builder.Services.AddHangfire(action =>
-    {
-        action.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(
-                options => { options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default")); },
-                new PostgreSqlStorageOptions
-                {
-                    SchemaName = "hangfire_worker"
-                });
-    });
-    
-    builder.Services.AddIdentity<User, IdentityRole<long>>(options =>
-        {
-            options.Lockout.AllowedForNewUsers = false;
-            
-            options.Password.RequireDigit = false;
-            options.Password.RequireLowercase = false;
-            options.Password.RequireUppercase = false;
-            options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequiredLength = 1;
-            options.Password.RequiredUniqueChars = 1;
-
-            options.User.RequireUniqueEmail = true;
-        })
-        .AddEntityFrameworkStores<DataContext>()
-        .AddDefaultTokenProviders(); // token for reset password etc
-    
-    builder.Services.AddDbContextFactory<DataContext>(option =>
-    {
-        option.UseNpgsql(
-            builder.Configuration.GetConnectionString("Default")
-        );
-        option.EnableSensitiveDataLogging();
-    });
-    
-    builder.Services.AddCors(option =>
-    {
-        option.AddDefaultPolicy(corsPolicyBuilder => corsPolicyBuilder
-            .WithOrigins(builder.Configuration.GetSection("CorsHosts").Value?.Split(",") ?? Array.Empty<string>())
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-        );
-    });
-
-    builder.Services.Configure<ForwardedHeadersOptions>(options =>
-    {
-        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    });
-
-    builder.Services.AddSingleton<NotificationService>();
-    builder.Services.AddSingleton<IBackgroundJobClient, BackgroundJobClient>();
-    builder.Services.AddScoped<UserService>();
-    builder.Services.AddScoped<MqttService>();
-    builder.Services.AddScoped<MeshtasticService>();
     builder.Services.AddScoped<RoutingService>();
-
     builder.Services.AddHostedMqttServer(options => options.WithDefaultEndpoint());
     builder.Services.AddMqttConnectionHandler();
-    
-    if (!builder.Environment.IsDevelopment())
-    {
-        builder.Services.AddLogging(loggingBuilder =>
-        {
-            loggingBuilder.AddSeq(builder.Configuration.GetSection("Logging").GetSection("Seq"));
-        });
-    }
-    
-    builder.Services.AddAuthorization();
     
     var tokenSettings = builder.Configuration.GetSection("Authentication")
         .GetSection("Schemes").GetSection("Bearer");
@@ -143,17 +66,7 @@ try
 
     var app = builder.Build();
 
-    app.UseCors();
-    app.UseForwardedHeaders();
-
-    if (!builder.Environment.IsDevelopment())
-    {
-        app.UseExceptionHandler("/error", createScopeForErrors: true);
-    }
-
-    app.UseAuthentication();
-    app.UseAuthorization();
-    app.MapControllers();
+    await app.Configure();
     
     app.UseMqttServer(
         server =>
@@ -167,15 +80,15 @@ try
             server.InterceptingClientEnqueueAsync += mqttController.BeforeSend;
             server.ClientDisconnectedAsync += mqttController.OnDisconnection;
         });
-
-    var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()
-        .CreateDbContextAsync();
-    await context.Database.MigrateAsync();
     
-    foreach (var nodeConfiguration in context.NodeConfigurations.Where(a => a.MqttId != null))
+    var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
+    
+    foreach (var nodeConfiguration in context.NodeConfigurations.Include(a => a.Node).Where(a => a.IsConnected))
     {
-        nodeConfiguration.MqttId = null;
+        nodeConfiguration.IsConnected = false;
+        nodeConfiguration.Node.IsMqttGateway = false;
         context.Update(nodeConfiguration);
+        context.Update(nodeConfiguration.Node);
     }
     await context.SaveChangesAsync();
     
@@ -203,18 +116,3 @@ finally
 }
 
 Console.WriteLine("Stopped");
-
-Logger ConfigureNlogFile()
-{
-    var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-    var configFile = $"nlog.{environment}.config";
-
-    if (!File.Exists(configFile))
-    {
-        configFile = "nlog.config";
-    }
-
-    Console.WriteLine($"Logger configured with file: {configFile}");
-
-    return LogManager.Setup().LoadConfigurationFromFile(configFile).GetCurrentClassLogger();
-}

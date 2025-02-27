@@ -8,6 +8,7 @@ using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using static Meshtastic.Protobufs.PortNum;
+using NeighborInfo = Common.Context.Entities.NeighborInfo;
 
 namespace MqttRouter.Services;
 
@@ -118,15 +119,27 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
 
     private async Task<List<NodeConfiguration>> GetNodesAround(Node node)
     {
-        List<NodeConfiguration> localNodes = [];
         double minLatitude;
         double maxLatitude;
         double minLongitude;
         double maxLongitude;
 
         var position = node.Positions.FirstOrDefault();
+
+        var localNodes = await Context.NeighborInfos
+            .Include(n => n.NodeReceiver)
+            .ThenInclude(n => n.NodeConfiguration)
+            .Where(n => n.NodeReceiver == node) // Receiver must be the "TO" because we will send the frame to a neighbor (heard) which will send it over LoRa and receive by "TO"
+            .Where(n => n.DataSource != NeighborInfo.Source.Unknown)
+            .Where(n => n.NodeHeard.NodeConfiguration != null)
+            .Select(n => n.NodeHeard.NodeConfiguration!)
+            .ToListAsync();
         
-        if (position != null)
+        if (localNodes.Count > 0)
+        {
+            logger.LogDebug("Node #{nodeId} has neighbors so we send to them ({nb})", node.Id, localNodes.Count);
+        } 
+        else if (position != null)
         {
             const int rayonKm = 50;
             const double rayonLatitude = rayonKm / 111.0;
@@ -212,39 +225,38 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         var nodeToConfiguration = await Context.NodeConfigurations.FirstOrDefaultAsync(a => a.Node == packet.To && !string.IsNullOrWhiteSpace(a.MqttId) && a.Node.LastSeen >= DateTime.UtcNow.AddDays(-1));
         
         logger.LogInformation("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId})", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId);
-        
-        if (nodeToConfiguration != null)
+
+        if (packet.PortNum is TextMessageApp or AdminApp or RoutingApp || meshPacket.PkiEncrypted)
         {
-            receivers.Add(nodeToConfiguration.MqttId!);
-            packetActivity.Accepted = true;
-            packetActivity.Comment = $"En direction d'un noeud précis : {packet.To}";
-        }
-        else
-        {
-            if (packet.PortNum is TextMessageApp or AdminApp || meshPacket.PkiEncrypted)
+            if (nodeToConfiguration != null)
+            {
+                receivers.Add(nodeToConfiguration.MqttId!);
+                packetActivity.Accepted = true;
+                packetActivity.Comment = $"En direction d'un noeud précis : {packet.To}";
+            }
+            else
             {
                 var localNodes = await GetNodesAround(packet.To);
 
-                logger.LogTrace("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId}). {nb} local nodes found", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId, localNodes.Count);
-            
+                logger.LogTrace(
+                    "Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId}). {nb} local nodes found",
+                    packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To,
+                    nodeToConfiguration?.MqttId, localNodes.Count);
+
                 if (localNodes.Count > 0)
                 {
                     packetActivity.Accepted = true;
                     packetActivity.ReceiverIds.AddRange(localNodes.Select(a => a.MqttId!).Distinct().ToList());
-                    packetActivity.Comment = $"En direction d'un noeud précis : {packet.To} mais pas connecté donc à son entourage : {localNodes.Count} locaux";
-                }
-                else
-                {
-                    packetActivity.Accepted = true;
                     packetActivity.HopLimit = 1;
-                    packetActivity.Comment = $"Trame autorisée avec {packet.HopLimit} car elle a de l'importance mais aucun destinataire trouvé : {packet.To}";
+                    packetActivity.Comment =
+                        $"En direction d'un noeud précis : {packet.To} mais pas connecté donc à son entourage en {packet.HopLimit} sauts : {localNodes.Count} locaux";
                 }
             }
-            else
-            {
-                packetActivity.Accepted = false;
-                packetActivity.Comment = $"Trame interdite même en direction d'un noeud précis quand le destinataire est introuvable : {packet.To}";
-            }
+        }
+        
+        if (!packetActivity.Accepted)
+        {
+            packetActivity.Comment = "Trame interdite même en direction d'un noeud précis";
         }
     }
 

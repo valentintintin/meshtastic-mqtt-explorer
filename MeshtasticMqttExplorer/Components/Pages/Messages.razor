@@ -139,6 +139,7 @@
 
         Channels = Context.Channels
             .Where(a => a.UpdatedAt >= DateTime.UtcNow.AddDays(-7))
+            .Where(a => a.Name != "PKI" && a.Name != "admin")
             .Where(a => a.TextMessages.Any(aa => aa.To!.NodeId == MeshtasticService.NodeBroadcast))
             .OrderBy(a => a.Name)
             .AsNoTrackingWithIdentityResolution()
@@ -146,6 +147,7 @@
 
         Totals = Context.TextMessages
             .Where(a => a.To!.NodeId == MeshtasticService.NodeBroadcast)
+            .Where(a => a.Channel.Name != "PKI" && a.Channel.Name != "admin")
             .Where(a => !CurrentMqttServer.HasValue || (a.To!.MqttServer != null && a.To!.MqttServer.Id == CurrentMqttServer))
             .GroupBy(t => t.ChannelId)
             .AsNoTrackingWithIdentityResolution()

@@ -8,8 +8,10 @@ using Common.Context.Entities;
 using Common.Exceptions;
 using Common.Extensions;
 using Common.Jobs;
+using Common.Models;
 using Google.Protobuf;
 using Hangfire;
+using Meshtastic.Connections;
 using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using MQTTnet.Protocol;
+using DeviceConnection = Common.Models.DeviceConnection;
 using Position = Meshtastic.Protobufs.Position;
 using User = Meshtastic.Protobufs.User;
 using Waypoint = Meshtastic.Protobufs.Waypoint;
@@ -39,31 +42,31 @@ public class MqttClientService(
     private readonly bool _isRecorder = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Recorder") ?? false;
     private readonly bool _isFront = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Explorer") ?? false;
     
-    public async Task<(Packet packet, MeshPacket meshPacket)?> DoReceive(string topic, byte[] payload, MqttServer mqttServer)
+    public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] payload, MqttServer mqttServer)
     {
         var services = serviceProvider.CreateScope().ServiceProvider;
         
         var mqttService = services.GetRequiredService<MqttService>();
         var packet = await mqttService.DoReceive(topic, payload, mqttServer);
 
-        if (packet is { packet: not null, meshPacket: not null, packet.PacketDuplicatedId: null })
+        if (packet is { packet: not null, serviceEnveloppe: not null, packet.PacketDuplicatedId: null } && !mqttServer.IsHighLoad)
         {
             try
             {
-                await RelayToAnotherMqttServer(topic, packet.Value.packet, packet.Value.meshPacket, mqttServer);
+                await RelayToAnotherMqttServer(topic, packet.Value.packet, packet.Value.serviceEnveloppe, mqttServer);
             }
             catch (Exception e)
             {
-                logger.LogError(e, "Relay error for Packet#{packetId} on topic {topic}", packet.Value.meshPacket.Id, topic);
+                logger.LogError(e, "Relay error for Packet#{packetId} on topic {topic}", packet.Value.serviceEnveloppe.Packet.Id, topic);
             }
         }
 
         return packet;
     }
 
-    private async Task RelayToAnotherMqttServer(string topic, Packet packet, MeshPacket meshPacket, MqttServer mqttServer)
+    private async Task RelayToAnotherMqttServer(string topic, Packet packet, ServiceEnvelope serviceEnvelope, MqttServer mqttServer)
     {
-        List<Task> tasks = [];
+        var meshPacket = serviceEnvelope.Packet;
         
         foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(a => a.Client.IsConnected && a.MqttServer != mqttServer && a.MqttServer.IsARelayType != null))
         {
@@ -71,7 +74,7 @@ public class MqttClientService(
                 || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.MapReport && meshPacket.Decoded?.Portnum == PortNum.MapReportApp
                 || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.NodeInfoAndPosition && meshPacket.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp
                 || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.UseFull && meshPacket.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.NeighborinfoApp or PortNum.TracerouteApp
-            )
+               )
             {
                 logger.LogInformation("Relay from MqttServer {name}, frame#{packetId} from {from} of type {portNum} to MqttServer {relayMqttName} topic {topic}", mqttServer.Name, packet.Id, packet.From, meshPacket.Decoded?.Portnum, mqttClientAndConfiguration.MqttServer.Name, topic);
 
@@ -79,7 +82,7 @@ public class MqttClientService(
                 {
                     try
                     {
-                        const int positionPrecision = 16;
+                        var positionPrecision = mqttClientAndConfiguration.MqttServer.RelayPositionPrecision ?? 32;
                         var dataApp = new Data();
                         dataApp.MergeFrom(meshPacket.Decoded.Payload);
 
@@ -87,24 +90,24 @@ public class MqttClientService(
                         {
                             case PortNum.PositionApp:
                             {
-                                var positionApp = new Position();
-                                positionApp.MergeFrom(meshPacket.Decoded.Payload);
+                                var position = new Position();
+                                position.MergeFrom(meshPacket.Decoded.Payload);
 
-                                if (positionApp.PrecisionBits > positionPrecision)
+                                if (position.PrecisionBits > positionPrecision)
                                 {
-                                    logger.LogTrace(
-                                        "Relay frame#{packetId} change precision to {precision} for {portNum}",
-                                        meshPacket.Id, positionPrecision, meshPacket.Decoded.Portnum);
+                                    logger.LogDebug(
+                                        "Relay frame#{packetId} change precision from {currentPrecision} to {newPrecision} for {portNum} and node #{node}",
+                                        meshPacket.Id, position.PrecisionBits, positionPrecision, meshPacket.Decoded.Portnum, packet.From);
 
-                                    positionApp.LatitudeI =
-                                        (int)(positionApp.LatitudeI & (uint.MaxValue << 32 - positionPrecision));
-                                    positionApp.LongitudeI =
-                                        (int)(positionApp.LongitudeI & (uint.MaxValue << 32 - positionPrecision));
-                                    positionApp.LatitudeI += 1 << (31 - positionPrecision);
-                                    positionApp.LongitudeI += 1 << (31 - positionPrecision);
-                                    positionApp.PrecisionBits = positionPrecision;
+                                    position.LatitudeI =
+                                        (int)(position.LatitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
+                                    position.LongitudeI =
+                                        (int)(position.LongitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
+                                    position.LatitudeI += 1 << (int)(31 - positionPrecision);
+                                    position.LongitudeI += 1 << (int)(31 - positionPrecision);
+                                    position.PrecisionBits = positionPrecision;
                                     
-                                    meshPacket.Decoded.Payload = positionApp.ToByteString();
+                                    meshPacket.Decoded.Payload = position.ToByteString();
                                 }
 
                                 break;
@@ -116,16 +119,16 @@ public class MqttClientService(
 
                                 if (mapReport.PositionPrecision > positionPrecision)
                                 {
-                                    logger.LogTrace(
-                                        "Relay frame#{packetId} change precision to {precision} for {portNum}",
-                                        meshPacket.Id, positionPrecision, meshPacket.Decoded.Portnum);
+                                    logger.LogDebug(
+                                        "Relay frame#{packetId} change precision from {currentPrecision} to {newPrecision} for {portNum} and node #{node}",
+                                        meshPacket.Id, mapReport.PositionPrecision, positionPrecision, meshPacket.Decoded.Portnum, packet.From);
 
                                     mapReport.LatitudeI =
-                                        (int)(mapReport.LatitudeI & (uint.MaxValue << 32 - positionPrecision));
+                                        (int)(mapReport.LatitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
                                     mapReport.LongitudeI =
-                                        (int)(mapReport.LongitudeI & (uint.MaxValue << 32 - positionPrecision));
-                                    mapReport.LatitudeI += 1 << (31 - positionPrecision);
-                                    mapReport.LongitudeI += 1 << (31 - positionPrecision);
+                                        (int)(mapReport.LongitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
+                                    mapReport.LatitudeI += 1 << (int)(31 - positionPrecision);
+                                    mapReport.LongitudeI += 1 << (int)(31 - positionPrecision);
                                     mapReport.PositionPrecision = positionPrecision;
                                     
                                     meshPacket.Decoded.Payload = mapReport.ToByteString();
@@ -141,14 +144,17 @@ public class MqttClientService(
                     }
                 }
 
-                tasks.Add(mqttClientAndConfiguration.Client.PublishBinaryAsync(topic, meshPacket.ToByteArray()));
+                var result = await mqttClientAndConfiguration.Client.PublishBinaryAsync(topic, serviceEnvelope.ToByteArray());
+
+                if (!result.IsSuccess)
+                {
+                    logger.LogWarning("Relay from MqttServer {name}, frame#{packetId} from {from} of type {portNum} to MqttServer {relayMqttName} topic {topic} KO : {code}, {error}", mqttServer.Name, packet.Id, packet.From, meshPacket.Decoded?.Portnum, mqttClientAndConfiguration.MqttServer.Name, topic, result.ReasonCode, result.ReasonString);
+                }
             }
         }
-        
-        await Task.WhenAll(tasks);
     }
 
-    public async Task PublishMessage(PublishMessageDto dto)
+    public async Task PublishMessage(SentPacketDto dto)
     {
         var mqttConfiguration = MqttClientAndConfigurations.FirstOrDefault(a => a.MqttServer.Id == dto.MqttServerId);
 
@@ -157,91 +163,15 @@ public class MqttClientService(
             throw new NotFoundException<MqttServer>(dto.MqttServerId);
         }
         
-        var meshtasticService = serviceProvider.CreateAsyncScope().ServiceProvider.GetRequiredService<MeshtasticService>();
-
-        var nodeFromId = dto.NodeFromId.ToInteger();
-        var nodeToId = string.IsNullOrWhiteSpace(dto.NodeToId) ? MeshtasticService.NodeBroadcast : dto.NodeToId.ToInteger();
-        var topic = (string) dto.RootTopic.Clone();
-
-        var data = new Data();
+        var meshtasticService = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<MeshtasticService>();
         
-        switch (Enum.Parse<PublishMessageDto.MessageType>(dto.Type))
-        {
-            case PublishMessageDto.MessageType.Message:
-                if (string.IsNullOrWhiteSpace(dto.Message))
-                {
-                    throw new ValidationException("Le message est vide");
-                }
-                
-                data.Portnum = PortNum.TextMessageApp;
-                data.Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(dto.Message!));
-                break;
-            case PublishMessageDto.MessageType.NodeInfo:
-                if (string.IsNullOrWhiteSpace(dto.ShortName))
-                {
-                    throw new ValidationException("Le nom court est vide");
-                }
-                
-                if (string.IsNullOrWhiteSpace(dto.Name))
-                {
-                    throw new ValidationException("Le nom long est vide");
-                }
-                
-                data.Portnum = PortNum.NodeinfoApp;
-                data.Payload = ByteString.CopyFrom(new User
-                {
-                    Id = dto.NodeFromId,
-                    ShortName = dto.ShortName,
-                    LongName = dto.Name
-                }.ToByteArray());
-                break;
-            case PublishMessageDto.MessageType.Position:
-                data.Portnum = PortNum.PositionApp;
-                data.Payload = ByteString.CopyFrom(new Position
-                {
-                    LongitudeI = (int) (dto.Longitude / 0.0000001),
-                    LatitudeI = (int) (dto.Latitude / 0.0000001),
-                    Altitude = dto.Altitude
-                }.ToByteArray());
-                break;
-            case PublishMessageDto.MessageType.Waypoint:
-                if (string.IsNullOrWhiteSpace(dto.Name))
-                {
-                    throw new ValidationException("Le nom est vide");
-                }
-                
-                data.Portnum = PortNum.WaypointApp;
-                data.Payload = ByteString.CopyFrom(new Waypoint
-                {
-                    Id = dto.Id ?? (uint) Random.Shared.NextInt64(),
-                    Name = dto.Name,
-                    Description = dto.Description,
-                    Expire = (uint)new DateTimeOffset(dto.Expires).ToUnixTimeSeconds(),
-                    LongitudeI = (int) (dto.Longitude / 0.0000001),
-                    LatitudeI = (int) (dto.Latitude / 0.0000001)
-                }.ToByteArray());
-                break;
-            case PublishMessageDto.MessageType.Raw:
-                if (string.IsNullOrWhiteSpace(dto.RawBase64))
-                {
-                    throw new ValidationException("La payload est vide");
-                }
-
-                if (!dto.PortNum.HasValue)
-                {
-                    throw new ValidationException("Aucun PortNum");
-                }
-                
-                data.Portnum = dto.PortNum.Value;
-                data.Payload = ByteString.FromBase64(dto.RawBase64);
-                break;
-        }
+        var topic = (string) dto.RootTopic.Clone();
         
         var packet = new ServiceEnvelope
         {
             ChannelId = dto.Channel,
             GatewayId = dto.NodeFromId,
-            Packet = meshtasticService.CreateMeshPacket(nodeToId, nodeFromId, dto.Channel, data, dto.HopLimit, dto.Key)
+            Packet = meshtasticService.CreateMeshPacketFromDto(dto)
         };
         
         if (packet.Packet.Decoded != null)
@@ -260,68 +190,54 @@ public class MqttClientService(
         logger.LogInformation("Send packet to MQTT topic {topic} : {packet} with data {data} | {base64}", topic, JsonSerializer.Serialize(packet), JsonSerializer.Serialize(packet.Packet.GetPayload()), Convert.ToBase64String(packetBytes));
 
         await mqttConfiguration.Client.PublishBinaryAsync(topic, packetBytes);
+
+        await meshtasticService.DoReceive(packet.Packet.From, dto.Channel, packet.Packet);
     }
 
-    private async Task ConnectMqtt()
+    private async Task ConnectMqtt(MqttClientAndConfiguration mqttClientAndConfiguration)
     {
-        while (true)
+        if (mqttClientAndConfiguration.Client.IsConnected)
         {
-            var shouldRetry = false;
+            return;
+        }
 
-            foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(m => !m.Client.IsConnected))
-            {
-                logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.MqttServer.Name);
+        logger.LogInformation("Run connection to MQTT {name}", mqttClientAndConfiguration.MqttServer.Name);
 
-                var mqttClientOptionsBuilder = new MqttClientOptionsBuilder().WithTcpServer(mqttClientAndConfiguration.MqttServer.Host, mqttClientAndConfiguration.MqttServer.Port)
-                    .WithClientId($"MeshtasticMqttExplorer_{Assembly.GetEntryAssembly()?.GetName().Name}_ValentinF4HVV_{environment.EnvironmentName}")
-                    .WithCleanSession();
+        var mqttClientOptionsBuilder = new MqttClientOptionsBuilder().WithTcpServer(mqttClientAndConfiguration.MqttServer.Host, mqttClientAndConfiguration.MqttServer.Port)
+            .WithClientId($"MeshtasticMqttExplorer_{Assembly.GetEntryAssembly()?.GetName().Name}_{environment.EnvironmentName}_{mqttClientAndConfiguration.MqttServer.Name}#{mqttClientAndConfiguration.MqttServer.Id}")
+            .WithCleanSession();
 
-                if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.MqttServer.Username))
-                {
-                    mqttClientOptionsBuilder = mqttClientOptionsBuilder.WithCredentials(mqttClientAndConfiguration.MqttServer.Username, mqttClientAndConfiguration.MqttServer.Password);
-                }
+        if (!string.IsNullOrWhiteSpace(mqttClientAndConfiguration.MqttServer.Username))
+        {
+            mqttClientOptionsBuilder = mqttClientOptionsBuilder.WithCredentials(mqttClientAndConfiguration.MqttServer.Username, mqttClientAndConfiguration.MqttServer.Password);
+        }
 
-                try
-                {
-                    await mqttClientAndConfiguration.Client.ConnectAsync(mqttClientOptionsBuilder.Build());
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Erreur during MQTT connection to {mqttServer}", mqttClientAndConfiguration.MqttServer.Name);
-                    shouldRetry = true;
-                }
-            }
-
-            if (shouldRetry)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5));
-                continue;
-            }
-
-            break;
+        try
+        {
+            await mqttClientAndConfiguration.Client.ConnectAsync(mqttClientOptionsBuilder.Build());
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Erreur during MQTT connection to {mqttServer}", mqttClientAndConfiguration.MqttServer.Name);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await ConnectMqtt(mqttClientAndConfiguration);
         }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!configuration.GetValue("ConnectToMqtt", true))
-        {
-            logger.LogWarning("MQTT disabled");
-            
-            return;
-        }
-        
         MqttClientAndConfigurations.AddRange(
             (await contextFactory.CreateDbContextAsync(stoppingToken)).MqttServers
-                .Where(a => a.Enabled)
-                .AsEnumerable()
-                .Where(a => (_isRecorder && a.Topics.Count > 0) || (_isWorker && a.IsARelayType != null) || _isFront)
-                .ToList()
-                .Select(a => new MqttClientAndConfiguration
-                {
-                    MqttServer = a,
-                    Client = new MqttClientFactory().CreateMqttClient()
-                })
+            .Where(a => a.Enabled)
+            .Where(a => a.Type == MqttServer.ServerType.Mqtt)
+            .AsEnumerable()
+            .Where(a => (_isRecorder && a.Topics.Count > 0) || (_isWorker && a.IsARelayType != null) || _isFront)
+            .ToList()
+            .Select(a => new MqttClientAndConfiguration
+            {
+                MqttServer = a,
+                Client = new MqttClientFactory().CreateMqttClient()
+            })
         );
 
         if (MqttClientAndConfigurations.Count == 0)
@@ -369,8 +285,8 @@ public class MqttClientService(
 
                 if (configuration.GetValue("UseWorker", false))
                 {
-                    backgroundJobClient.Enqueue<MqttReceiveJob>("packet", a => a.ExecuteAsync(topic,
-                        e.ApplicationMessage.Payload.ToArray(), mqttClientAndConfiguration.MqttServer.Id, guid));
+                    var queue = mqttClientAndConfiguration.MqttServer.IsHighLoad ? "packet-2" : "packet";
+                    backgroundJobClient.Enqueue<MqttReceiveJob>(queue, a => a.ExecuteAsync(topic, e.ApplicationMessage.Payload.ToArray(), mqttClientAndConfiguration.MqttServer.Id, guid));
                 }
                 else
                 {
@@ -382,88 +298,28 @@ public class MqttClientService(
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>
             {
                 logger.LogWarning(args.Exception, "MQTT {name} disconnected, reason : {reason}", mqttClientAndConfiguration.MqttServer.Name, args.ReasonString);
+                
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                await ConnectMqtt(mqttClientAndConfiguration);
             };
         }
 
-        await ConnectMqtt();
+        Task.WaitAll(MqttClientAndConfigurations
+            .Where(m => !m.Client.IsConnected)
+            .Select(ConnectMqtt)
+            .ToArray(), stoppingToken);
+    }
 
-        stoppingToken.WaitHandle.WaitOne();
-        
-        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(m => m.Client.IsConnected))
-        {
-            logger.LogWarning("Disconnect from MQTT {name}", mqttClientAndConfiguration.MqttServer.Name);
-            await mqttClientAndConfiguration.Client.DisconnectAsync(cancellationToken: stoppingToken);
-        }
+    public void DisconnectAsync()
+    {
+        Task.WaitAll(MqttClientAndConfigurations
+            .Where(a => a.Client.IsConnected)
+            .Select(a => a.Client.DisconnectAsync())
+            .ToArray());
     }
     
-    public class MqttClientAndConfiguration
+    public class MqttClientAndConfiguration : DeviceConnection
     {
         public required IMqttClient Client { get; init; }
-        public required MqttServer MqttServer { get; init; }
-        public int NbPacket { get; set; }
-        public DateTime? LastPacketReceivedDate { get; set; }
-    }
-}
-
-public class PublishMessageDto
-{
-    [Required]
-    public long MqttServerId { get; set; }
-
-    [Required]
-    [Length(2, 9)]
-    public string NodeFromId { get; set; } = "!1000001";
-    
-    [Required]
-    [MinLength(1)]
-    public string Channel { get; set; } = "LongFast";
-    
-    [Length(2, 9)]
-    public string? NodeToId { get; set; }
-    
-    [Range(0, 7)]
-    public uint HopLimit { get; set; } = 3;
-    
-    [Required]
-    [MinLength(4)]
-    public string RootTopic { get; set; } = "msh/EU_868/2/";
-
-    [MinLength(4)]
-    public string? Key { get; set; }// = "AQ==";
-    
-    public string Type { get; set; } = MessageType.Message.ToString();
-    
-    [Length(1, 200)]
-    public string? Message { get; set; }
-    
-    public double Latitude { get; set; }
-    public double Longitude { get; set; }
-    public int Altitude { get; set; }
-    
-    [Length(4, 4)]
-    public string? ShortName { get; set; }
-    
-    [Length(1, 37)]
-    public string? Name { get; set; }
-    
-    [MaxLength(100)]
-    public string? Description { get; set; }
-    
-    public uint? Id { get; set; }
-    
-    public DateTime Expires { get; set; } = DateTime.UtcNow.AddDays(1);
-    
-    public PortNum? PortNum { get; set; }
-    
-    [MinLength(1)]
-    public string? RawBase64 { get; set; }
-    
-    public enum MessageType
-    {
-        Message,
-        NodeInfo,
-        Position,
-        Waypoint,
-        Raw
     }
 }

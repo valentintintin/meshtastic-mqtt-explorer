@@ -70,9 +70,9 @@ public class UserService(
         Logger.LogInformation("Update user#{id} {mail} OK", user.Id, updateDto.Email);
     }
 
-    public async Task<User?> Login(string username, string password, string ip)
+    public async Task<User?> Login(string username, string password, string? ip)
     {
-        Logger.LogInformation("Login of {username}", username);
+        Logger.LogInformation("Try login of {username}", username);
         
         var user = await userManager.FindByNameAsync(username.Trim());
 

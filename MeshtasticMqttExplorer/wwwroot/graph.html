@@ -49,7 +49,7 @@
     zoomState = event.transform;
    });
 
-   fetch("/graph?_=" + new Date().getTime()).then(response => response.json()).then(data => {
+   fetch("/api/graph?_=" + new Date().getTime()).then(response => response.json()).then(data => {
     const dataCopy = JSON.parse(JSON.stringify(data));
 
     function getSubgraphForNode(data, nodeId) {

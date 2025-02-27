@@ -9,4 +9,9 @@ public static class ChannelExtensions
     {
         return string.IsNullOrWhiteSpace(name) ? null : await channels.FirstOrDefaultAsync(n => n.Name == name);
     }
+    
+    public static Channel? FindByName(this IQueryable<Channel> channels, string name)
+    {
+        return string.IsNullOrWhiteSpace(name) ? null : channels.FirstOrDefault(n => n.Name == name);
+    }
 }

@@ -8,6 +8,8 @@ public class NodeConfiguration : IEntity
     
     public string? MqttId { get; set; }
     
+    public bool IsConnected { get; set; }
+    
     public DateTime? LastSeenOnMqtt { get; set; }
 
     public bool Forbidden { get; set; }

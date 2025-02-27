@@ -41,6 +41,9 @@
         <PropertyColumn Property="c => c.MqttId" Title="MQTT client ID" Filterable>
             @context.MqttId
         </PropertyColumn>
+        <PropertyColumn Property="c => c.IsConnected" Title="Connecté au MQTT" Sortable Filterable>
+            @(context.IsConnected ? "Oui" : " Non")
+        </PropertyColumn>
         <PropertyColumn Property="c => c.UserId" Title="Utilisateur">
             @if (context.User != null)
             {
@@ -80,17 +83,17 @@
         NodesQueryable = Context.NodeConfigurations
             .Include(a => a.Node)
             .Include(a => a.User)
-            .Where(a => a.LastSeenOnMqtt.HasValue)
-            .Where(a => !OnlyConnected || !string.IsNullOrWhiteSpace(a.MqttId))
+            .Where(a => !string.IsNullOrWhiteSpace(a.MqttId))
+            .Where(a => !OnlyConnected || a.IsConnected)
             .AsNoTrackingWithIdentityResolution();
         
         Total = Context.NodeConfigurations
             .AsNoTrackingWithIdentityResolution()
-            .Count(a => a.LastSeenOnMqtt.HasValue);
+            .Count(a => !string.IsNullOrWhiteSpace(a.MqttId));
         
         TotalConnected = Context.NodeConfigurations
             .AsNoTrackingWithIdentityResolution()
-            .Count(a => !string.IsNullOrWhiteSpace(a.MqttId));
+            .Count(a => a.IsConnected);
 
     }
 

@@ -10,7 +10,7 @@ using NeighborInfo = Common.Context.Entities.NeighborInfo;
 namespace MeshtasticMqttExplorer.Controllers;
 
 [ApiController]
-[Route("graph")]
+[Route("api/graph")]
 public class GraphController(ILogger<GraphController> logger, IDbContextFactory<DataContext> contextFactory) : AController(logger)
 {
     [HttpGet]

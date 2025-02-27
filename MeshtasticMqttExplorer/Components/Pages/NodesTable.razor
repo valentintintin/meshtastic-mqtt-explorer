@@ -49,7 +49,7 @@
                 @(context.Role?.ToString() ?? "-")
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }">
+        <PropertyColumn Property="c => c.IsMqttGateway" Title="Passerelle MQTT" Filterable Sortable SortDirections="new [] { SortDirection.Ascending, SortDirection.Descending }">
             <div style="width: 30px">
                 @(context.IsMqttGateway == true ? "Oui" : "Non")
             </div>

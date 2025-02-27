@@ -1,11 +1,19 @@
 ﻿@page "/send"
+@using System.ComponentModel.DataAnnotations
 @using System.Net
+@using System.Text
+@using Common.Context.Entities
+@using Common.Exceptions
 @using Common.Extensions
+@using Common.Models
 @using Common.Services
+@using Google.Protobuf
+@using Meshtastic.Protobufs
 
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IConfiguration Configuration
 @inject MqttClientService MqttClientService
+@inject HttpClientService HttpClientService
 @inject IMessageService Message
 @inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
@@ -29,14 +37,14 @@ else
                 <FormItem Label="Mon Id">
                     <Input @bind-Value="@context.NodeFromId" MaxLength="9"/>
                 </FormItem>
-                <FormItem Label="Id destinataire (vide si tout le monde)">
+                <FormItem Label="Id destinataire">
                     <Input @bind-Value="@context.NodeToId" MaxLength="9" />
                 </FormItem>
                 <FormItem Label="Canal">
                     <Input @bind-Value="@context.Channel"/>
                 </FormItem>
                 <FormItem Label="Serveur MQTT">
-                    <Select DataSource="@MqttConfigurations"
+                    <Select DataSource="@DeviceConnections"
                             @bind-Value="@context.MqttServerId"
                             ItemValue="c => c.MqttServer.Id"
                             ItemLabel="c => c.MqttServer.Name"
@@ -46,12 +54,12 @@ else
             </Panel>
             <Panel Header="Données" Key="2">
                 <Tabs Type="@TabType.Card" @bind-ActiveKey="@context.Type">
-                    <TabPane Tab="Message" Key="@PublishMessageDto.MessageType.Message.ToString()">
+                    <TabPane Tab="Message" Key="@SentPacketDto.MessageType.Message.ToString()">
                         <FormItem Label="Message">
                             <TextArea ShowCount MaxLength="200" @bind-Value="@context.Message"></TextArea>
                         </FormItem>
                     </TabPane>
-                    <TabPane Tab="NodeInfo" Key="@PublishMessageDto.MessageType.NodeInfo.ToString()">
+                    <TabPane Tab="NodeInfo" Key="@SentPacketDto.MessageType.NodeInfo.ToString()">
                         <FormItem Label="Nom long (max 37)">
                             <Input @bind-Value="@context.Name" MaxLength="37" />
                         </FormItem>
@@ -59,7 +67,7 @@ else
                             <Input @bind-Value="@context.ShortName" MaxLength="4" />
                         </FormItem>
                     </TabPane>
-                    <TabPane Tab="Position" Key="@PublishMessageDto.MessageType.Position.ToString()">
+                    <TabPane Tab="Position" Key="@SentPacketDto.MessageType.Position.ToString()">
                         <FormItem Label="Latitude">
                             <AntDesign.InputNumber Width="150" TValue="double" Step="0.0001" @bind-Value="@context.Latitude"/>
                         </FormItem>
@@ -70,7 +78,7 @@ else
                             <AntDesign.InputNumber Width="150" TValue="int" Max="5000" @bind-Value="@context.Altitude" Formatter="FormatM" Parser="ParseM" />
                         </FormItem>
                     </TabPane>
-                    <TabPane Tab="Point d'intérêt" Key="@PublishMessageDto.MessageType.Waypoint.ToString()">
+                    <TabPane Tab="Point d'intérêt" Key="@SentPacketDto.MessageType.Waypoint.ToString()">
                         <FormItem Label="Nom (max 30)">
                             <Input @bind-Value="@context.Name" MaxLength="30" />
                         </FormItem>
@@ -90,7 +98,7 @@ else
                             <AntDesign.InputNumber Width="150" TValue="uint?" Min="0" Max="MeshtasticService.NodeBroadcast" @bind-Value="@context.Id"/>
                         </FormItem>
                     </TabPane>
-                    <TabPane Tab="Brut" Key="@PublishMessageDto.MessageType.Raw.ToString()">
+                    <TabPane Tab="Brut" Key="@SentPacketDto.MessageType.Raw.ToString()">
                         <FormItem Label="Port num">
                             <Select DataSource="@Utils.PortNumFilters"
                                     @bind-Value="@context.PortNum"
@@ -111,6 +119,9 @@ else
                 <FormItem Label="Nombre de sauts">
                     <AntDesign.InputNumber Min="0" Max="7" @bind-Value="@context.HopLimit" TValue="uint"/>
                 </FormItem>
+                <FormItem Label="Avec accusé de réception">
+                    <Checkbox @bind-Value="@context.WantAck"></Checkbox>
+                </FormItem>
                 <FormItem Label="Topic racine MQTT">
                     <Input @bind-Value="@context.RootTopic"/>
                 </FormItem>
@@ -128,14 +139,17 @@ else
 @code
 {
     private bool _allowed;
-    private PublishMessageDto _model = null!;
-    private List<MqttClientService.MqttClientAndConfiguration> MqttConfigurations { get; set; } = [];
+    private SentPacketDto _model = null!;
+    private List<DeviceConnection> DeviceConnections { get; set; } = [];
 
     protected override void OnInitialized()
     {
         _allowed = Configuration.GetValue("AllowSend", true);
 
-        MqttConfigurations = MqttClientService.MqttClientAndConfigurations;
+        DeviceConnections = MqttClientService.MqttClientAndConfigurations
+            .Cast<DeviceConnection>()
+            .Concat(HttpClientService.HttpClientAndConfigurations)
+            .ToList();
         
         base.OnInitialized();
     }
@@ -144,17 +158,17 @@ else
     {
         if (firstRender)
         {
-            _model = await LocalStorage.GetItemAsync<PublishMessageDto>("lastSentDto") ?? new PublishMessageDto();
+            _model = await LocalStorage.GetItemAsync<SentPacketDto>("lastSentDto") ?? new SentPacketDto();
             
-            var mqttClientAndConfiguration = MqttConfigurations.FirstOrDefault();
+            var deviceConnection = DeviceConnections.FirstOrDefault();
 
-            if (mqttClientAndConfiguration == null)
+            if (deviceConnection == null)
             {
                 _allowed = false;
             }
             else
             {
-                _model.MqttServerId = mqttClientAndConfiguration.MqttServer.Id;
+                _model.MqttServerId = deviceConnection.MqttServer.Id;
             }
 
             await InvokeAsync(StateHasChanged);
@@ -167,7 +181,15 @@ else
     {
         try
         {
-            await MqttClientService.PublishMessage(_model);
+            try
+            {
+                await MqttClientService.PublishMessage(_model);
+            }
+            catch (NotFoundException<MqttServer>)
+            {
+                await HttpClientService.PublishMessage(_model);
+            }
+            
             await Message.Success("Trame bien envoyée !");
             await LocalStorage.SetItemAsync("lastSentDto", _model);
         }
@@ -176,23 +198,6 @@ else
             Console.WriteLine(e);
             await Message.Error($"Il y a eu une erreur pendant l'envoi : {e.Message}");
         }
-    }
-
-    private IPAddress? GetIpAddress()
-    {
-        var ipAddress = HttpContextAccessor.HttpContext?.Request.Headers["HTTP_X_FORWARDED_FOR"];
-
-        if (!string.IsNullOrWhiteSpace(ipAddress))
-        {
-            return IPAddress.Parse(ipAddress!);
-        }
-
-        return HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress;
-    }
-
-    private uint IpAddressToInt(IPAddress? addr)
-    {
-        return addr != null ? (uint) IPAddress.NetworkToHostOrder((int) addr.Address) : 0;
     }
     
     private string FormatM(int value)

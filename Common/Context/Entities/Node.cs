@@ -41,7 +41,7 @@ public class Node : IEntity
     
     public bool Ignored { get; set; }
     
-    public int? HopStart { get; set; }
+    public int? HopStart { get; set; } // TODO uint
 
     public virtual ICollection<Packet> PacketsFrom { get; set; } = [];
     public virtual ICollection<Packet> PacketsGateway { get; set; } = [];

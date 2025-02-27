@@ -21,9 +21,21 @@ public class MqttServer : IEntity
     public bool Enabled { get; set; } = true;
 
     public RelayType? IsARelayType { get; set; }
-    
+
+    public uint? RelayPositionPrecision { get; set; } = 32;
+
+    public ServerType Type { get; set; } = ServerType.Mqtt;
+
+    public bool IsHighLoad { get; set; }
+
     public virtual ICollection<Packet> Packets { get; set; } = [];
     public virtual ICollection<Node> Nodes { get; set; } = [];
+    
+    public enum ServerType
+    {
+        Mqtt,
+        NodeHttp
+    }
     
     public enum RelayType
     {

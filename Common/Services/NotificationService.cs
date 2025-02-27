@@ -1,4 +1,3 @@
-using System.Reactive.Concurrency;
 using System.Text.Json;
 using Common.Context;
 using Common.Context.Entities;
@@ -7,14 +6,13 @@ using Common.Models;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Common.Services;
 
 public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IConfiguration configuration) : AService(logger, contextFactory)
 {
-    private Dictionary<(string url, uint packetId), string?> MessageIdForPacketId { get; } = new();
+    private Dictionary<(string url, uint packetId), (string? messageId, DateTime dateTime)> MessageIdForPacketId { get; } = new();
     
     public async Task SendNotification(Packet packet)
     {
@@ -39,7 +37,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             )
             .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
             .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
-            .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
+            // .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
             .AsEnumerable()
             .Where(n => 
                 !n.DistanceAroundPositionKm.HasValue
@@ -61,6 +59,16 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         {
             var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails);
             await MakeRequest(notificationConfiguration, message, packet);
+            
+            PurgeMessageIds();
+        }
+    }
+
+    private void PurgeMessageIds()
+    {
+        foreach (var (key, _) in MessageIdForPacketId.Where(a => DateTime.UtcNow - a.Value.dateTime >= TimeSpan.FromMinutes(5)))
+        {
+            MessageIdForPacketId.Remove(key);
         }
     }
 
@@ -77,7 +85,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         if (packet.To.NodeId != MeshtasticService.NodeBroadcast)
         {
-            message += "" + '\n' + '\n' + $"Pour : {packet.To.AllNames}";
+            message += "" + '\n' + '\n' + $"Pour : <b>{packet.To.AllNames}</b>";
         }
 
         if (includeHopsDetails)
@@ -91,7 +99,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             {
                 var nbHop = aPacketData.Key;
 
-                message += "<b>-- " + (nbHop == 0 ? "Reçu en direct" : $"Saut {nbHop}/{packet.HopStart}") + " --</b>" +
+                message += "-- " + (nbHop == 0 ? "Reçu en <b>direct</b>" : $"Saut <b>{nbHop}</b>/{packet.HopStart}") + " --" +
                            '\n' + '\n';
 
                 foreach (var aPacket in aPacketData)
@@ -122,9 +130,18 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         var requestUrl = webhook.Url;
 
         var cacheMessageIdKey = (webhook.Url, packet.PacketId);
-        if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && MessageIdForPacketId.TryGetValue(cacheMessageIdKey, out var messageId) && !string.IsNullOrWhiteSpace(messageId))
+        if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && MessageIdForPacketId.TryGetValue(cacheMessageIdKey, out var messageId) && !string.IsNullOrWhiteSpace(messageId.messageId))
         {
-            requestUrl = webhook.UrlToEditMessage.Replace("{{messageId}}", messageId);   
+            Logger.LogDebug("Send notification to {name} for packet #{packetId} with edit url and messageId {messageId} found", webhook.Name, packet.Id, messageId.messageId);
+            
+            if (!webhook.IncludeHopsDetails)
+            {
+                Logger.LogDebug("Send notification to {name} for packet #{packetId} ignored because no hop details but edit url", webhook.Name, packet.Id);
+                
+                return;
+            }
+            
+            requestUrl = webhook.UrlToEditMessage.Replace("{{messageId}}", messageId.messageId);
         }
 
         requestUrl = requestUrl.Replace("{{message}}", encodedMessage);
@@ -141,9 +158,8 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             
             if (requestUrl.StartsWith("https://api.telegram.org/"))
             {
-                messageId = GetMessageIdFromTelegramResponse(responseContent);
                 MessageIdForPacketId.Remove(cacheMessageIdKey);
-                MessageIdForPacketId.Add(cacheMessageIdKey, messageId);
+                MessageIdForPacketId.Add(cacheMessageIdKey, (GetMessageIdFromTelegramResponse(responseContent), DateTime.UtcNow));
             }
         }
         catch (Exception e)

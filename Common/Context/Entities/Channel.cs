@@ -7,6 +7,8 @@ public class Channel : IEntity
     public DateTime UpdatedAt { get; set; }
     
     public required string Name { get; set; }
+    
+    public required uint Index { get; set; }
 
     public virtual ICollection<TextMessage> TextMessages { get; set; } = [];
     public virtual ICollection<Packet> Packets { get; set; } = [];

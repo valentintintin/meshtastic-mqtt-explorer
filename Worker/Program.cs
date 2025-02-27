@@ -1,66 +1,39 @@
-using Common.Context;
+using Common;
 using Common.Jobs;
 using Common.Services;
 using Hangfire;
-using Hangfire.PostgreSql;
-using Microsoft.EntityFrameworkCore;
 using NLog;
-using NLog.Extensions.Logging;
-using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 Console.WriteLine("Starting");
 
-var logger = ConfigureNlogFile();
+var logger = Init.ConfigureNlogFile();
 
 try {
     var builder = Host.CreateApplicationBuilder(args);
 
-    builder.Logging.ClearProviders().SetMinimumLevel(LogLevel.Trace);
-    builder.Logging.AddNLog();
-    
-    builder.Services.AddDbContextFactory<DataContext>(option =>
-    {
-        option.UseNpgsql(
-            builder.Configuration.GetConnectionString("Default")
-        );
-        option.EnableSensitiveDataLogging();
-    });
-    
-    builder.Services.AddSingleton<NotificationService>();
-    builder.Services.AddSingleton<MqttClientService>();
-    builder.Services.AddSingleton<IRecurringJobManager, RecurringJobManager>();
-    builder.Services.AddScoped<MeshtasticService>();
-    builder.Services.AddScoped<MqttService>();
+    builder.Configure();
     
     builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
-
-    builder.Services.AddHangfire(action =>
-    {
-        action
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(
-                options => { options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default")); },
-                new PostgreSqlStorageOptions
-                {
-                    SchemaName = "hangfire_worker",
-                    QueuePollInterval = TimeSpan.FromSeconds(2)
-                });
-    });
+    
     builder.Services.AddHangfireServer(action =>
     {
-        action.ServerName = "Meshtastic Explorer Worker";
+        action.ServerName = "Meshtastic Explorer Worker 1";
         action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
-        action.WorkerCount = 1;
+        action.WorkerCount = 2;
         action.Queues = ["packet", "default"];
+    });
+    
+    builder.Services.AddHangfireServer(action =>
+    {
+        action.ServerName = "Meshtastic Explorer Worker 2";
+        action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
+        action.WorkerCount = 4;
+        action.Queues = ["packet-2", "default-2"];
     });
     
     var app = builder.Build();
 
-    var context = await app.Services.GetRequiredService<IDbContextFactory<DataContext>>()
-        .CreateDbContextAsync();
-    await context.Database.MigrateAsync();
+    await app.Configure();
     
     app.Services.GetRequiredService<IRecurringJobManager>().AddOrUpdate<PurgeJob>("purgeJob", (a) => a.RunPurge(), Cron.Hourly);
 
@@ -88,18 +61,3 @@ finally
 }
 
 Console.WriteLine("Stopped");
-
-Logger ConfigureNlogFile()
-{
-    var environment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production";
-    var configFile = $"nlog.{environment}.config";
-
-    if (!File.Exists(configFile))
-    {
-        configFile = "nlog.config";
-    }
-
-    Console.WriteLine($"Logger configured with file: {configFile}");
-
-    return LogManager.Setup().LoadConfigurationFromFile(configFile).GetCurrentClassLogger();
-}
