@@ -26,28 +26,28 @@ public class PurgeJob(
         
         Logger.LogTrace("Delete old data if they are too old < {date}", minDate);
 
-        Context.RemoveRange(Context.Positions.Where(a => a.UpdatedAt < minDate));
-        Context.RemoveRange(Context.NeighborInfos.Where(a => a.UpdatedAt < minDate));
-        Context.RemoveRange(Context.SignalHistories.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.Telemetries.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.TextMessages.Where(a => a.CreatedAt < minDate));
-        Context.RemoveRange(Context.Waypoints.Where(a => a.UpdatedAt < minDate));
-        await Context.SaveChangesAsync();
+        await Context.Positions.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        await Context.NeighborInfos.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        await Context.SignalHistories.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
+        await Context.Telemetries.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
+        await Context.TextMessages.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
+        await Context.Waypoints.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        await Context.WebhooksHistories.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
 
-        Context.RemoveRange(Context.Packets.Where(a => a.CreatedAt < minDate));
-        await Context.SaveChangesAsync();
+        await Context.Packets.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
 
         var nodesToDelete = Context.Nodes.Where(a => a.LastSeen < minDate).ToList();
         var nodesIdToDelete = nodesToDelete.Select(a => a.Id).ToList();
-        Context.RemoveRange(Context.TextMessages.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId)));
-        Context.RemoveRange(Context.Packets.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId) || nodesIdToDelete.Contains(a.GatewayId)));
+        await Context.TextMessages.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId)).ExecuteDeleteAsync();
+        await Context.Packets.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId) || nodesIdToDelete.Contains(a.GatewayId)).ExecuteDeleteAsync();
+        await Context.NeighborInfos.Where(a => nodesIdToDelete.Contains(a.NodeHeardId) || nodesIdToDelete.Contains(a.NodeReceiverId)).ExecuteDeleteAsync();
         Context.RemoveRange(nodesToDelete);
         await Context.SaveChangesAsync();
         
         var channelsToDelete = Context.Channels.Where(a => a.UpdatedAt < minDate).ToList();
         var channelsIdToDelete = nodesToDelete.Select(a => a.Id).ToList();
-        Context.RemoveRange(Context.TextMessages.Where(a => channelsIdToDelete.Contains(a.ChannelId)));
-        Context.RemoveRange(Context.Packets.Where(a => channelsIdToDelete.Contains(a.ToId)));
+        await Context.TextMessages.Where(a => channelsIdToDelete.Contains(a.ChannelId)).ExecuteDeleteAsync();
+        await Context.Packets.Where(a => channelsIdToDelete.Contains(a.ToId)).ExecuteDeleteAsync();
         Context.RemoveRange(channelsToDelete);
         await Context.SaveChangesAsync();
     }

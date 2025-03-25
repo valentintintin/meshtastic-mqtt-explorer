@@ -273,6 +273,10 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
             >= 2 when char.IsDigit(node.LongName[0]) => node.LongName[..2],
             _ => nodeConfiguration.Department
         };
+        if (nodeConfiguration.Department?.Length > 2)
+        {
+            nodeConfiguration.Department = nodeConfiguration.Department[..2];
+        }
 
         if (nodeConfiguration.Id == 0)
         {

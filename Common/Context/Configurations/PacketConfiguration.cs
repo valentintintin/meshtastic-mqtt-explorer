@@ -49,6 +49,14 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
         builder.HasOne(a => a.Channel)
             .WithMany(a => a.Packets)
             .HasForeignKey(a => a.ChannelId);
+
+        builder.HasOne(a => a.RelayNodeNode)
+            .WithMany(a => a.RelayFor)
+            .HasForeignKey(a => a.RelayNodeId);
+
+        builder.HasOne(a => a.NextHopNode)
+            .WithMany(a => a.NextHopFor)
+            .HasForeignKey(a => a.NextHopId);
         
         builder.HasOne(a => a.PacketDuplicated)
             .WithMany(a => a.AllDuplicatedPackets)

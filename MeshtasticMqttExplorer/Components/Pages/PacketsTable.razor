@@ -4,6 +4,7 @@
 @using Common.Context
 @using Common.Context.Entities
 @using Common.Extensions
+@using Common.Services
 @using Meshtastic.Protobufs
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
@@ -166,8 +167,7 @@ else
                 }
             </div>
         </PropertyColumn>
-        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters"
-                        Class="@(context is { Encrypted: true, PortNum: null } ? "red" : "")">
+        <PropertyColumn Property="c => c.PortNum" Title="Type" Filters="Utils.PortNumFilters">
             <div style="max-height: 150px; min-width: 300px; overflow-y: auto">
                 <b>@(context.PortNum?.ToString().Replace("App", string.Empty) ?? "Chiffrée")</b>
                 <br />
@@ -176,12 +176,6 @@ else
         </PropertyColumn>
     </ChildContent>
 </Table>
-
-<style>
-    .red {
-        background-color: #ffccc7 !important;
-    }
-</style>
 
 @code
 {
@@ -196,9 +190,10 @@ else
     
     private readonly List<SegmentedOption<ShowType>> _showTypesOptions = [
         new(ShowType.From, "En tant qu'expéditeur"),
-        new(ShowType.To, "En tant que destinataire"),
-        new(ShowType.Gateway, "En tant que passerelle"),
         new(ShowType.FromTo, "En tant qu'expéditeur et destinaire"),
+        new(ShowType.To, "En tant que destinataire"),
+        new(ShowType.FromOnBroadcast, "En tant qu'expéditeur broadcast"),
+        new(ShowType.Gateway, "En tant que passerelle"),
         new(ShowType.All, "Tous"),
     ];
     
@@ -248,6 +243,17 @@ else
                         .Where(a => a.PacketDuplicated == null);
                     
                     totalQueryable = totalQueryable
+                        .Where(a => a.FromId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    break;
+                case ShowType.FromOnBroadcast:
+                    PacketsQueryable = PacketsQueryable
+                        .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
+                        .Where(a => a.FromId == Id)
+                        .Where(a => a.PacketDuplicated == null);
+                    
+                    totalQueryable = totalQueryable
+                        .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
                         .Where(a => a.FromId == Id)
                         .Where(a => a.PacketDuplicated == null);
                     break;
@@ -322,6 +328,7 @@ else
     private enum ShowType
     {
         From,
+        FromOnBroadcast,
         Gateway,
         To,
         FromTo,

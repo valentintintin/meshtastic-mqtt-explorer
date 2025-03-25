@@ -12,8 +12,6 @@ namespace Common.Services;
 
 public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IConfiguration configuration) : AService(logger, contextFactory)
 {
-    private Dictionary<(string url, uint packetId), (string? messageId, DateTime dateTime)> MessageIdForPacketId { get; } = new();
-    
     public async Task SendNotification(Packet packet)
     {
         var context = await ContextFactory.CreateDbContextAsync();
@@ -24,7 +22,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             .Where(n => !n.From.HasValue || packet.From.NodeId == n.From)
             .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
             .Where(n => !n.Gateway.HasValue || packet.Gateway.NodeId == n.Gateway)
-            .Where(n => !n.FromOrTo.HasValue 
+            .Where(n => !n.FromOrTo.HasValue
                         || packet.From.NodeId == n.FromOrTo 
                         || packet.To.NodeId == n.FromOrTo)
             .Where(n => !n.MqttServerId.HasValue
@@ -47,6 +45,13 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
                     && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value, packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <= n.DistanceAroundPositionKm
                 )
             )
+            .Union(
+                    context.WebhooksHistories
+                        .Where(nn => nn.Packet.PacketId == packet.PacketId)
+                        .Select(n => n.Webhook)
+                        .Where(nn => !string.IsNullOrWhiteSpace(nn.UrlToEditMessage))
+                        .Where(nn => nn.Enabled)
+            )
             .DistinctBy(n => n.Url)
             .ToList();
 
@@ -58,17 +63,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         foreach (var notificationConfiguration in notificationsCanalToSend)
         {
             var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails);
-            await MakeRequest(notificationConfiguration, message, packet);
-            
-            PurgeMessageIds();
-        }
-    }
-
-    private void PurgeMessageIds()
-    {
-        foreach (var (key, _) in MessageIdForPacketId.Where(a => DateTime.UtcNow - a.Value.dateTime >= TimeSpan.FromMinutes(5)))
-        {
-            MessageIdForPacketId.Remove(key);
+            await MakeRequest(notificationConfiguration, message, packet, context);
         }
     }
 
@@ -98,7 +93,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             foreach (var aPacketData in allPackets)
             {
                 var nbHop = aPacketData.Key;
-
+                
                 message += "-- " + (nbHop == 0 ? "Reçu en <b>direct</b>" : $"Saut <b>{nbHop}</b>/{packet.HopStart}") + " --" +
                            '\n' + '\n';
 
@@ -106,6 +101,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
                 {
                     message +=
                         $"--> <b>{aPacket.Gateway.Name()}</b>\n{aPacket.GatewayDistanceKm} Km, SNR <b>{aPacket.RxSnr}</b>, RSSI <b>{aPacket.RxRssi}</b>, MQTT {aPacket.MqttServer?.Name}. {(packet.Id == aPacket.Id ? "Dernier reçu." : "")}"
+                        + (aPacket.RelayNodeNode != null ? $"\n-Via-> <b>{aPacket.RelayNodeNode.Name()}</b>" : "")
                         + '\n' + '\n';
                 }
             }
@@ -120,7 +116,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         return message;
     }
 
-    private async Task MakeRequest(Webhook webhook, string message, Packet packet) 
+    private async Task<WebhookHistory?> MakeRequest(Webhook webhook, string message, Packet packet, DataContext context) 
     {
         Logger.LogTrace("Send notification to {name} for packet #{packetId}", webhook.Name, packet.Id);
         
@@ -129,19 +125,25 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         var encodedMessage = Uri.EscapeDataString(message);
         var requestUrl = webhook.Url;
 
-        var cacheMessageIdKey = (webhook.Url, packet.PacketId);
-        if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && MessageIdForPacketId.TryGetValue(cacheMessageIdKey, out var messageId) && !string.IsNullOrWhiteSpace(messageId.messageId))
+        var messageHistory = await context.WebhooksHistories.FirstOrDefaultAsync(a => a.WebhookId == webhook.Id && a.Packet.PacketId == packet.PacketId) ?? new WebhookHistory
         {
-            Logger.LogDebug("Send notification to {name} for packet #{packetId} with edit url and messageId {messageId} found", webhook.Name, packet.Id, messageId.messageId);
+            WebhookId = webhook.Id
+        };
+
+        messageHistory.PacketId = packet.Id;
+        
+        if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && !string.IsNullOrWhiteSpace(messageHistory.MessageId))
+        {
+            Logger.LogDebug("Send notification to {name} for packet #{packetId} with edit url and messageId {messageId} found", webhook.Name, packet.Id, messageHistory.MessageId);
             
             if (!webhook.IncludeHopsDetails)
             {
                 Logger.LogDebug("Send notification to {name} for packet #{packetId} ignored because no hop details but edit url", webhook.Name, packet.Id);
-                
-                return;
+
+                return null;
             }
             
-            requestUrl = webhook.UrlToEditMessage.Replace("{{messageId}}", messageId.messageId);
+            requestUrl = webhook.UrlToEditMessage.Replace("{{messageId}}", messageHistory.MessageId);
         }
 
         requestUrl = requestUrl.Replace("{{message}}", encodedMessage);
@@ -158,14 +160,28 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             
             if (requestUrl.StartsWith("https://api.telegram.org/"))
             {
-                MessageIdForPacketId.Remove(cacheMessageIdKey);
-                MessageIdForPacketId.Add(cacheMessageIdKey, (GetMessageIdFromTelegramResponse(responseContent), DateTime.UtcNow));
+                messageHistory.MessageId = GetMessageIdFromTelegramResponse(responseContent);
             }
+
+            if (messageHistory.Id == 0)
+            {
+                context.Add(messageHistory);
+            }
+            else
+            {
+                context.Update(messageHistory);
+            }
+
+            await context.SaveChangesAsync();
+            
+            return messageHistory;
         }
         catch (Exception e)
         {
             Logger.LogWarning(e, "Send notification to {name} for packet #{packetId} KO", webhook.Name, packet.Id);
         }
+
+        return null;
     }
     
     private string? GetMessageIdFromTelegramResponse(string responseContent)

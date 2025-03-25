@@ -27,6 +27,8 @@ public class MqttServer : IEntity
     public ServerType Type { get; set; } = ServerType.Mqtt;
 
     public bool IsHighLoad { get; set; }
+    public bool MqttPostJson { get; set; }
+    public bool ShouldBeRelayed { get; set; }
 
     public virtual ICollection<Packet> Packets { get; set; } = [];
     public virtual ICollection<Node> Nodes { get; set; } = [];
@@ -34,7 +36,9 @@ public class MqttServer : IEntity
     public enum ServerType
     {
         Mqtt,
-        NodeHttp
+        NodeHttp,
+        NodeSerial,
+        MqttServer
     }
     
     public enum RelayType

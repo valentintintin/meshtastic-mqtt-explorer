@@ -20,9 +20,12 @@ public class MqttReceiveJob(ILogger<MqttReceiveJob> logger, IDbContextFactory<Da
             throw new NotFoundException<MqttServer>(mqttServerId);
         }
 
-        var services = serviceProvider.CreateScope().ServiceProvider;
-        var packet = await services.GetRequiredService<MqttClientService>().DoReceive(topic, payload, mqttServer);
+        var services = ServiceProvider.CreateScope().ServiceProvider;
+        var mqttService = services.GetRequiredService<MqttService>();
 
+        var mqttClient = MqttClientService.MqttClientAndConfigurations.FirstOrDefault(a => a.MqttServer == mqttServer)?.Client;
+        var packet = await mqttService.DoReceive(topic, payload, mqttServer, mqttClient != null ? async message => await mqttClient.PublishAsync(message) : null);
+        
         Logger.LogInformation("Received frame#{packetId} from {name} on {topic} with id {guid} done. Frame time {frameTime}", packet?.packet.Id, mqttServer.Name, topic, guid, DateTimeOffset.FromUnixTimeSeconds(packet?.serviceEnveloppe.Packet.RxTime ?? 0));
     }
 }

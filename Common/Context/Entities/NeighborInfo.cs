@@ -33,6 +33,8 @@ public class NeighborInfo : IEntity
         Neighbor,
         Gateway,
         Traceroute,
-        Unknown
+        Unknown,
+        Relay,
+        NextHop,
     }
 }

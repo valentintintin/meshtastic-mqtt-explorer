@@ -15,11 +15,11 @@ public static class PacketExtensions
         return packets
             .Include(p => p.Gateway)
             .Include(p => p.MqttServer)
-            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId)
-            .ToList()
+            .Include(p => p.RelayNodeNode)
+            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId && a.RelayNodeId != packet.GatewayId)
             .OrderByDescending(p => p.HopLimit)
             .ThenByDescending(p => p.RxSnr)
-            .ToList()
+            .AsEnumerable()
             .GroupBy(a => a.HopStart - a.HopLimit ?? 0)
             .OrderBy(a => a.Key)
             .ToList();

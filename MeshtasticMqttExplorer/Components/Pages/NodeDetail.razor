@@ -150,11 +150,10 @@
         Alive = Node.LastSeen >= aDay;
         
         var countPackets = Context.Packets
-            .Where(a => a.From == Node && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null)
+            .Where(a => a.From == Node && a.To.NodeId == MeshtasticService.NodeBroadcast && a.PortNum != PortNum.RoutingApp && a.PortNum != PortNum.TextMessageApp && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null)
             .AsNoTrackingWithIdentityResolution();
         PacketsStats.Total = await countPackets.CountAsync();
         PacketsStats.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
-        PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         
         if (Node.MqttServer != null)

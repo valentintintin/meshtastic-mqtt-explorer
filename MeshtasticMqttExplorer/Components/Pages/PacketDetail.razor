@@ -11,6 +11,7 @@
 @using Common.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
+@using Node = Common.Context.Entities.Node
 @using NotificationService = Common.Services.NotificationService
 
 @inject IJSRuntime JsRuntime
@@ -32,15 +33,52 @@
                 <Timeline>
                     <TimelineItem Color="TimelineDotColor.Blue">
                         Expéditeur : <a href="/node/@Packet.FromId" target="_blank" rel="nofollow">@Packet.From.AllNames</a>
+                        <br />
+                        @if (Packet.Position != null)
+                        {
+                            <a href="https://www.openstreetmap.org/#map=15/@Packet.Position.Latitude.ToString(CultureInfo.InvariantCulture)/@Packet.Position.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                        }
                     </TimelineItem>
+
+                    @if (Packet.RelayNodeNode != null)
+                    {
+                        <TimelineItem Color="TimelineDotColor.Gray">
+                            Noeud relai : <a href="/node/@Packet.RelayNodeNode.Id" target="_blank" rel="nofollow">@Packet.RelayNodeNode.AllNames</a>
+                        </TimelineItem>
+                    }
+                    else if (Packet.RelayNode > 0 && Packet.RelayNode != (Packet.From.NodeId & 0xFF))
+                    {
+                        <TimelineItem Color="TimelineDotColor.Gray">
+                            Noeud relai : un qui se termine par <b>@Packet.RelayNode.Value.ToHexString()</b>
+                        </TimelineItem>
+                    }
+
+                    @if (Packet.NextHopNode != null)
+                    {
+                        <TimelineItem Color="TimelineDotColor.Gray">
+                            Noeud suivant : <a href="/node/@Packet.NextHopNode.Id" target="_blank" rel="nofollow">@Packet.NextHopNode.AllNames</a>
+                        </TimelineItem>
+                    }
+                    else if (Packet.NextHop > 0 && Packet.NextHop != (Packet.To.NodeId & 0xFF))
+                    {
+                        <TimelineItem Color="TimelineDotColor.Gray">
+                            Noeud suivant : un qui se termine par <b>@Packet.NextHop.Value.ToHexString()</b>
+                        </TimelineItem>
+                    }
+                    
                     <TimelineItem Color="TimelineDotColor.Red">
-                        Destinataire: <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
+                        Destinataire : <a href="/node/@Packet.ToId" target="_blank" rel="nofollow">@Packet.To.AllNames</a>
                     </TimelineItem>
 
                     <TimelineItem Color="TimelineDotColor.Green">
                         Passerelle MQTT @Packet.MqttServer?.Name : <a href="/node/@Packet.GatewayId" target="_blank" rel="nofollow">@Packet.Gateway.AllNames</a>
                         <br/>
                         Distance de <b>@Math.Round(Packet.GatewayDistanceKm ?? 0, 2) Km</b> - <b>@Math.Abs(Packet.HopStart - Packet.HopLimit ?? 0)</b> sauts | SNR : <b>@Packet.RxSnr</b> | RSSI : <b>@Packet.RxRssi</b>
+                        <br />
+                        @if (Packet.GatewayPosition != null)
+                        {
+                            <a href="https://www.openstreetmap.org/#map=15/@Packet.GatewayPosition.Latitude.ToString(CultureInfo.InvariantCulture)/@Packet.GatewayPosition.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
+                        }
                     </TimelineItem>
                 </Timeline>
 
@@ -87,7 +125,7 @@
                                 }
                             </b>
                         </p>
-                        
+
                         <Timeline>
                             @foreach (var duplicatedPacket in duplicatedPacketData)
                             {
@@ -95,7 +133,14 @@
                                     Passerelle MQTT @duplicatedPacket.MqttServer?.Name : <a href="/node/@duplicatedPacket.GatewayId" target="_blank" rel="nofollow">@duplicatedPacket.Gateway.AllNames</a>
                                     <br/>
                                     Distance de <b>@Math.Round(duplicatedPacket.GatewayDistanceKm ?? 0, 2) Km</b> | SNR : <b>@duplicatedPacket.RxSnr</b> | RSSI : <b>@duplicatedPacket.RxRssi</b>
-                                    <br />
+
+                                    @if (duplicatedPacket.RelayNodeNode != null)
+                                    {
+                                        <br/>
+                                        <text>Via <a href="/node/@duplicatedPacket.RelayNodeId" target="_blank" rel="nofollow">@duplicatedPacket.RelayNodeNode.AllNames</a></text>
+                                    }
+
+                                    <br/>
                                     <a target="_blank" href="/packet/@duplicatedPacket.Id"><i>Voir la trame</i></a>
                                 </TimelineItem>
                             }
@@ -138,7 +183,7 @@
     private Packet? Packet { get; set; }
     private List<IGrouping<int, Packet>> AllDuplicatedPackets { get; set; } = [];
     private DataContext Context { get; set; } = null!;
-
+    
     protected override async Task OnInitializedAsync()
     {
         Context = await ContextFactory.CreateDbContextAsync();
@@ -153,9 +198,15 @@
         Loading = true;
         
         var query = Context.Packets
+            .Include(n => n.GatewayPosition)
+            .Include(n => n.Position)
             .Include(n => n.Channel)
             .Include(n => n.MqttServer)
             .Include(n => n.From)
+            .Include(n => n.RelayNodeNode)
+            .Include(n => n.NextHopNode)
+            .ThenInclude(n => n.MyNeighbors)
+            .ThenInclude(n => n.NodeHeard)
             .Include(n => n.To)
             .Include(n => n.Gateway)
             .AsNoTrackingWithIdentityResolution()
@@ -178,7 +229,6 @@
         }
 
         AllDuplicatedPackets = Context.Packets.GetAllPacketForPacketIdGroupedByHops(Packet);
-
         NotificationText = NotificationService.GetPacketMessageToSend(Packet, Context);
         
         Loading = false;

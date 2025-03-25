@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Text;
+using System.Text.Json;
 using Common;
 using Common.Context;
 using Common.Context.Entities;
@@ -8,11 +10,13 @@ using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
 using Google.Protobuf;
+using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MQTTnet;
 using MQTTnet.Server;
 using MqttRouter.Services;
 using MqttServer = Common.Context.Entities.MqttServer;
@@ -20,7 +24,7 @@ using User = Common.Context.Entities.Router.User;
 
 namespace MqttRouter.Controllers;
 
-public class MqttServerController(IServiceProvider serviceProvider)
+public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Server.MqttServer server)
 {
     private readonly ILogger<MqttServerController> _logger =
         serviceProvider.GetRequiredService<ILogger<MqttServerController>>();
@@ -99,6 +103,12 @@ public class MqttServerController(IServiceProvider serviceProvider)
                 return;
             }
 
+            if (eventArgs.ApplicationMessage.Topic.Contains("stat") ||
+                eventArgs.ApplicationMessage.Topic.Contains("json"))
+            {
+                return;
+            }
+
             var services = serviceProvider.CreateScope().ServiceProvider;
             var context = await services.GetRequiredService<IDbContextFactory<DataContext>>().CreateDbContextAsync();
             var routingService = services.GetRequiredService<RoutingService>();
@@ -111,8 +121,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
             routingService.SetDbContext(context);
             mqttService.SetDbContext(context);
-            _mqttServer ??= await context.MqttServers.FirstAsync(a =>
-                a.Name == serviceProvider.GetRequiredService<IConfiguration>().GetValue<string>("MqttServerName"));
+            _mqttServer ??= await context.MqttServers.FirstAsync(a => a.Type == MqttServer.ServerType.MqttServer);
 
             _logger.LogTrace("Client {clientId} send packet {guid} on {topic}", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic);
@@ -150,19 +159,12 @@ public class MqttServerController(IServiceProvider serviceProvider)
                     eventArgs.ApplicationMessage.Topic);
             }
 
-            if (eventArgs.ApplicationMessage.Topic.Contains("stat") ||
-                eventArgs.ApplicationMessage.Topic.Contains("json"))
-            {
-                eventArgs.ProcessPublish = false;
-                return;
-            }
-
             (Packet packet, ServiceEnvelope serviceEnveloppe)? packetAndMeshPacket;
 
             try
             {
                 packetAndMeshPacket = await mqttService.DoReceive(eventArgs.ApplicationMessage.Topic,
-                    eventArgs.ApplicationMessage.Payload.ToArray(), _mqttServer!);
+                    eventArgs.ApplicationMessage.Payload.ToArray(), _mqttServer, async message => await server.InjectApplicationMessage(new InjectedMqttApplicationMessage(message)));
 
                 if (packetAndMeshPacket?.packet == null)
                 {
@@ -257,7 +259,7 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
     private void PurgeOldPublishInfos()
     {
-        _messagesToPublish.RemoveAll(a => DateTime.UtcNow - a.Packet.CreatedAt >= TimeSpan.FromMinutes(1));
+        _messagesToPublish.RemoveAll(a => DateTime.UtcNow - a.Packet.CreatedAt >= TimeSpan.FromMinutes(5));
     }
 
     public async Task BeforeSend(InterceptingClientApplicationMessageEnqueueEventArgs eventArgs)
@@ -271,15 +273,16 @@ public class MqttServerController(IServiceProvider serviceProvider)
 
             var meshPacket = new ServiceEnvelope();
 
+            var data = eventArgs.ApplicationMessage.Payload.ToArray();
             try
             {
-                meshPacket.MergeFrom(eventArgs.ApplicationMessage.Payload.ToArray());
+                meshPacket.MergeFrom(data);
             }
             catch (Exception e)
             {
                 _logger.LogWarning(e,
-                    "Impossible to decode ProtoBuf the packet from client {senderId} on {topic}",
-                    eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic);
+                    "Impossible to decode ProtoBuf the packet from client {senderId} on {topic}. Raw {base64}",
+                    eventArgs.SenderClientId, eventArgs.ApplicationMessage.Topic, Convert.ToBase64String(data));
 
                 eventArgs.AcceptEnqueue = false;
 

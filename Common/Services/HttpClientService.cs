@@ -71,7 +71,7 @@ public class HttpClientService(
 
         while (true)
         {
-            foreach (var httpClientAndConfiguration in HttpClientAndConfigurations)
+            foreach (var httpClientAndConfiguration in HttpClientAndConfigurations.Where(a => a.MqttServer.Enabled))
             {
                 var fromRadio = await RetrievePacket(httpClientAndConfiguration, stoppingToken);
 

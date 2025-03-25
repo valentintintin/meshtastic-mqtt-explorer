@@ -41,7 +41,7 @@
                             <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
                         </DescriptionsItem>
                         
-                        <DescriptionsItem Title="Nombre de trames (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                        <DescriptionsItem Title="Nombre de trames broadcast (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
                             @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)/@(PacketsInfo?.Total ?? 0)
                             <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
                         </DescriptionsItem>
@@ -103,6 +103,10 @@
             <Card Title="Télémétries">
                 <ChildContent>
                     <Descriptions Bordered="true" Column="1">
+                        <DescriptionsItem Title="Dernière télémétrie" ContentStyle="font-weight: bold">
+                            <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryDevice?.CreatedAt)" Fallback="-"></TimeElapsed>
+                        </DescriptionsItem>
+                        
                         <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
                             <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
                         </DescriptionsItem>
@@ -122,6 +126,13 @@
                             </DescriptionsItem>
                         }
                         
+                        @if (LastTelemetryEnvironment?.CreatedAt != null)
+                        {
+                            <DescriptionsItem Title="Dernière télémétrie environment" ContentStyle="font-weight: bold">
+                                <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryEnvironment?.CreatedAt)" Fallback="-"></TimeElapsed>
+                            </DescriptionsItem>
+                        }
+
                         @if (LastTelemetryEnvironment?.Temperature.HasValue == true)
                         {
                             <DescriptionsItem Title="Température" ContentStyle="font-weight: bold">
@@ -147,6 +158,13 @@
                         {
                             <DescriptionsItem Title="Qualité de l'air (IAQ)" ContentStyle="font-weight: bold">
                                 @(LastTelemetryEnvironment?.Iaq?.ToString() ?? "-")
+                            </DescriptionsItem>
+                        }
+
+                        @if (LastTelemetryPower?.CreatedAt != null)
+                        {
+                            <DescriptionsItem Title="Dernière télémétrie énergie" ContentStyle="font-weight: bold">
+                                <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryPower?.CreatedAt)" Fallback="-"></TimeElapsed>
                             </DescriptionsItem>
                         }
                         

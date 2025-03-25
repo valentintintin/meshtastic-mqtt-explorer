@@ -18,14 +18,14 @@
 @inject MeshtasticService MeshtasticService
 
 <div style="display: flex; flex-direction: column">
-    @if (Packet.PortNum != null)
+    @if (FullDetail)
     {
-        @if (FullDetail)
-        {
-            <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-around;">
+            @if (Packet.PortNum != null)
+            {
                 <div style="max-width: 500px;">
                     <b>Décodé</b>
-                    <br />
+                    <br/>
 
                     @switch (Packet.PortNum)
                     {
@@ -72,7 +72,7 @@
                             @if (Marker != null)
                             {
                                 <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
-                                
+
                                 <Osm Height="350px" @ref="Map" Latitude="Marker.Latitude" Longitude="Marker.Longitude" Zoom="15" OneMarker="Marker"></Osm>
                             }
 
@@ -82,7 +82,7 @@
                             {
                                 <text>Demande d'info</text>
                             }
-                            
+
                             <Descriptions Column="1">
                                 <DescriptionsItem Title="Nom court">
                                     @User?.ShortName
@@ -106,7 +106,7 @@
                             {
                                 <text>Demande de position</text>
                             }
-                            
+
                             <Descriptions Column="1">
                                 <DescriptionsItem Title="Latitude">
                                     @(Position?.LatitudeI * 0.0000001)
@@ -122,16 +122,17 @@
                             @if (Marker != null)
                             {
                                 <a href="https://www.openstreetmap.org/#map=15/@Marker.Latitude.ToString(CultureInfo.InvariantCulture)/@Marker.Longitude.ToString(CultureInfo.InvariantCulture)" target="_blank">Carte</a>
-                                
+
                                 <Osm Height="350px" @ref="Map" Latitude="Marker.Latitude" Longitude="Marker.Longitude" Zoom="15" OneMarker="Marker"></Osm>
                             }
+
                             break;
                         case PortNum.TelemetryApp:
                             @if (Packet.WantResponse == true)
                             {
                                 <text>Demande d'une télémétrie de type @Telemetry?.VariantCase</text>
                             }
-                             
+
                             <Descriptions Column="1">
                                 @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.DeviceMetrics)
                                 {
@@ -249,7 +250,8 @@
                                                     @if (route.Snr != null)
                                                     {
                                                         <text>Entendu avec un SNR de </text>
-                                                        <b>@route.Snr</b><text> par</text>
+                                                        <b>@route.Snr</b>
+                                                        <text> par</text>
                                                         <br/>
                                                     }
 
@@ -280,10 +282,11 @@
                                                     @if (route.Snr != null)
                                                     {
                                                         <text>Entendu avec un SNR de </text>
-                                                        <b>@route.Snr</b><text> par</text>
+                                                        <b>@route.Snr</b>
+                                                        <text> par</text>
                                                         <br/>
                                                     }
-                                                    
+
                                                     @if (route.Node != null)
                                                     {
                                                         <a href="/node/@route.Node.Id" target="_blank" rel="nofollow">@route.Node.FullName() - @route.Node.NodeId</a>
@@ -323,6 +326,7 @@
                                                 @Routing?.ErrorReason
                                             </DescriptionsItem>
                                         }
+
                                         break;
                                     case Routing.VariantOneofCase.RouteRequest:
                                         <DescriptionsItem Title="Demande de routes">
@@ -396,33 +400,27 @@
 
                                 <Osm Height="350px" @ref="Map" Latitude="Marker.Latitude" Longitude="Marker.Longitude" Zoom="15" OneMarker="Marker"></Osm>
                             }
+
                             break;
                     }
                 </div>
-            
-                <div style="display: flex; flex-wrap: wrap; flex: 1; max-width: 700px;">
+            }
+
+            <div style="display: flex; flex-wrap: wrap; flex: 1; max-width: 700px;">
+                @if (Packet.PortNum != null)
+                {
                     <div>
                         <b>Payload</b>
                         <pre>@PayloadJson</pre>
                     </div>
+                }
                 
-                    <div>
-                        <b>Brut</b>
-                        <pre>@RawJson</pre>
-                    </div>
+                <div>
+                    <b>Brut</b>
+                    <pre>@RawJson</pre>
                 </div>
             </div>
-        }
-        else {
-            @if (string.IsNullOrWhiteSpace(TextMessage))
-            {
-                <pre>@PayloadJson</pre>
-            }
-            else
-            {
-                <pre>@TextMessage</pre>
-            }
-        }
+        </div>
     
         <div>
             <Popover ContentTemplate="@ContentPayloadRaw" Title="Données JSON">
@@ -437,6 +435,16 @@
                 <Button OnClick="() => CopyTextToClipboard(RawBase64)">Paquet base64</Button>
             </Popover>
         </div>
+    }
+    else if (Packet.PortNum != null) {
+        @if (string.IsNullOrWhiteSpace(TextMessage))
+        {
+            <pre>@PayloadJson</pre>
+        }
+        else
+        {
+            <pre>@TextMessage</pre>
+        }
     }
 </div>
 

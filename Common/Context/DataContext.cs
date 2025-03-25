@@ -30,6 +30,7 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     
     public required DbSet<MqttServer> MqttServers { get; set; }
     public required DbSet<Webhook> Webhooks { get; set; }
+    public required DbSet<WebhookHistory> WebhooksHistories { get; set; }
     
     public required DbSet<NodeConfiguration> NodeConfigurations { get; set; }
     public required DbSet<PacketActivity> PacketActivities { get; set; }

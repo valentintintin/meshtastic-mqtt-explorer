@@ -73,7 +73,7 @@ try
         {
             var serviceProvider = app.Services.CreateScope().ServiceProvider;
             
-            var mqttController = new MqttServerController(serviceProvider);
+            var mqttController = new MqttServerController(serviceProvider, server);
 
             server.ValidatingConnectionAsync += mqttController.OnConnection;
             server.InterceptingPublishAsync += mqttController.OnNewPacket;

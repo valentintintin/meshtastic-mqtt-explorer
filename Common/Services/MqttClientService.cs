@@ -37,7 +37,7 @@ public class MqttClientService(
     IBackgroundJobClient backgroundJobClient)
     : BackgroundService
 {
-    public readonly List<MqttClientAndConfiguration> MqttClientAndConfigurations  = [];
+    public static readonly List<MqttClientAndConfiguration> MqttClientAndConfigurations  = [];
     private readonly bool _isWorker = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Worker") ?? false;
     private readonly bool _isRecorder = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Recorder") ?? false;
     private readonly bool _isFront = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Explorer") ?? false;
@@ -45,113 +45,12 @@ public class MqttClientService(
     public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] payload, MqttServer mqttServer)
     {
         var services = serviceProvider.CreateScope().ServiceProvider;
-        
         var mqttService = services.GetRequiredService<MqttService>();
-        var packet = await mqttService.DoReceive(topic, payload, mqttServer);
 
-        if (packet is { packet: not null, serviceEnveloppe: not null, packet.PacketDuplicatedId: null } && !mqttServer.IsHighLoad)
-        {
-            try
-            {
-                await RelayToAnotherMqttServer(topic, packet.Value.packet, packet.Value.serviceEnveloppe, mqttServer);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Relay error for Packet#{packetId} on topic {topic}", packet.Value.serviceEnveloppe.Packet.Id, topic);
-            }
-        }
+        var mqttClient = MqttClientAndConfigurations.FirstOrDefault(a => a.MqttServer == mqttServer)?.Client;
+        var packet = await mqttService.DoReceive(topic, payload, mqttServer, mqttClient != null ? async message => await mqttClient.PublishAsync(message) : null);
 
         return packet;
-    }
-
-    private async Task RelayToAnotherMqttServer(string topic, Packet packet, ServiceEnvelope serviceEnvelope, MqttServer mqttServer)
-    {
-        var meshPacket = serviceEnvelope.Packet;
-        
-        foreach (var mqttClientAndConfiguration in MqttClientAndConfigurations.Where(a => a.Client.IsConnected && a.MqttServer != mqttServer && a.MqttServer.IsARelayType != null))
-        {
-            if (mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.All
-                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.MapReport && meshPacket.Decoded?.Portnum == PortNum.MapReportApp
-                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.NodeInfoAndPosition && meshPacket.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp
-                || mqttClientAndConfiguration.MqttServer.IsARelayType == MqttServer.RelayType.UseFull && meshPacket.Decoded?.Portnum is PortNum.MapReportApp or PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.NeighborinfoApp or PortNum.TracerouteApp
-               )
-            {
-                logger.LogInformation("Relay from MqttServer {name}, frame#{packetId} from {from} of type {portNum} to MqttServer {relayMqttName} topic {topic}", mqttServer.Name, packet.Id, packet.From, meshPacket.Decoded?.Portnum, mqttClientAndConfiguration.MqttServer.Name, topic);
-
-                if (meshPacket.Decoded != null)
-                {
-                    try
-                    {
-                        var positionPrecision = mqttClientAndConfiguration.MqttServer.RelayPositionPrecision ?? 32;
-                        var dataApp = new Data();
-                        dataApp.MergeFrom(meshPacket.Decoded.Payload);
-
-                        switch (meshPacket.Decoded?.Portnum)
-                        {
-                            case PortNum.PositionApp:
-                            {
-                                var position = new Position();
-                                position.MergeFrom(meshPacket.Decoded.Payload);
-
-                                if (position.PrecisionBits > positionPrecision)
-                                {
-                                    logger.LogDebug(
-                                        "Relay frame#{packetId} change precision from {currentPrecision} to {newPrecision} for {portNum} and node #{node}",
-                                        meshPacket.Id, position.PrecisionBits, positionPrecision, meshPacket.Decoded.Portnum, packet.From);
-
-                                    position.LatitudeI =
-                                        (int)(position.LatitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
-                                    position.LongitudeI =
-                                        (int)(position.LongitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
-                                    position.LatitudeI += 1 << (int)(31 - positionPrecision);
-                                    position.LongitudeI += 1 << (int)(31 - positionPrecision);
-                                    position.PrecisionBits = positionPrecision;
-                                    
-                                    meshPacket.Decoded.Payload = position.ToByteString();
-                                }
-
-                                break;
-                            }
-                            case PortNum.MapReportApp:
-                            {
-                                var mapReport = new MapReport();
-                                mapReport.MergeFrom(meshPacket.Decoded.Payload);
-
-                                if (mapReport.PositionPrecision > positionPrecision)
-                                {
-                                    logger.LogDebug(
-                                        "Relay frame#{packetId} change precision from {currentPrecision} to {newPrecision} for {portNum} and node #{node}",
-                                        meshPacket.Id, mapReport.PositionPrecision, positionPrecision, meshPacket.Decoded.Portnum, packet.From);
-
-                                    mapReport.LatitudeI =
-                                        (int)(mapReport.LatitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
-                                    mapReport.LongitudeI =
-                                        (int)(mapReport.LongitudeI & (uint.MaxValue << (int)(32 - positionPrecision)));
-                                    mapReport.LatitudeI += 1 << (int)(31 - positionPrecision);
-                                    mapReport.LongitudeI += 1 << (int)(31 - positionPrecision);
-                                    mapReport.PositionPrecision = positionPrecision;
-                                    
-                                    meshPacket.Decoded.Payload = mapReport.ToByteString();
-                                }
-
-                                break;
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "Frame#{packetId} of type {portNum} impossible to change ProtoBuf", meshPacket.Id, meshPacket.Decoded!.Portnum);
-                    }
-                }
-
-                var result = await mqttClientAndConfiguration.Client.PublishBinaryAsync(topic, serviceEnvelope.ToByteArray());
-
-                if (!result.IsSuccess)
-                {
-                    logger.LogWarning("Relay from MqttServer {name}, frame#{packetId} from {from} of type {portNum} to MqttServer {relayMqttName} topic {topic} KO : {code}, {error}", mqttServer.Name, packet.Id, packet.From, meshPacket.Decoded?.Portnum, mqttClientAndConfiguration.MqttServer.Name, topic, result.ReasonCode, result.ReasonString);
-                }
-            }
-        }
     }
 
     public async Task PublishMessage(SentPacketDto dto)
@@ -270,7 +169,11 @@ public class MqttClientService(
             
             mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
             {
-                var guid = Guid.NewGuid();
+                if (mqttClientAndConfiguration.MqttServer.IsHighLoad && JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet-2") > 20)
+                {
+                    return;
+                }
+                
                 var topic = e.ApplicationMessage.Topic;
 
                 if (topic.Contains("paho") || topic.Contains("stat") || topic.Contains("json"))
@@ -278,12 +181,14 @@ public class MqttClientService(
                     return;
                 }
 
+                var guid = Guid.NewGuid();
+
                 logger.LogInformation("Received from {name} on {topic} with id {guid}", mqttClientAndConfiguration.MqttServer.Name, topic, guid);
 
                 mqttClientAndConfiguration.NbPacket++;
                 mqttClientAndConfiguration.LastPacketReceivedDate = DateTime.UtcNow;
 
-                if (configuration.GetValue("UseWorker", false))
+                if (configuration.GetValue("UseWorker", false) || mqttClientAndConfiguration.MqttServer.IsHighLoad)
                 {
                     var queue = mqttClientAndConfiguration.MqttServer.IsHighLoad ? "packet-2" : "packet";
                     backgroundJobClient.Enqueue<MqttReceiveJob>(queue, a => a.ExecuteAsync(topic, e.ApplicationMessage.Payload.ToArray(), mqttClientAndConfiguration.MqttServer.Id, guid));

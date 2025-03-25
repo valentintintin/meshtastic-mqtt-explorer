@@ -73,7 +73,8 @@ public static class Init
                     options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default"));
                 }, new PostgreSqlStorageOptions
                 {
-                    SchemaName = "hangfire_worker" 
+                    SchemaName = "hangfire_worker",
+                    QueuePollInterval = TimeSpan.FromSeconds(5)
                 });
         });
     

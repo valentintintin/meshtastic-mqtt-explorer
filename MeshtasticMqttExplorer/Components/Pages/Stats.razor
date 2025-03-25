@@ -178,7 +178,7 @@
     
     <Divider></Divider>
 
-    <Card Title="Paquets par serveur MQTT, Bande, nœud et type pour depuis hier">
+    <Card Title="Paquets boradcast par serveur MQTT, Bande, nœud et type hier">
         <ChildContent>
             <Table TItem="PacketNodeType" DataSource="DataYesterdayNodePackets" Loading="Loading" Responsive>
                 <PropertyColumn Property="c => c.MqttServerId" Title="Serveur MQTT" Filters="Utils.MqttServerFilters">
@@ -397,8 +397,8 @@
         
         DataYesterdayNodePackets = await Context.Packets
             .Include(a => a.MqttServer)
-            .Where(a => a.PortNum != PortNum.MapReportApp)
-            .Where(a => a.CreatedAt.Date >= yesterday)
+            .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast && a.PortNum != PortNum.RoutingApp && a.PortNum != PortNum.TextMessageApp && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null)
+            .Where(a => a.CreatedAt.Date == yesterday)
             .Where(a => a.MqttServer != null)
             .Where(n => !ShowOnlyRouterAccepted || (n.PacketActivity != null && n.PacketActivity.HopLimit > 0))
             .GroupBy(a => new
@@ -440,16 +440,5 @@
     public async ValueTask DisposeAsync()
     {
         await Context.DisposeAsync();
-    }
-    
-    public class PacketNodeType
-    {
-        public required long? MqttServerId { get; set; }
-        public required string? MqttServerName { get; set; }
-        public required Config.Types.LoRaConfig.Types.RegionCode? RegionCode { get; set; }
-        public required long NodeId { get; set; }
-        public required string NodeName { get; set; }
-        public required PortNum? PortNum { get; set; }
-        public required int Nb { get; set; }
     }
 }

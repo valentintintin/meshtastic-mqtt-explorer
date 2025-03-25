@@ -163,7 +163,7 @@
         {
             await Map.ClearMarkers();
             
-            var markers = Nodes.Select(GetMarker).ToList();
+            var markers = Nodes.Where(n => !n.IsOffline() || n.MqttServer?.IsHighLoad != true).Select(GetMarker).ToList();
             List<Osm.Line> lines = [];
             
             foreach (var node in Nodes)

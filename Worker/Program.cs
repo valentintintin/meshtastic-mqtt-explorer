@@ -18,16 +18,15 @@ try {
     builder.Services.AddHangfireServer(action =>
     {
         action.ServerName = "Meshtastic Explorer Worker 1";
-        action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
-        action.WorkerCount = 2;
+        action.SchedulePollingInterval = TimeSpan.FromSeconds(1);
+        action.WorkerCount = 1;
         action.Queues = ["packet", "default"];
     });
     
     builder.Services.AddHangfireServer(action =>
     {
         action.ServerName = "Meshtastic Explorer Worker 2";
-        action.SchedulePollingInterval = TimeSpan.FromSeconds(2);
-        action.WorkerCount = 4;
+        action.WorkerCount = 1;
         action.Queues = ["packet-2", "default-2"];
     });
     

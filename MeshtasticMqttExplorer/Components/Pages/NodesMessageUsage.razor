@@ -1,0 +1,127 @@
+@page "/nodes-actives"
+@implements IAsyncDisposable
+
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Common.Services
+@using MeshtasticMqttExplorer.Components.Shared
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Nœuds actifs</PageTitle>
+
+<PageHeader Title="Nœuds actifs">
+    <SubtitleTemplate>
+        @TextMessages.Count ayant envoyés un message
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Spin Spinning="Loading">
+    <Osm Height="calc(100vh - 250px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+
+    <Card Title="Légende" Size="CardSize.Small" Bordered="true">
+        <TitleTemplate>
+            Légende
+        </TitleTemplate>
+        <ChildContent>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-green.png" alt="Vert" />
+                1 jour
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-blue.png" alt="Bleu" />
+                2 jours
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-orange.png" alt="Orange" />
+                3 jours
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-red.png" alt="Rouge" />
+                Plus de 3 jours
+            </div>
+        </ChildContent>
+    </Card>
+</Spin>
+
+@code
+{
+    private bool Loading { get; set; } = true;
+    private bool HasRenderMapData { get; set; }
+    private List<TextMessage> TextMessages { get; set; } = [];
+    private DataContext Context { get; set; } = null!;
+    private Osm? Map { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && Map != null && !HasRenderMapData)
+        {
+            await Map.AddMarkers(TextMessages.Select(GetMarker).ToList());
+
+            HasRenderMapData = true;
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await FetchData();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        HasRenderMapData = false;
+     
+        if (Map != null)
+        {
+            await Map.ClearMarkers();
+        }
+        
+        TextMessages = await Context.TextMessages
+            .Include(n => n.Channel)
+            .Include(n => n.From)
+            .Where(n => n.To.NodeId == MeshtasticService.NodeBroadcast)
+            .Where(n => n.From.Latitude.HasValue && n.From.Longitude.HasValue)
+            .GroupBy(n => n.From)
+            .Select(a => a.OrderByDescending(aa => aa.CreatedAt).First())
+            .OrderBy(a => a.CreatedAt) // Draw old before new
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
+
+        Loading = false;
+            
+        await InvokeAsync(StateHasChanged); 
+    }
+    private Osm.Marker GetMarker(TextMessage textMessage)
+    {
+        var days = (DateTime.UtcNow - textMessage.CreatedAt).Days;
+        
+        return new Osm.Marker
+        {
+            Id = $"node-{textMessage.FromId}",
+            Latitude = textMessage.From.Latitude!.Value,
+            Longitude = textMessage.From.Longitude!.Value,
+            Label = textMessage.From.AllNames,
+            Popup = $"<p><a href=\"/node/{textMessage.FromId}\" target=\"_blank\" rel=\"nofollow\"><b>{textMessage.From.AllNames}</b></a></p>" +
+                    $"<p><b>{textMessage.CreatedAt.ToFrench()}</b></p>" +
+                    $"<p>{textMessage.Channel.Name} : <b>{textMessage.Message}</b></p>",
+            Color = days <= 1 ? "green" : days <= 2 ? "blue" : days <= 3 ? "orange" : "red"
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

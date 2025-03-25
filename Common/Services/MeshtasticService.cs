@@ -108,7 +108,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Update(nodeFrom);
             await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, RegionCodeAndModemPresetSource.Gateway);
         }
-        if (meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.TelemetryApp or PortNum.PositionApp)
+        
+        if (meshPacket.To == NodeBroadcast && meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.TextMessageApp)
         {
             nodeFrom.HopStart = (int?)meshPacket.HopStart;
             await Context.SaveChangesAsync();
@@ -164,6 +165,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         var intervalDuplicated = TimeSpan.FromHours(1);
         var payload = meshPacket.GetPayload();
 
+        var packetDuplicated = await Context.Packets
+            .Where(a => a.PortNum != PortNum.MapReportApp)
+            .Where(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo && DateTime.UtcNow - a.CreatedAt <= intervalDuplicated)
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync();
+
         var packet = new Packet
         {
             Channel = channel,
@@ -188,22 +195,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
             To = nodeTo,
-            PacketDuplicated = await Context.Packets
-                .OrderBy(a => a.CreatedAt)
-                .Where(a => a.PortNum != PortNum.MapReportApp)
-                .FirstOrDefaultAsync(a => a.PacketId == meshPacket.Id && a.From == nodeFrom && a.To == nodeTo && DateTime.UtcNow - a.CreatedAt <= intervalDuplicated)
+            PacketDuplicated = packetDuplicated.FirstOrDefault(),
+            RelayNode = meshPacket.RelayNode,
+            NextHop = meshPacket.NextHop
         };
 
         // Check if owner send multiple time same packet
-        if (packet.PacketDuplicated != null 
-            && await Context.Packets
-                        .Where(a => a.PortNum != PortNum.MapReportApp)
-                        .AnyAsync(a =>
-                            a.PacketId == meshPacket.Id
-                            && a.From == nodeFrom && a.To == nodeTo
-                            && a.Gateway == nodeGateway
-                            && DateTime.UtcNow - a.CreatedAt <= intervalDuplicated)
-            )
+        if (packetDuplicated.Any(a => a.Gateway == nodeGateway))
         {
             return null;
         }
@@ -233,7 +231,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             shouldCompute = packet.PortNum == PortNum.TracerouteApp; // Interresant pour avoir le dernier noeud du chemin retour d'un traceroute 
 
-            if (packet.To == packet.Gateway)
+            if (packet.From == packet.Gateway)
             {
                 Logger.LogInformation("Packet #{packetId} from {from} to {to} by {gateway} duplicated but it's the real one for #{packetDuplicated}, saved as original and set others as duplicated", meshPacket.Id, packet.From, packet.To, packet.Gateway, packet.PacketDuplicated.Id);
 
@@ -263,8 +261,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         if (shouldCompute)
         {
-            Context.RemoveRange(Context.NeighborInfos.Where(p => p.Packet == packet));
-            Context.RemoveRange(Context.SignalHistories.Where(p => p.Packet == packet));
+            await Context.NeighborInfos.Where(p => p.Packet == packet).ExecuteDeleteAsync();
+            await Context.SignalHistories.Where(p => p.Packet == packet).ExecuteDeleteAsync();
             
             switch (meshPacket.Decoded?.Portnum)
             {
@@ -299,12 +297,41 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Logger.LogTrace("Packet #{packetId} don't need to compute again", meshPacket.Id);
         }
 
-        await SetPositionAndUpdateNeighborForPacket(packet, nodeFromPosition);
+        await SetPositionAndUpdateNeighborsForPacket(packet, nodeFromPosition);
 
         return (packet, meshPacket);
     }
 
-    private async Task SetPositionAndUpdateNeighborForPacket(Packet packet, Position? nodeFromPosition)
+    private async Task<Node?> GetNodeFromLastByteForAnother(Node from, uint lastByte)
+    {
+        // TODO Utiliser les voisins ?
+        var nodesCandidate = await Context.Nodes
+            .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
+            .Where(a => a != from)
+            .Where(a => (a.NodeId & 0xFF) == lastByte)
+            .OrderByDescending(a => a.UpdatedAt)
+            .ToListAsync();
+
+        if (nodesCandidate.Count == 1)
+        {
+            return nodesCandidate.First();
+        }
+
+        var fromPosition = from.Positions.FirstOrDefault();
+
+        if (fromPosition != null)
+        { 
+            return nodesCandidate
+                .Where(n => n is { Latitude: not null, Longitude: not null })
+                .OrderBy(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude))
+                .FirstOrDefault(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude) <= MeshtasticUtils.DefaultDistanceAllowed)
+                ?? nodesCandidate.FirstOrDefault();
+        }
+
+        return null;
+    }
+
+    private async Task SetPositionAndUpdateNeighborsForPacket(Packet packet, Position? nodeFromPosition)
     {
         var latitude1 = nodeFromPosition?.Latitude ?? packet.From.Latitude;
         var longitude1 = nodeFromPosition?.Longitude ?? packet.From.Longitude;
@@ -325,8 +352,36 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         }
         else
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, null, packet.GatewayPosition, nodeFromPosition);
+            if (packet.RelayNode > 0)
+            {
+                packet.RelayNodeNode = await GetNodeFromLastByteForAnother(packet.Gateway, packet.RelayNode!.Value);
+
+                if (packet.RelayNodeNode != null)
+                {
+                    await SetNeighbor(Entities_NeighborInfo.Source.Relay, packet, packet.Gateway, packet.RelayNodeNode, packet.RxSnr!.Value, packet.RxRssi, packet.RelayNodeNode.Positions.FirstOrDefault(), packet.GatewayPosition);
+                    Context.Update(packet);
+                }
+            }
+
+            if (packet.RelayNodeNode == null)
+            {
+                await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, null, packet.GatewayPosition, nodeFromPosition);
+            }
         }
+        
+        if (packet.NextHop > 0)
+        {
+            packet.NextHopNode = await GetNodeFromLastByteForAnother(packet.Gateway, packet.NextHop!.Value);
+
+            if (packet is { RelayNodeNode: not null, NextHopNode: not null })
+            {
+                await SetNeighbor(Entities_NeighborInfo.Source.NextHop, packet, packet.NextHopNode, packet.RelayNodeNode, -999, null,
+                    packet.NextHopNode.Positions.FirstOrDefault(), packet.RelayNodeNode.Positions.FirstOrDefault());
+                Context.Update(packet);
+            }
+        }
+
+        await Context.SaveChangesAsync();
     }
 
     private async Task<Position?> DoMapReportingPacket(Node nodeFrom, MapReport? mapReport)
@@ -388,7 +443,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
         
-        Context.RemoveRange(Context.Telemetries.Where(p => p.Packet == packet));
+        await Context.Telemetries.Where(p => p.Packet == packet).ExecuteDeleteAsync();
 
         var telemetry = new Telemetry
         {
@@ -469,7 +524,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
         
-        Context.RemoveRange(Context.TextMessages.Where(p => p.Packet == packet));
+        await Context.TextMessages.Where(p => p.Packet == packet).ExecuteDeleteAsync();
         
         Logger.LogInformation("New message {message} from {nodeFrom} to {nodeTo}", textMessagePayload, nodeFrom, nodeTo);
 
@@ -492,7 +547,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return;
         }
 
-        Context.RemoveRange(Context.Waypoints.Where(p => p.Packet == packet));
+        await Context.Waypoints.Where(p => p.Packet == packet).ExecuteDeleteAsync();
         
         var waypoint = await Context.Waypoints.FirstOrDefaultAsync(a => a.WaypointId == payload.Id) ??
                        new Context.Entities.Waypoint
@@ -613,6 +668,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         var origin = isTowardsDestination ? nodeToId : nodeFromId;
         var dest = isTowardsDestination ? nodeFromId : nodeToId;
+
+        var nodesIds = new [] { origin, dest }.Concat(payload.Route).Concat(payload.RouteBack).ToList();
+        
+        var nodes = context.Nodes.Where(n => nodesIds.Contains(n.NodeId));
         
         routes = new List<uint> { origin }
             .Concat(payload.Route)
@@ -621,7 +680,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .Select((n, i) => new NodeSnr
             {
                 NodeId = n,
-                Node = context.Nodes.FindByNodeId(n),
+                Node = nodes.FindByNodeId(n),
                 Hop = i,
                 Snr = i > 0 && i < payload.SnrTowards.Count + 1 ? payload.SnrTowards[i - 1] : null
             })
@@ -635,7 +694,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 .Select((n, i) => new NodeSnr
                 {
                     NodeId = n,
-                    Node = context.Nodes.FindByNodeId(n),
+                    Node = nodes.FindByNodeId(n),
                     Hop = i,
                     Snr = i > 0 && i < payload.SnrBack.Count + 1 ? payload.SnrBack[i - 1] : null
                 })
@@ -647,10 +706,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     public List<NodeSnr> GetNeighborsInfo(RepeatedField<Neighbor> neighbors)
     {
+        var nodesIds = neighbors.Select(nn => nn.NodeId).ToList();
+        var nodes = Context.Nodes.Where(n => nodesIds.Contains(n.NodeId));
+        
         return neighbors.Select(n => new NodeSnr
         {
             NodeId = n.NodeId,
-            Node = Context.Nodes.FindByNodeId(n.NodeId),
+            Node = nodes.FindByNodeId(n.NodeId),
             RawSnr = n.Snr
         }).ToList();
     }
@@ -659,7 +721,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
     {
         if (packet != null)
         {
-            Context.RemoveRange(Context.Positions.Where(p => p.Packet == packet));
+            await Context.Positions.Where(p => p.Packet == packet).ExecuteDeleteAsync();
         }
 
         var decimalLatitude = latitude * 0.0000001; 

@@ -17,7 +17,7 @@ namespace Common.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.1")
+                .HasAnnotation("ProductVersion", "9.0.3")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -77,6 +77,9 @@ namespace Common.Migrations
                     b.Property<bool>("IsHighLoad")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("MqttPostJson")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -91,6 +94,9 @@ namespace Common.Migrations
 
                     b.Property<long?>("RelayPositionPrecision")
                         .HasColumnType("bigint");
+
+                    b.Property<bool>("ShouldBeRelayed")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Topics")
                         .IsRequired()
@@ -348,6 +354,12 @@ namespace Common.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<long?>("NextHop")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("NextHopId")
+                        .HasColumnType("bigint");
+
                     b.Property<long?>("PacketDuplicatedId")
                         .HasColumnType("bigint");
 
@@ -374,6 +386,12 @@ namespace Common.Migrations
                     b.Property<string>("Priority")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
+
+                    b.Property<long?>("RelayNode")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("RelayNodeId")
+                        .HasColumnType("bigint");
 
                     b.Property<long?>("ReplyId")
                         .HasColumnType("bigint");
@@ -419,6 +437,8 @@ namespace Common.Migrations
 
                     b.HasIndex("MqttServerId");
 
+                    b.HasIndex("NextHopId");
+
                     b.HasIndex("PacketDuplicatedId");
 
                     b.HasIndex("PacketId");
@@ -428,6 +448,8 @@ namespace Common.Migrations
                     b.HasIndex("PortNumVariant");
 
                     b.HasIndex("PositionId");
+
+                    b.HasIndex("RelayNodeId");
 
                     b.HasIndex("ToId");
 
@@ -992,6 +1014,39 @@ namespace Common.Migrations
                     b.ToTable("Webhooks");
                 });
 
+            modelBuilder.Entity("Common.Context.Entities.WebhookHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MessageId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("PacketId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("WebhookId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PacketId");
+
+                    b.HasIndex("WebhookId");
+
+                    b.ToTable("WebhooksHistories");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<long>", b =>
                 {
                     b.Property<long>("Id")
@@ -1204,6 +1259,10 @@ namespace Common.Migrations
                         .HasForeignKey("MqttServerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Common.Context.Entities.Node", "NextHopNode")
+                        .WithMany("NextHopFor")
+                        .HasForeignKey("NextHopId");
+
                     b.HasOne("Common.Context.Entities.Packet", "PacketDuplicated")
                         .WithMany("AllDuplicatedPackets")
                         .HasForeignKey("PacketDuplicatedId")
@@ -1213,6 +1272,10 @@ namespace Common.Migrations
                         .WithMany()
                         .HasForeignKey("PositionId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Common.Context.Entities.Node", "RelayNodeNode")
+                        .WithMany("RelayFor")
+                        .HasForeignKey("RelayNodeId");
 
                     b.HasOne("Common.Context.Entities.Node", "To")
                         .WithMany("PacketsTo")
@@ -1230,9 +1293,13 @@ namespace Common.Migrations
 
                     b.Navigation("MqttServer");
 
+                    b.Navigation("NextHopNode");
+
                     b.Navigation("PacketDuplicated");
 
                     b.Navigation("Position");
+
+                    b.Navigation("RelayNodeNode");
 
                     b.Navigation("To");
                 });
@@ -1388,6 +1455,25 @@ namespace Common.Migrations
                     b.Navigation("MqttServer");
                 });
 
+            modelBuilder.Entity("Common.Context.Entities.WebhookHistory", b =>
+                {
+                    b.HasOne("Common.Context.Entities.Packet", "Packet")
+                        .WithMany()
+                        .HasForeignKey("PacketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Common.Context.Entities.Webhook", "Webhook")
+                        .WithMany("Histories")
+                        .HasForeignKey("WebhookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Packet");
+
+                    b.Navigation("Webhook");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<long>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole<long>", null)
@@ -1459,6 +1545,8 @@ namespace Common.Migrations
 
                     b.Navigation("NeighborsFor");
 
+                    b.Navigation("NextHopFor");
+
                     b.Navigation("NodeConfiguration");
 
                     b.Navigation("PacketsFrom");
@@ -1468,6 +1556,8 @@ namespace Common.Migrations
                     b.Navigation("PacketsTo");
 
                     b.Navigation("Positions");
+
+                    b.Navigation("RelayFor");
 
                     b.Navigation("Telemetries");
 
@@ -1488,6 +1578,11 @@ namespace Common.Migrations
             modelBuilder.Entity("Common.Context.Entities.Router.User", b =>
                 {
                     b.Navigation("NodeConfigurations");
+                });
+
+            modelBuilder.Entity("Common.Context.Entities.Webhook", b =>
+                {
+                    b.Navigation("Histories");
                 });
 #pragma warning restore 612, 618
         }

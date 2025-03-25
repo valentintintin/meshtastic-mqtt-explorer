@@ -53,6 +53,8 @@ public class Node : IEntity
     public virtual ICollection<NeighborInfo> NeighborsFor { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesFrom { get; set; } = [];
     public virtual ICollection<TextMessage> TextMessagesTo { get; set; } = [];
+    public virtual ICollection<Packet> RelayFor { get; set; } = [];
+    public virtual ICollection<Packet> NextHopFor { get; set; } = [];
     
     public virtual NodeConfiguration? NodeConfiguration { get; set; }
 

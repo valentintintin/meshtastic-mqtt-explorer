@@ -75,24 +75,24 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Hangfire.AspNetCore" Version="1.8.17" />
-      <PackageReference Include="Hangfire.Core" Version="1.8.17" />
+      <PackageReference Include="Hangfire.AspNetCore" Version="1.8.18" />
+      <PackageReference Include="Hangfire.Core" Version="1.8.18" />
       <PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.1" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.1" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.1" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.1">
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.3" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.3" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="9.0.3" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.3">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.1" />
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.3" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.3" />
       <PackageReference Include="MQTTnet" Version="5.0.1.1416" />
-      <PackageReference Include="NLog" Version="5.3.4" />
-      <PackageReference Include="NLog.Extensions.Logging" Version="5.3.15" />
+      <PackageReference Include="NLog" Version="5.4.0" />
+      <PackageReference Include="NLog.Extensions.Logging" Version="5.4.0" />
       <PackageReference Include="NLog.Targets.Seq" Version="4.0.2-dev-00175" />
-      <PackageReference Include="NLog.Web.AspNetCore" Version="5.3.15" />
-      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
+      <PackageReference Include="NLog.Web.AspNetCore" Version="5.4.0" />
+      <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.1-dev-00124" />
       <PackageReference Include="System.Reactive" Version="6.0.1" />
     </ItemGroup>

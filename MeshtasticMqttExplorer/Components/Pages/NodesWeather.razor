@@ -64,12 +64,12 @@
             await Map.ClearMarkers();
         }
         
-        var twelveHours = DateTime.UtcNow.AddHours(-4);
+        var afterDate = DateTime.UtcNow.AddHours(-4);
 
         Telemetries = await Context.Telemetries
             .Include(n => n.Node)
             .Where(n => n.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics)
-            .CreatedAfter(twelveHours)
+            .CreatedAfter(afterDate)
             .Where(n => n.Node.Latitude.HasValue && n.Node.Longitude.HasValue)
             .GroupBy(n => n.NodeId)
             .Select(a => a.OrderByDescending(b => b.CreatedAt).First())

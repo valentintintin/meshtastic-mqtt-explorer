@@ -60,6 +60,13 @@ public class Packet : IEntity
     
     public double? GatewayDistanceKm { get; set; }
     
+    public uint? RelayNode { get; set; }
+    public long? RelayNodeId { get; set; }
+    public virtual Node? RelayNodeNode { get; set; }
+    public uint? NextHop { get; set; }
+    public long? NextHopId { get; set; }
+    public virtual Node? NextHopNode { get; set; }
+    
     public long? PacketDuplicatedId { get; set; }
     public virtual Packet? PacketDuplicated { get; set; }
     public virtual ICollection<Packet> AllDuplicatedPackets { get; set; } = [];

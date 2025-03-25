@@ -1,0 +1,154 @@
+@page "/nodes-bad-config"
+@implements IAsyncDisposable
+
+@using Common.Context
+@using Common.Services
+@using Meshtastic.Protobufs
+@using MeshtasticMqttExplorer.Components.Shared
+@using MeshtasticMqttExplorer.Models
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<DataContext> ContextFactory;
+
+<PageTitle>Nœuds mal configuré</PageTitle>
+
+<PageHeader Title="Nœuds mal configurés">
+    <SubtitleTemplate>
+        @NodesPackets.Count(a => a.Nb >= 100) mal configurés. Décompte du nombre de trames envoyés hier en broadcast sauf MapReport et Messages
+    </SubtitleTemplate>
+    <PageHeaderExtra>
+        <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Spin Spinning="Loading">
+    <Osm Height="calc(100vh - 250px)" @ref="Map" Latitude="46.199144" Longitude="2.321139" Zoom="5"></Osm>
+
+    <Card Title="Légende" Size="CardSize.Small" Bordered="true">
+        <TitleTemplate>
+            Légende
+        </TitleTemplate>
+        <ChildContent>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-green.png" alt="Vert" />
+                Correct (30 trames par jours)
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-blue.png" alt="Bleu" />
+                Bon (60 trames par jours)
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-orange.png" alt="Orange" />
+                Passable (100 trames par jours)
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-red.png" alt="Rouge" />
+                Mauvais (200 trames par jours)
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-black.png" alt="Noir" />
+                Horrible (plus de 200 trames par jours)
+            </div>
+        </ChildContent>
+    </Card>
+</Spin>
+
+@code
+{
+    private bool Loading { get; set; } = true;
+    private bool HasRenderMapData { get; set; }
+    private List<PacketNodeType> NodesPackets { get; set; } = [];
+    private DataContext Context { get; set; } = null!;
+    private Osm? Map { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && Map != null && !HasRenderMapData)
+        {
+            await Map.AddMarkers(NodesPackets.Select(GetMarker).ToList());
+
+            HasRenderMapData = true;
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        await FetchData();
+
+        await base.OnInitializedAsync();
+    }
+
+    private async Task FetchData()
+    {
+        Loading = true;
+        HasRenderMapData = false;
+     
+        if (Map != null)
+        {
+            await Map.ClearMarkers();
+        }
+        
+        var today = DateTime.UtcNow.Date;
+        var yesterday = today.AddDays(-1);
+        
+        NodesPackets = await Context.Packets
+            .Include(a => a.From)
+            .Where(a => a.PortNum != PortNum.MapReportApp && a.PortNum != PortNum.TextMessageApp && a.ViaMqtt != true)
+            .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
+            .Where(a => a.PacketDuplicated == null)
+            .Where(a => a.CreatedAt.Date >= yesterday && a.CreatedAt.Date < today)
+            .Where(a => a.From.Latitude.HasValue && a.From.Longitude.HasValue)
+            .GroupBy(a => new
+            {
+                NodeId = a.From.Id,
+                NodeName = a.From.AllNames,
+                a.From.Latitude,
+                a.From.Longitude,
+            }, (grouped, packets) => new PacketNodeType
+            {
+                NodeId = grouped.NodeId,
+                NodeName = grouped.NodeName!,
+                Nb = packets.Count(),
+                Latitude = grouped.Latitude,
+                Longitude = grouped.Longitude
+            })
+            .OrderBy(v => v.Nb) // Draw worst first
+            .AsNoTrackingWithIdentityResolution()
+            .ToListAsync();
+
+        Loading = false;
+            
+        await InvokeAsync(StateHasChanged); 
+    }
+    private Osm.Marker GetMarker(PacketNodeType packetNode)
+    {
+        var color = packetNode.Nb switch
+        {
+            <= 30 => "green",
+            <= 60 => "blue",
+            <= 100 => "orange",
+            <= 200 => "red",
+            _ => "black"
+        };
+
+        return new Osm.Marker
+        {
+            Id = $"node-{packetNode.NodeId}",
+            Latitude = packetNode.Latitude!.Value,
+            Longitude = packetNode.Longitude!.Value,
+            Label = packetNode.NodeName,
+            Popup = $"<p><a href=\"/node/{packetNode.NodeId}\" target=\"_blank\" rel=\"nofollow\"><b>{packetNode.NodeName}</b></a></p>" +
+                    $"<p>Nombre : <b>{packetNode.Nb}</b> hier</p>",
+            Color = color
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}
