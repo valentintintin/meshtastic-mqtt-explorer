@@ -1,4 +1,5 @@
 using Common.Context.Entities;
+using Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Common.Extensions.Entities;
@@ -10,7 +11,7 @@ public static class PacketExtensions
         return packetId > 0 ? await packets.OrderBy(p => p.CreatedAt).FirstOrDefaultAsync(n => n.PacketId == packetId) : null;
     }
 
-    public static List<IGrouping<int, Packet>> GetAllPacketForPacketIdGroupedByHops(this IQueryable<Packet> packets, Packet packet)
+    public static List<PacketsHop> GetAllPacketForPacketIdGroupedByHops(this IQueryable<Packet> packets, Packet packet)
     {
         return packets
             .Include(p => p.Gateway)
@@ -20,8 +21,12 @@ public static class PacketExtensions
             .OrderByDescending(p => p.HopLimit)
             .ThenByDescending(p => p.RxSnr)
             .AsEnumerable()
-            .GroupBy(a => a.HopStart - a.HopLimit ?? 0)
-            .OrderBy(a => a.Key)
+            .GroupBy(a => a.HopStart - a.HopLimit ?? 0, (hop, list) => new PacketsHop
+            {
+                Hop = hop,
+                Packets = list.OrderByDescending(l => l.RxSnr).ToList()
+            })
+            .OrderBy(a => a.Hop)
             .ToList();
     }
 }

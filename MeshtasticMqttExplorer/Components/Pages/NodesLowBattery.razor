@@ -1,20 +1,21 @@
-@page "/nodes-actives"
+@page "/nodes-low-battery"
 @implements IAsyncDisposable
 
+@using System.Globalization
 @using Common.Context
 @using Common.Context.Entities
 @using Common.Extensions
-@using Common.Services
+@using Common.Extensions.Entities
 @using MeshtasticMqttExplorer.Components.Shared
 @using Microsoft.EntityFrameworkCore
 
 @inject IDbContextFactory<DataContext> ContextFactory;
 
-<PageTitle>Nœuds actifs</PageTitle>
+<PageTitle>Nœuds batterie faible</PageTitle>
 
-<PageHeader Title="Nœuds actifs">
+<PageHeader Title="Nœuds batterie faible">
     <SubtitleTemplate>
-        @TextMessages.Count ayant envoyés un message
+        @Telemetries.Count nœuds ont leur batterie &lt;= 25%
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -31,19 +32,27 @@
         <ChildContent>
             <div class="legend">
                 <img src="/images/markers/marker-icon-green.png" alt="Vert" />
-                1 jour
+                25%
             </div>
             <div class="legend">
                 <img src="/images/markers/marker-icon-blue.png" alt="Bleu" />
-                2 jours
+                20%
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-yellow.png" alt="Jaune" />
+                15%
             </div>
             <div class="legend">
                 <img src="/images/markers/marker-icon-orange.png" alt="Orange" />
-                3 jours
+                10%
             </div>
             <div class="legend">
                 <img src="/images/markers/marker-icon-red.png" alt="Rouge" />
-                Plus de 3 jours
+                5%
+            </div>
+            <div class="legend">
+                <img src="/images/markers/marker-icon-black.png" alt="Noir" />
+                2%
             </div>
         </ChildContent>
     </Card>
@@ -53,7 +62,7 @@
 {
     private bool Loading { get; set; } = true;
     private bool HasRenderMapData { get; set; }
-    private List<TextMessage> TextMessages { get; set; } = [];
+    private List<Telemetry> Telemetries { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     private Osm? Map { get; set; }
 
@@ -61,7 +70,7 @@
     {
         if (!firstRender && Map != null && !HasRenderMapData)
         {
-            await Map.AddMarkers(TextMessages.Select(GetMarker).ToList());
+            await Map.AddMarkers(Telemetries.Select(GetMarker).ToList());
 
             HasRenderMapData = true;
         }
@@ -88,36 +97,42 @@
             await Map.ClearMarkers();
         }
         
-        TextMessages = (await Context.TextMessages
-            .Include(n => n.Channel)
-            .Include(n => n.From)
-            .Where(n => n.To.NodeId == MeshtasticService.NodeBroadcast)
-            .Where(n => n.From.Latitude.HasValue && n.From.Longitude.HasValue)
-            .GroupBy(n => n.From)
-            .Select(a => a.OrderByDescending(aa => aa.CreatedAt).First())
+        Telemetries = (await Context.Telemetries
+            .Include(n => n.Node)
+            .Where(n => n.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics)
+            .Where(n => n.Node.Latitude.HasValue && n.Node.Longitude.HasValue)
+            .GroupBy(n => n.NodeId)
+            .Select(a => a.OrderByDescending(b => b.CreatedAt).First())
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync())
-            .OrderBy(a => a.CreatedAt) // Draw old before new
+            .Where(n => n is { BatteryLevel: <= 25, Voltage: > 0 })
             .ToList();
 
         Loading = false;
             
         await InvokeAsync(StateHasChanged); 
     }
-    private Osm.Marker GetMarker(TextMessage textMessage)
+
+    private Osm.Marker GetMarker(Telemetry telemetry)
     {
-        var days = (DateTime.UtcNow - textMessage.CreatedAt).Days;
+        var color = telemetry.BatteryLevel switch
+        {
+            <= 2 => "black",
+            <= 5 => "red",
+            <= 10 => "orange",
+            <= 15 => "yellow",
+            <= 20 => "blue",
+            _ => "green"
+        };
         
         return new Osm.Marker
         {
-            Id = $"node-{textMessage.FromId}",
-            Latitude = textMessage.From.Latitude!.Value,
-            Longitude = textMessage.From.Longitude!.Value,
-            Label = textMessage.From.AllNames,
-            Popup = $"<p><a href=\"/node/{textMessage.FromId}\" target=\"_blank\" rel=\"nofollow\"><b>{textMessage.From.AllNames}</b></a></p>" +
-                    $"<p><b>{textMessage.CreatedAt.ToFrench()}</b></p>" +
-                    $"<p>{textMessage.Channel.Name} : <b>{textMessage.Message}</b></p>",
-            Color = days <= 1 ? "green" : days <= 2 ? "blue" : days <= 3 ? "orange" : "red"
+            Id = telemetry.Id.ToString(),
+            Latitude = telemetry.Node.Latitude!.Value,
+            Longitude = telemetry.Node.Longitude!.Value,
+            Label = $"{telemetry.BatteryLevel}%",
+            Popup = $"<p><a href=\"/node/{telemetry.NodeId}\" target=\"_blank\" rel=\"nofollow\"><b>{telemetry.Node.AllNames}</b></a></p><p>Rôle : {(telemetry.Node.Role?.ToString() ?? "Inconnu")}</p><p>{telemetry.BatteryLevel}% | {telemetry.Voltage}V</p><p>Dernière MAJ : {telemetry.Node.LastSeen?.ToFrench().ToString(CultureInfo.CurrentCulture)}</p>",
+            Color = color
         };
     }
 

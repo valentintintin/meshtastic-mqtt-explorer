@@ -8,6 +8,7 @@
 @using Common.Context.Entities
 @using Common.Extensions
 @using Common.Extensions.Entities
+@using Common.Models
 @using Common.Services
 @using Microsoft.EntityFrameworkCore
 @using MeshtasticMqttExplorer.Components.Shared
@@ -113,21 +114,21 @@
                     {
                         <p>
                             <b>
-                                @if (duplicatedPacketData.Key == 0)
+                                @if (duplicatedPacketData.Hop == 0)
                                 {
                                     <text>Reçu en direct</text>
                                 }
                                 else
                                 {
                                     <text>Saut </text>
-                                    @duplicatedPacketData.Key<text>/</text>
+                                    @duplicatedPacketData.Hop<text>/</text>
                                     @Packet.HopStart
                                 }
                             </b>
                         </p>
 
                         <Timeline>
-                            @foreach (var duplicatedPacket in duplicatedPacketData)
+                            @foreach (var duplicatedPacket in duplicatedPacketData.Packets)
                             {
                                 <TimelineItem Color="duplicatedPacket.HopLimit == duplicatedPacket.HopStart ? TimelineDotColor.Green : TimelineDotColor.Blue">
                                     Passerelle MQTT @duplicatedPacket.MqttServer?.Name : <a href="/node/@duplicatedPacket.GatewayId" target="_blank" rel="nofollow">@duplicatedPacket.Gateway.AllNames</a>
@@ -181,7 +182,7 @@
 
     private bool Loading { get; set; } = true;
     private Packet? Packet { get; set; }
-    private List<IGrouping<int, Packet>> AllDuplicatedPackets { get; set; } = [];
+    private List<PacketsHop> AllDuplicatedPackets { get; set; } = [];
     private DataContext Context { get; set; } = null!;
     
     protected override async Task OnInitializedAsync()

@@ -31,6 +31,12 @@
             <div>
                 <Segmented Disabled="Loading" Options="@ModemsPresets" Value="Settings.CurrentModemPreset" TValue="Config.Types.LoRaConfig.Types.ModemPreset?" OnChange="value => SetModemPreset(value)"/>
                 <Segmented Disabled="Loading" Options="@RegionsCodes" Value="Settings.CurrentRegionCode" TValue="Config.Types.LoRaConfig.Types.RegionCode?" OnChange="value => SetRegionCode(value)"/>
+
+                <Select DataSource="Roles" Disabled="Loading"
+                        Value="Settings.CurrentRole" OnSelectedItemChanged="value => SetRole(value)"
+                        TItem="Config.Types.DeviceConfig.Types.Role?" TItemValue="Config.Types.DeviceConfig.Types.Role?"
+                        Placeholder="Tous les rôles" Style="width: 200px">
+                </Select>
             </div>
 
             <div>
@@ -138,6 +144,7 @@
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> { new(null, "Tous") } 
         .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
+    private List<Config.Types.DeviceConfig.Types.Role?> Roles { get; } = Utils.RoleFilters.Select(r => r.Value).ToList();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -163,7 +170,11 @@
         {
             await Map.ClearMarkers();
             
-            var markers = Nodes.Where(n => !n.IsOffline() || n.MqttServer?.IsHighLoad != true).Select(GetMarker).ToList();
+            var markers = Nodes
+                .Where(n => !n.IsOffline() || n.MqttServer?.IsHighLoad != true)
+                .OrderBy(a => a.UpdatedAt) // Draw old before new
+                .Select(GetMarker)
+                .ToList();
             List<Osm.Line> lines = [];
             
             foreach (var node in Nodes)
@@ -294,6 +305,7 @@
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
             .Where(n => Settings.CurrentRegionCode == null || n.RegionCode == Settings.CurrentRegionCode || n.RegionCode == null)
             .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
+            .Where(n => Settings.CurrentRole == null || n.Role == Settings.CurrentRole || n.Role == null)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
         
@@ -306,6 +318,7 @@
             .Where(a => a.NodeHeard.LastSeen.HasValue && a.NodeHeard.LastSeen >= MinDate && a.NodeReceiver.LastSeen.HasValue && a.NodeReceiver.LastSeen >= MinDate)
             .Where(n => Settings.CurrentRegionCode == null|| n.NodeReceiver.RegionCode == Settings.CurrentRegionCode)
             .Where(n => Settings.CurrentModemPreset == null || n.NodeReceiver.ModemPreset == Settings.CurrentModemPreset || n.NodeReceiver.ModemPreset == null)
+            .Where(n => Settings.CurrentRole == null || n.NodeReceiver.Role == Settings.CurrentRole || n.NodeReceiver.Role == null)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync())
             .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(n.NodeReceiver.Latitude!.Value, n.NodeReceiver.Longitude!.Value, n.NodeHeard.Latitude!.Value, n.NodeHeard.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
@@ -346,6 +359,17 @@
     private async Task SetRegionCode(Config.Types.LoRaConfig.Types.RegionCode? regionCode)
     {
         Settings.CurrentRegionCode = regionCode;
+
+        if (RenderFinished)
+        {
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            await FetchData();
+        }
+    }
+
+    private async Task SetRole(Config.Types.DeviceConfig.Types.Role? role)
+    {
+        Settings.CurrentRole = role;
 
         if (RenderFinished)
         {
@@ -458,6 +482,7 @@
         public Config.Types.LoRaConfig.Types.RegionCode? CurrentRegionCode { get; set; }
         
         public Config.Types.LoRaConfig.Types.ModemPreset? CurrentModemPreset { get; set; }
+        public Config.Types.DeviceConfig.Types.Role? CurrentRole { get; set; }
 
         public bool HideLinks { get; set; }
         public bool ShowIncompleteLinks { get; set; }

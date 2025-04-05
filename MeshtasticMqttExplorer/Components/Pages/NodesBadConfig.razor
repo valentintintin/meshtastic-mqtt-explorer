@@ -38,6 +38,10 @@
                 Bon (60 trames par jours)
             </div>
             <div class="legend">
+                <img src="/images/markers/marker-icon-yellow.png" alt="Jaune" />
+                Attention (80 trames par jours)
+            </div>
+            <div class="legend">
                 <img src="/images/markers/marker-icon-orange.png" alt="Orange" />
                 Passable (100 trames par jours)
             </div>
@@ -97,7 +101,7 @@
         
         NodesPackets = await Context.Packets
             .Include(a => a.From)
-            .Where(a => a.PortNum != PortNum.MapReportApp && a.PortNum != PortNum.TextMessageApp && a.ViaMqtt != true)
+            .Where(a => a.PortNum != PortNum.MapReportApp && a.PortNum != PortNum.TextMessageApp && a.ViaMqtt != true && a.HopStart > 0)
             .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
             .Where(a => a.PacketDuplicated == null)
             .Where(a => a.CreatedAt.Date >= yesterday && a.CreatedAt.Date < today)
@@ -116,6 +120,7 @@
                 Latitude = grouped.Latitude,
                 Longitude = grouped.Longitude
             })
+            .Where(v => v.Nb >= 30)
             .OrderBy(v => v.Nb) // Draw worst first
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
@@ -130,6 +135,7 @@
         {
             <= 30 => "green",
             <= 60 => "blue",
+            <= 80 => "yellow",
             <= 100 => "orange",
             <= 200 => "red",
             _ => "black"

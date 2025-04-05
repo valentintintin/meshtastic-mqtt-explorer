@@ -169,7 +169,7 @@ public class MqttClientService(
             
             mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
             {
-                if (mqttClientAndConfiguration.MqttServer.IsHighLoad && JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet-2") > 20)
+                if (mqttClientAndConfiguration.MqttServer.IsHighLoad && (JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet-2") > 20 || JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet") > 100))
                 {
                     return;
                 }

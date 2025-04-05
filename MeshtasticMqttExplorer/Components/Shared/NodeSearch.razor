@@ -1,4 +1,5 @@
 @using Common.Context
+@using Common.Extensions.Entities
 @using Microsoft.EntityFrameworkCore
 @implements IAsyncDisposable
 
@@ -22,12 +23,7 @@
     
     private async Task OnSearch()
     {
-        SearchValue = SearchValue.Trim().TrimStart('!').ToLower();
-        
-        var node = await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.ShortName != null && a.ShortName.ToLower() == SearchValue) 
-            ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().TrimStart('!') == SearchValue)
-            ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.NodeIdString != null && a.NodeIdString.ToLower().EndsWith(SearchValue))
-            ?? await Context.Nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.LongName != null && a.LongName.ToLower() == SearchValue);
+        var node = await Context.Nodes.Search(SearchValue);
         
         if (node != null) {
             Navigation.NavigateTo($"/node/{node.Id}");

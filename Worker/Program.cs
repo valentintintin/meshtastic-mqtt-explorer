@@ -19,7 +19,7 @@ try {
     {
         action.ServerName = "Meshtastic Explorer Worker 1";
         action.SchedulePollingInterval = TimeSpan.FromSeconds(1);
-        action.WorkerCount = 1;
+        action.WorkerCount = 2;
         action.Queues = ["packet", "default"];
     });
     
