@@ -59,7 +59,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
                     }
                 }
                 
-                if (packet.PayloadJson != null && sendAsJsonPayload != null && mqttServer.MqttPostJson)
+                if (sendAsJsonPayload != null && mqttServer.MqttPostJson)
                 {
                     try
                     {
@@ -116,7 +116,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
                             shortName = packetAndMeshPacket.Value.packet.To.ShortName,
                             latitude = packetAndMeshPacket.Value.packet.To.Latitude,
                             longitude = packetAndMeshPacket.Value.packet.To.Longitude,
-                            role = packetAndMeshPacket.Value.packet.From.Role,
+                            role = packetAndMeshPacket.Value.packet.To.Role,
                         },
                         gateway = new
                         {
@@ -125,8 +125,16 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
                             shortName = packetAndMeshPacket.Value.packet.Gateway.ShortName,
                             latitude = packetAndMeshPacket.Value.packet.Gateway.Latitude,
                             longitude = packetAndMeshPacket.Value.packet.Gateway.Longitude,
-                            role = packetAndMeshPacket.Value.packet.From.Role,
+                            role = packetAndMeshPacket.Value.packet.Gateway.Role,
                         },
+                        relay = packetAndMeshPacket.Value.packet.RelayNodeNode != null ? new {
+                            id = packetAndMeshPacket.Value.packet.RelayNodeNode.NodeIdString,  
+                            longName = packetAndMeshPacket.Value.packet.RelayNodeNode.LongName,  
+                            shortName = packetAndMeshPacket.Value.packet.RelayNodeNode.ShortName,
+                            latitude = packetAndMeshPacket.Value.packet.RelayNodeNode.Latitude,
+                            longitude = packetAndMeshPacket.Value.packet.RelayNodeNode.Longitude,
+                            role = packetAndMeshPacket.Value.packet.RelayNodeNode.Role,
+                        } : null,
                         packetEnveloppe = packetAndMeshPacket.Value.meshPacket
                     }, MeshtasticService.JsonSerializerOptions)
                 )

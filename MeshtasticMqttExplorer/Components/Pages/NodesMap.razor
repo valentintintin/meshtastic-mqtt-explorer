@@ -21,7 +21,7 @@
 
 <PageHeader Title="Cartes des nœuds">
     <SubtitleTemplate>
-        @Total nœuds avec position dont @TotalAlive en ligne depuis le @MinDate.ToFrench()
+        @Total nœuds avec position dont @TotalAlive en ligne depuis le @MinDate.ToFrench() et les liens depuis le @MinDateNeighbors.ToFrench()
     </SubtitleTemplate>
     <PageHeaderExtra>
         <Button Disabled="@Loading" OnClick="FetchData">Actualiser</Button>
@@ -35,16 +35,22 @@
                 <Select DataSource="Roles" Disabled="Loading"
                         Value="Settings.CurrentRole" OnSelectedItemChanged="value => SetRole(value)"
                         TItem="Config.Types.DeviceConfig.Types.Role?" TItemValue="Config.Types.DeviceConfig.Types.Role?"
-                        Placeholder="Tous les rôles" Style="width: 200px">
+                        Placeholder="les rôles" Style="width: 200px">
                 </Select>
             </div>
 
             <div>
-                <Switch @bind-Checked="Settings.HideLinks" Disabled="@Loading" UnCheckedChildren="Afficher les liens" CheckedChildren="Cacher les liens" OnChange="value => SetHideLinks(value)"/>
+                <Switch @bind-Checked="Settings.HideLinks" Disabled="@Loading" CheckedChildren="Cacher les liens" UnCheckedChildren="Cacher les liens" OnChange="value => SetHideLinks(value)"/>
                 
                 @if (!Settings.HideLinks)
                 {
-                    <Switch @bind-Checked="Settings.ShowIncompleteLinks" Disabled="@Loading" UnCheckedChildren="Cacher les liens incomplets" CheckedChildren="Afficher tous les liens" OnChange="value => SetHideIncompleteLinks(value)"/>
+                    <Switch @bind-Checked="Settings.ShowIncompleteLinks" Disabled="@Loading" CheckedChildren="Afficher les liens unidirectionnels" UnCheckedChildren="Afficher les unidirectionnels" OnChange="value => SetHideIncompleteLinks(value)"/>
+                    
+                    <Select DataSource="DurationsNeighbors" Disabled="Loading"
+                            Value="Settings.DurationNeighbors" OnSelectedItemChanged="value => SetDurationNeighbors(value)"
+                            TItem="TimeSpan" TItemValue="TimeSpan"
+                            Placeholder="Durée des liens" Style="width: 150px">
+                    </Select>
                 }
             </div>
             
@@ -61,7 +67,7 @@
 
     @if (!Settings.ShowLegend)
     {
-        <Switch @bind-Checked="Settings.ShowLegend" UnCheckedChildren="Afficher la légende" CheckedChildren="Cacher la légende" OnChange="value => SetShowLegend(value)"/>
+        <Switch @bind-Checked="Settings.ShowLegend" CheckedChildren="Afficher la légende" UnCheckedChildren="Afficher la légende" OnChange="value => SetShowLegend(value)"/>
     }
     
     @if (Settings.ShowLegend)
@@ -70,7 +76,7 @@
             <TitleTemplate>
                 Légende
                 &nbsp;
-                <Switch @bind-Checked="Settings.ShowLegend" UnCheckedChildren="Afficher la légende" CheckedChildren="Cacher la légende" OnChange="value => SetShowLegend(value)"/>
+                <Switch @bind-Checked="Settings.ShowLegend" CheckedChildren="Afficher la légende" UnCheckedChildren="Afficher la légende" OnChange="value => SetShowLegend(value)"/>
             </TitleTemplate>
             <ChildContent>
                 <GridRow Gutter="(16, 16)" Justify="RowJustify.Center">
@@ -103,7 +109,7 @@
                         {
                             <div class="legend">
                                 <span style="background-color: @Utils.Red" class="legend-bar"></span>
-                                Lien radio incomplet entre 2 noeuds
+                                Lien radio unidirectionnel entre 2 noeuds
                             </div>
                         }
 
@@ -134,6 +140,7 @@
     private int Total { get; set; }
     private int TotalAlive { get; set; }
     private DateTime MinDate { get; set; } = DateTime.MinValue;
+    private DateTime MinDateNeighbors { get; set; } = DateTime.MinValue;
     private List<Node> Nodes { get; set; } = [];
     private List<NeighborInfo> Neighbors { get; set; } = [];
     private DataContext Context { get; set; } = null!;
@@ -145,6 +152,7 @@
         .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
     private List<Config.Types.DeviceConfig.Types.Role?> Roles { get; } = Utils.RoleFilters.Select(r => r.Value).ToList();
+    private List<TimeSpan> DurationsNeighbors { get; } = [TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(6), TimeSpan.FromHours(12), TimeSpan.FromDays(1), TimeSpan.FromDays(2), TimeSpan.FromDays(3)];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -172,6 +180,9 @@
             
             var markers = Nodes
                 .Where(n => !n.IsOffline() || n.MqttServer?.IsHighLoad != true)
+                .Where(n => Settings.CurrentRegionCode == null|| n.RegionCode == Settings.CurrentRegionCode)
+                .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
+                .Where(n => Settings.CurrentRole == null || n.Role == Settings.CurrentRole || n.Role == null)
                 .OrderBy(a => a.UpdatedAt) // Draw old before new
                 .Select(GetMarker)
                 .ToList();
@@ -199,9 +210,17 @@
 
             if (!Settings.HideLinks)
             {
-                foreach (var neighbor in Neighbors.Where(a => a.DataSource != NeighborInfo.Source.Unknown))
+                var neighborInfos = Neighbors
+                    .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.DataSource != NeighborInfo.Source.NextHop)
+                    .Where(a => a.UpdatedAt >= MinDateNeighbors)
+                    .Where(n => Settings.CurrentRegionCode == null|| n.NodeReceiver.RegionCode == Settings.CurrentRegionCode)
+                    .Where(n => Settings.CurrentModemPreset == null || n.NodeReceiver.ModemPreset == Settings.CurrentModemPreset || n.NodeReceiver.ModemPreset == null)
+                    .Where(n => Settings.CurrentRole == null || n.NodeReceiver.Role == Settings.CurrentRole || n.NodeReceiver.Role == null)
+                    .ToList();
+                
+                foreach (var neighbor in neighborInfos)
                 {
-                    var reverseNeighbor = Neighbors.FirstOrDefault(n => n.NodeHeard == neighbor.NodeReceiver && n.NodeReceiver == neighbor.NodeHeard && n.DataSource != NeighborInfo.Source.Unknown);
+                    var reverseNeighbor = neighborInfos.FirstOrDefault(n => n.NodeHeard == neighbor.NodeReceiver && n.NodeReceiver == neighbor.NodeHeard && n.DataSource != NeighborInfo.Source.Unknown);
                     var isBidirectionnal = reverseNeighbor != null;
                     var reverseAlreadyDrawn = isBidirectionnal && lines.Exists(l => l.Id == $"node-{neighbor.NodeHeard.Id}->node-{neighbor.NodeReceiver.Id}");
 
@@ -232,7 +251,7 @@
                         Popup = Utils.GetNeighborLinePopupHtml(neighbor.NodeReceiver, neighbor, reverseNeighbor)
                     });
 
-                    if (!isBidirectionnal) // Il manque un côté donc on le fait artificiellement pour mettre une ligne rouge
+                    if (!isBidirectionnal && neighbor.Distance >= 1) // Il manque un côté donc on le fait artificiellement pour mettre une ligne rouge
                     {
                         startPoint = [neighbor.NodeHeard.Latitude!.Value, neighbor.NodeHeard.Longitude!.Value];
 
@@ -276,6 +295,7 @@
     protected override async Task OnInitializedAsync()
     {
         MinDate = DateTime.Today.ToUniversalTime().AddDays(-3);
+        MinDateNeighbors = DateTime.Today.ToUniversalTime().AddDays(-1);
         
         if (CultureInfo.CurrentCulture.Name != "fr-FR")
         {
@@ -303,9 +323,6 @@
             .Where(n => !n.Ignored)
             .Where(n => n.LastSeen.HasValue && n.LastSeen >= MinDate)
             .Where(n => n.Latitude.HasValue && n.Longitude.HasValue)
-            .Where(n => Settings.CurrentRegionCode == null || n.RegionCode == Settings.CurrentRegionCode || n.RegionCode == null)
-            .Where(n => Settings.CurrentModemPreset == null || n.ModemPreset == Settings.CurrentModemPreset || n.ModemPreset == null)
-            .Where(n => Settings.CurrentRole == null || n.Role == Settings.CurrentRole || n.Role == null)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync();
         
@@ -313,12 +330,9 @@
             .Include(a => a.NodeReceiver)
             .Include(a => a.NodeHeard)
             .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
+            .Where(a => a.UpdatedAt >= MinDate)
             .Where(a => a.Distance < MeshtasticUtils.DefaultDistanceAllowed && a.NodeHeard.Latitude.HasValue && a.NodeHeard.Longitude.HasValue && a.NodeReceiver.Latitude.HasValue && a.NodeReceiver.Longitude.HasValue)
             .Where(a => !a.NodeReceiver.Ignored && !a.NodeHeard.Ignored)
-            .Where(a => a.NodeHeard.LastSeen.HasValue && a.NodeHeard.LastSeen >= MinDate && a.NodeReceiver.LastSeen.HasValue && a.NodeReceiver.LastSeen >= MinDate)
-            .Where(n => Settings.CurrentRegionCode == null|| n.NodeReceiver.RegionCode == Settings.CurrentRegionCode)
-            .Where(n => Settings.CurrentModemPreset == null || n.NodeReceiver.ModemPreset == Settings.CurrentModemPreset || n.NodeReceiver.ModemPreset == null)
-            .Where(n => Settings.CurrentRole == null || n.NodeReceiver.Role == Settings.CurrentRole || n.NodeReceiver.Role == null)
             .AsNoTrackingWithIdentityResolution()
             .ToListAsync())
             .Where(n => Math.Abs(n.Distance!.Value - MeshtasticUtils.CalculateDistance(n.NodeReceiver.Latitude!.Value, n.NodeReceiver.Longitude!.Value, n.NodeHeard.Latitude!.Value, n.NodeHeard.Longitude!.Value)) < MeshtasticUtils.DifferenceBetweenDistanceAllowed)
@@ -363,7 +377,7 @@
         if (RenderFinished)
         {
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
-            await FetchData();
+            HasRenderMapData = false;
         }
     }
 
@@ -374,7 +388,7 @@
         if (RenderFinished)
         {
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
-            await FetchData();
+            HasRenderMapData = false;
         }
     }
 
@@ -385,7 +399,7 @@
         if (RenderFinished)
         {
             await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
-            await FetchData();
+            HasRenderMapData = false;
         }
     }
 
@@ -403,6 +417,18 @@
     private async Task SetHideIncompleteLinks(bool value)
     {
         Settings.ShowIncompleteLinks = value;
+
+        if (RenderFinished)
+        {
+            await LocalStorage.SetItemAsync("nodeMapSettings", Settings);
+            HasRenderMapData = false;
+        }
+    }
+
+    private async Task SetDurationNeighbors(TimeSpan value)
+    {
+        Settings.DurationNeighbors = value;
+        MinDateNeighbors = (value.TotalDays >= 1 ? DateTime.Today : DateTime.Now).ToUniversalTime().Subtract(value);
 
         if (RenderFinished)
         {
@@ -486,5 +512,6 @@
 
         public bool HideLinks { get; set; }
         public bool ShowIncompleteLinks { get; set; }
+        public TimeSpan DurationNeighbors { get; set; } = TimeSpan.FromDays(1);
     }
 }

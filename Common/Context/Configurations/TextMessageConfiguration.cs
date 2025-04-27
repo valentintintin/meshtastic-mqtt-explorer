@@ -12,11 +12,13 @@ public class TextMessageConfiguration : IEntityTypeConfiguration<TextMessage>
         
         builder.HasOne(a => a.From)
             .WithMany(a => a.TextMessagesFrom)
-            .HasForeignKey(a => a.FromId);
+            .HasForeignKey(a => a.FromId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.To)
             .WithMany(a => a.TextMessagesTo)
-            .HasForeignKey(a => a.ToId);
+            .HasForeignKey(a => a.ToId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Packet)
             .WithMany()
@@ -25,7 +27,8 @@ public class TextMessageConfiguration : IEntityTypeConfiguration<TextMessage>
         
         builder.HasOne(a => a.Channel)
             .WithMany(a => a.TextMessages)
-            .HasForeignKey(a => a.ChannelId);
+            .HasForeignKey(a => a.ChannelId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(a => a.Message).HasMaxLength(512);
     }

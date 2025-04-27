@@ -229,7 +229,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         if (packet.PacketDuplicated != null)
         {
-            shouldCompute = packet.PortNum == PortNum.TracerouteApp; // Interresant pour avoir le dernier noeud du chemin retour d'un traceroute 
+            shouldCompute = packet.PortNum == PortNum.TracerouteApp; // Interessant pour avoir le dernier noeud du chemin retour d'un traceroute 
 
             if (packet.From == packet.Gateway)
             {
@@ -289,6 +289,9 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                     break;
                 case PortNum.TracerouteApp:
                     await DoTraceroutePacket(packet.From, packet.To, packet, meshPacket.GetPayload<RouteDiscovery>());
+                    break;
+                case PortNum.PaxcounterApp:
+                    await DoPaxCounterPacket(packet.From, packet, meshPacket.GetPayload<Paxcount>());
                     break;
             }
         }
@@ -445,6 +448,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         
         await Context.Telemetries.Where(p => p.Packet == packet).ExecuteDeleteAsync();
 
+        if (telemetryPayload.LocalStats != null)
+        {
+            nodeFrom.NumOnlineLocalNodes = (int?)telemetryPayload.LocalStats.NumTotalNodes;
+            Context.Update(nodeFrom);
+        }
+        
         var telemetry = new Telemetry
         {
             Node = nodeFrom,
@@ -452,9 +461,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Type = telemetryPayload.VariantCase,
             BatteryLevel = telemetryPayload.DeviceMetrics?.BatteryLevel,
             Voltage = telemetryPayload.DeviceMetrics?.Voltage.IfNaNOrInfinityGetNull(),
-            ChannelUtilization = telemetryPayload.DeviceMetrics?.ChannelUtilization.IfNaNOrInfinityGetNull(),
-            AirUtilTx = telemetryPayload.DeviceMetrics?.AirUtilTx.IfNaNOrInfinityGetNull(),
-            Uptime = telemetryPayload.DeviceMetrics?.UptimeSeconds > 0 ? TimeSpan.FromSeconds(telemetryPayload.DeviceMetrics.UptimeSeconds) : null,
+            ChannelUtilization = telemetryPayload.DeviceMetrics?.ChannelUtilization.IfNaNOrInfinityGetNull() ?? telemetryPayload.LocalStats?.ChannelUtilization.IfNaNOrInfinityGetNull(),
+            AirUtilTx = telemetryPayload.DeviceMetrics?.AirUtilTx.IfNaNOrInfinityGetNull() ?? telemetryPayload.LocalStats?.AirUtilTx.IfNaNOrInfinityGetNull(),
+            Uptime = telemetryPayload.DeviceMetrics?.UptimeSeconds > 0 ? TimeSpan.FromSeconds(telemetryPayload.DeviceMetrics.UptimeSeconds) : 
+                telemetryPayload.LocalStats?.UptimeSeconds > 0 ? TimeSpan.FromSeconds(telemetryPayload.LocalStats.UptimeSeconds) : null,
             Temperature = telemetryPayload.EnvironmentMetrics?.Temperature.IfNaNOrInfinityGetNull(),
             RelativeHumidity = telemetryPayload.EnvironmentMetrics?.RelativeHumidity.IfNaNOrInfinityGetNull(),
             BarometricPressure = telemetryPayload.EnvironmentMetrics?.BarometricPressure.IfNaNOrInfinityGetNull(),
@@ -466,6 +476,12 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Channel1Current = telemetryPayload.PowerMetrics?.Ch1Current.IfNaNOrInfinityGetNull(),
             Channel2Current = telemetryPayload.PowerMetrics?.Ch2Current.IfNaNOrInfinityGetNull(),
             Channel3Current = telemetryPayload.PowerMetrics?.Ch3Current.IfNaNOrInfinityGetNull(),
+            NumPacketsRx = telemetryPayload.LocalStats?.NumPacketsRx,
+            NumPacketsRxBad = telemetryPayload.LocalStats?.NumPacketsRxBad,
+            NumTxRelayCanceled = telemetryPayload.LocalStats?.NumTxRelayCanceled,
+            NumPacketsTx = telemetryPayload.LocalStats?.NumPacketsTx,
+            NumRxDupe = telemetryPayload.LocalStats?.NumRxDupe,
+            NumTxRelay = telemetryPayload.LocalStats?.NumTxRelay,
             CreatedAt = packet.CreatedAt,
             UpdatedAt = packet.UpdatedAt
         };
@@ -652,6 +668,26 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 heardNode = nodeReceiver;
             }
         }
+    }
+
+    private async Task DoPaxCounterPacket(Node nodeFrom, Packet packet, Paxcount? payload)
+    {
+        if (payload == null)
+        {
+            return;
+        }
+
+        await Context.PaxCounters.Where(p => p.Packet == packet).ExecuteDeleteAsync();
+
+        Context.Add(new PaxCounter
+        {
+            Node = nodeFrom,
+            Packet = packet,
+            Wifi = payload.Wifi,
+            Ble = payload.Ble,
+            Uptime = payload.Uptime
+        });
+        await Context.SaveChangesAsync();
     }
 
     public (List<NodeSnr> routes, List<NodeSnr> routesBack) GetTracerouteInfo(uint nodeFromId, uint nodeToId, RouteDiscovery? payload, bool isTowardsDestination)

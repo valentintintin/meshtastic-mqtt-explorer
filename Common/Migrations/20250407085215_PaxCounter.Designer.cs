@@ -3,6 +3,7 @@ using System;
 using Common.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Common.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250407085215_PaxCounter")]
+    partial class PaxCounter
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,10 +256,6 @@ namespace Common.Migrations
 
                     b.Property<int?>("NumOnlineLocalNodes")
                         .HasColumnType("integer");
-
-                    b.Property<string>("OldAllNames")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PrimaryChannel")
                         .HasMaxLength(32)
@@ -832,24 +831,6 @@ namespace Common.Migrations
                     b.Property<long>("NodeId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("NumPacketsRx")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NumPacketsRxBad")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NumPacketsTx")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NumRxDupe")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NumTxRelay")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("NumTxRelayCanceled")
-                        .HasColumnType("bigint");
-
                     b.Property<long?>("PacketId")
                         .HasColumnType("bigint");
 
@@ -1325,8 +1306,7 @@ namespace Common.Migrations
 
                     b.HasOne("Common.Context.Entities.Node", "NextHopNode")
                         .WithMany("NextHopFor")
-                        .HasForeignKey("NextHopId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("NextHopId");
 
                     b.HasOne("Common.Context.Entities.Packet", "PacketDuplicated")
                         .WithMany("AllDuplicatedPackets")
@@ -1340,8 +1320,7 @@ namespace Common.Migrations
 
                     b.HasOne("Common.Context.Entities.Node", "RelayNodeNode")
                         .WithMany("RelayFor")
-                        .HasForeignKey("RelayNodeId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("RelayNodeId");
 
                     b.HasOne("Common.Context.Entities.Node", "To")
                         .WithMany("PacketsTo")

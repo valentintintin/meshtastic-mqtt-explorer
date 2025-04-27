@@ -17,7 +17,8 @@ public class TelemetryConfiguration : IEntityTypeConfiguration<Telemetry>
         
         builder.HasOne(a => a.Node)
             .WithMany(a => a.Telemetries)
-            .HasForeignKey(a => a.NodeId);
+            .HasForeignKey(a => a.NodeId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Packet)
             .WithMany()

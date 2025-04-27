@@ -32,7 +32,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         if (!MeshtasticService.NodesIgnored.Contains(packet.To.NodeId)) // Message direct
         {
             await UpdateNodeConfiguration(packet.To);
-            await DoWhenPacketIsNotBroadcast(clientId, userId, packet, receivers, packetActivity, meshPacket);
+            await DoWhenPacketIsNotBroadcast(clientId, userId, packet, packetActivity, meshPacket);
         }
         else
         {
@@ -200,6 +200,33 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
 
     private void DoWhenTextMessage(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
+        if (packet.Channel.Name.Equals("fr_balise", StringComparison.CurrentCultureIgnoreCase))
+        {
+            logger.LogInformation(
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because channel forbidden",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
+                    
+            packetActivity.Accepted = false;
+            packetActivity.Comment = "C'est un message sur un canal interdit";
+
+            return;
+        }
+
+        // if (packet.Channel.Name.Equals("fr_emcom", StringComparison.InvariantCultureIgnoreCase))
+        // {
+        //     const int radius = 200;
+        //     
+        //     logger.LogInformation(
+        //         "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because important but in a radius of {radius}",
+        //         packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, radius);
+        //             
+        //     packetActivity.Accepted = true;
+        //     packetActivity.HopLimit = CoolHopLimit;
+        //     packetActivity.Comment = "C'est un message";
+        //
+        //     return;
+        // }
+        
         logger.LogInformation(
             "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because important",
             packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
@@ -220,7 +247,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         packetActivity.Comment = "C'est un point d'intérêt";
     }
 
-    private async Task DoWhenPacketIsNotBroadcast(string clientId, long? userId, Packet packet, List<string> receivers, PacketActivity packetActivity, MeshPacket meshPacket)
+    private async Task DoWhenPacketIsNotBroadcast(string clientId, long? userId, Packet packet, PacketActivity packetActivity, MeshPacket meshPacket)
     {
         var nodeToConfiguration = await Context.NodeConfigurations.FirstOrDefaultAsync(a => a.Node == packet.To && !string.IsNullOrWhiteSpace(a.MqttId) && a.Node.LastSeen >= DateTime.UtcNow.AddDays(-1));
         
@@ -230,9 +257,9 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         {
             if (nodeToConfiguration != null)
             {
-                receivers.Add(nodeToConfiguration.MqttId!);
                 packetActivity.Accepted = true;
                 packetActivity.Comment = $"En direction d'un noeud précis : {packet.To}";
+                packetActivity.ReceiverIds.Add(nodeToConfiguration.MqttId!);
             }
             else
             {

@@ -14,6 +14,7 @@ try {
     builder.Configure();
     
     builder.Services.AddHostedService(p => p.GetRequiredService<MqttClientService>());
+    builder.Services.AddHostedService(p => p.GetRequiredService<HttpClientService>());
     
     builder.Services.AddHangfireServer(action =>
     {

@@ -68,7 +68,7 @@ public static class Utils
         })
         .OrderBy(p => p.Text)
         .ToArray();
-    public static readonly TableFilter<PortNum?>[] PortNumFilters = ((PortNum[])[PortNum.NeighborinfoApp, PortNum.TelemetryApp, PortNum.NodeinfoApp, PortNum.RangeTestApp, PortNum.SerialApp, PortNum.AdminApp, PortNum.PositionApp, PortNum.MapReportApp, PortNum.WaypointApp, PortNum.RoutingApp, PortNum.TracerouteApp, PortNum.TextMessageApp]).OrderBy(num => num)
+    public static readonly TableFilter<PortNum?>[] PortNumFilters = ((PortNum[])[PortNum.NeighborinfoApp, PortNum.TelemetryApp, PortNum.NodeinfoApp, PortNum.RangeTestApp, PortNum.SerialApp, PortNum.AdminApp, PortNum.PositionApp, PortNum.MapReportApp, PortNum.WaypointApp, PortNum.RoutingApp, PortNum.TracerouteApp, PortNum.TextMessageApp, PortNum.PaxcounterApp]).OrderBy(num => num)
         .Select(p => new TableFilter<PortNum?>
         {
             Text = p.ToString(),

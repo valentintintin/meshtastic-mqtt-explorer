@@ -92,8 +92,15 @@
                         </DescriptionsItem>
                         
                         <DescriptionsItem Title="Ajouté le" ContentStyle="font-weight: bold">
-                            <Date Value="NodeInfo.CreatedAt" Fallback="-"></Date>
+                            <Date Value="NodeInfo?.CreatedAt" Fallback="-"></Date>
                         </DescriptionsItem>
+                        
+                        @if (!string.IsNullOrWhiteSpace(NodeInfo?.OldAllNames))
+                        {
+                            <DescriptionsItem Title="Ancien nom" ContentStyle="font-weight: bold">
+                                @NodeInfo.OldAllNames
+                            </DescriptionsItem>
+                        }
                     </Descriptions>
                 </ChildContent>
             </Card>
@@ -104,19 +111,19 @@
                 <ChildContent>
                     <Descriptions Bordered="true" Column="1">
                         <DescriptionsItem Title="Dernière télémétrie" ContentStyle="font-weight: bold">
-                            <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryDevice?.CreatedAt)" Fallback="-"></TimeElapsed>
+                            <TimeElapsed Value="DateTime.UtcNow - LastTelemetryDevice?.CreatedAt" Fallback="-"></TimeElapsed>
                         </DescriptionsItem>
                         
                         <DescriptionsItem Title="Durée de fonctionnement" ContentStyle="font-weight: bold">
-                            <TimeElapsed Value="LastTelemetryDevice?.Uptime" Fallback="-"></TimeElapsed>
+                            <TimeElapsed Value="LastTelemetryDevice?.Uptime ?? LastTelemetryLocalStats?.Uptime" Fallback="-"></TimeElapsed>
                         </DescriptionsItem>
 
                         <DescriptionsItem Title="Utilisation du canal" ContentStyle="font-weight: bold">
-                            @(LastTelemetryDevice?.ChannelUtilization?.ToString() ?? "-")%
+                            @((LastTelemetryDevice?.ChannelUtilization ?? LastTelemetryLocalStats?.ChannelUtilization)?.ToString() ?? "-")%
                         </DescriptionsItem>
 
                         <DescriptionsItem Title="Emission sur l'air" ContentStyle="font-weight: bold">
-                            @(LastTelemetryDevice?.AirUtilTx?.ToString() ?? "-")%
+                            @((LastTelemetryDevice?.AirUtilTx ?? LastTelemetryLocalStats?.AirUtilTx).ToString() ?? "-")%
                         </DescriptionsItem>
 
                         @if (LastTelemetryDevice?.BatteryLevel.HasValue == true)
@@ -125,11 +132,42 @@
                                 @(LastTelemetryDevice?.BatteryLevel?.ToString() ?? "-")% @(LastTelemetryDevice?.Voltage?.ToString() ?? "-")V
                             </DescriptionsItem>
                         }
+
+                        @if (LastTelemetryLocalStats?.CreatedAt != null)
+                        {
+                            <DescriptionsItem Title="Dernière télémétrie stats" ContentStyle="font-weight: bold">
+                                <TimeElapsed Value="DateTime.UtcNow - LastTelemetryLocalStats?.CreatedAt" Fallback="-"></TimeElapsed>
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de trames RX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumPacketsRx?.Today/@NumPacketsRx?.Yesterday/@NumPacketsRx?.Total
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de mauvaises trames RX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumPacketsRxBad?.Today/@NumPacketsRxBad?.Yesterday/@NumPacketsRxBad?.Total
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de trames TX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumPacketsTx?.Today/@NumPacketsTx?.Yesterday/@NumPacketsTx?.Total
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de trames en double (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumRxDupe?.Today/@NumRxDupe?.Yesterday/@NumRxDupe?.Total
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de trames relayées (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumTxRelay?.Today/@NumTxRelay?.Yesterday/@NumTxRelay?.Total
+                            </DescriptionsItem>
+
+                            <DescriptionsItem Title="Nombre de trames non relayées (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
+                                @NumTxRelayCanceled?.Today/@NumTxRelayCanceled?.Yesterday/@NumTxRelayCanceled?.Total
+                            </DescriptionsItem>
+                        }
                         
                         @if (LastTelemetryEnvironment?.CreatedAt != null)
                         {
                             <DescriptionsItem Title="Dernière télémétrie environment" ContentStyle="font-weight: bold">
-                                <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryEnvironment?.CreatedAt)" Fallback="-"></TimeElapsed>
+                                <TimeElapsed Value="DateTime.UtcNow - LastTelemetryEnvironment?.CreatedAt" Fallback="-"></TimeElapsed>
                             </DescriptionsItem>
                         }
 
@@ -164,7 +202,7 @@
                         @if (LastTelemetryPower?.CreatedAt != null)
                         {
                             <DescriptionsItem Title="Dernière télémétrie énergie" ContentStyle="font-weight: bold">
-                                <TimeElapsed Value="(DateTime.UtcNow - LastTelemetryPower?.CreatedAt)" Fallback="-"></TimeElapsed>
+                                <TimeElapsed Value="DateTime.UtcNow - LastTelemetryPower?.CreatedAt" Fallback="-"></TimeElapsed>
                             </DescriptionsItem>
                         }
                         
@@ -207,6 +245,19 @@
                         {
                             <DescriptionsItem Title="Intensité canal 3" ContentStyle="font-weight: bold">
                                 @(LastTelemetryPower?.Channel3Current?.ToString() ?? "-")mA
+                            </DescriptionsItem>
+                        }
+                        
+                        @if (NodeInfo?.PaxCounters.Count > 0)
+                        {
+                            <DescriptionsItem Title="Dernier Pax" ContentStyle="font-weight: bold">
+                                <TimeElapsed Value="DateTime.UtcNow - NodeInfo?.PaxCounters.Last().CreatedAt" Fallback="-"></TimeElapsed>
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Pax WiFi" ContentStyle="font-weight: bold">
+                                @NodeInfo?.PaxCounters.Last().Wifi
+                            </DescriptionsItem>
+                            <DescriptionsItem Title="Pax Bluetooth" ContentStyle="font-weight: bold">
+                                @NodeInfo?.PaxCounters.Last().Ble
                             </DescriptionsItem>
                         }
                     </Descriptions>
@@ -365,7 +416,7 @@
             </GridCol>
         }
         
-        @if (DataAirUtil?.Any() == true)
+        @if (DataAirUtil?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Utilisation sur l'air">
@@ -376,7 +427,7 @@
             </GridCol>
         }
             
-        @if (DataChannelUtil?.Any() == true)
+        @if (DataChannelUtil?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Utilisation du canal">
@@ -387,7 +438,7 @@
             </GridCol>
         }
 
-        @if (DataVoltageBattery?.Any() == true)
+        @if (DataVoltageBattery?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Batterie">
@@ -398,7 +449,7 @@
             </GridCol>
         }
 
-        @if (DataWeatherTemperature?.Any() == true)
+        @if (DataWeatherTemperature?.Count > 0)
         {
                 <GridCol Xs="24" Md="12">
                 <Card Title="Température">
@@ -409,7 +460,7 @@
             </GridCol>
         }
         
-        @if (DataWeatherHumidity?.Any() == true)
+        @if (DataWeatherHumidity?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Humidité">
@@ -420,7 +471,7 @@
             </GridCol>
         }
 
-        @if (DataWeatherPressure?.Any() == true)
+        @if (DataWeatherPressure?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Pression atmosphérique">
@@ -431,18 +482,18 @@
             </GridCol>
         }
 
-        @if (DataAirquality?.Any() == true)
+        @if (DataAirQuality?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Qualité de l'air (IAQ)">
                     <ChildContent>
-                        <AntDesign.Charts.Line Data="DataAirquality" Config="_configAirQuality"/>
+                        <AntDesign.Charts.Line Data="DataAirQuality" Config="_configAirQuality"/>
                     </ChildContent>
                 </Card>
             </GridCol>
         }
 
-        @if (DataPowerMetricsVoltage1?.Any() == true)
+        @if (DataPowerMetricsVoltage1?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Tension canal 1">
@@ -453,7 +504,7 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsCurrent1?.Any() == true)
+        @if (DataPowerMetricsCurrent1?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Intensité canal 1">
@@ -464,7 +515,7 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsVoltage2?.Any() == true)
+        @if (DataPowerMetricsVoltage2?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Tension canal 2">
@@ -475,7 +526,7 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsCurrent2?.Any() == true)
+        @if (DataPowerMetricsCurrent2?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Intensité canal 2">
@@ -486,7 +537,7 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsVoltage3?.Any() == true)
+        @if (DataPowerMetricsVoltage3?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Tension canal 3">
@@ -497,12 +548,34 @@
             </GridCol>
         }
 
-        @if (DataPowerMetricsCurrent3?.Any() == true)
+        @if (DataPowerMetricsCurrent3?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
                 <Card Title="Intensité canal 3">
                     <ChildContent>
                         <AntDesign.Charts.Line Data="DataPowerMetricsCurrent3" Config="_configCurrent"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPaxCounterWiFi?.Count > 0)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="PaxCounter WiFi">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPaxCounterWiFi" Config="_configCount"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
+        @if (DataPaxCounterBle?.Count > 0)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="PaxCounter Bluetooth">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataPaxCounterBle" Config="_configCount"/>
                     </ChildContent>
                 </Card>
             </GridCol>
@@ -519,8 +592,16 @@
     public PacketsStats? PacketsInfo { get; set; }
 
     private Telemetry? LastTelemetryDevice { get; set; }
+    private Telemetry? LastTelemetryLocalStats { get; set; }
     private Telemetry? LastTelemetryEnvironment { get; set; }
     private Telemetry? LastTelemetryPower { get; set; }
+    
+    private PacketsStats? NumPacketsRx { get; set; }
+    private PacketsStats? NumPacketsRxBad { get; set; }
+    private PacketsStats? NumTxRelayCanceled { get; set; }
+    private PacketsStats? NumPacketsTx { get; set; }
+    private PacketsStats? NumRxDupe { get; set; }
+    private PacketsStats? NumTxRelay { get; set; }
     
     private List<DateChartData<float>>? DataAirUtil { get; set; }
     private List<DateChartData<float>>? DataChannelUtil { get; set; }
@@ -528,13 +609,15 @@
     private List<DateChartData<float>>? DataWeatherTemperature { get; set; }
     private List<DateChartData<float>>? DataWeatherHumidity { get; set; }
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
-    private List<DateChartData<float>>? DataAirquality { get; set; }
+    private List<DateChartData<float>>? DataAirQuality { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage1 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsCurrent1 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage2 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsCurrent2 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage3 { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsCurrent3 { get; set; }
+    private List<DateChartData<uint>>? DataPaxCounterWiFi { get; set; }
+    private List<DateChartData<uint>>? DataPaxCounterBle { get; set; }
     private bool HasRenderMapData { get; set; }
     private Osm? Map { get; set; }
 
@@ -546,6 +629,7 @@
     private readonly LineConfig _configAirQuality = Utils.GetLineConfig("Qualité de l'air (IAQ)");
     private readonly LineConfig _configVoltage = Utils.GetLineConfig("Tensions (V)");
     private readonly LineConfig _configCurrent = Utils.GetLineConfig("Intensité (mA)");
+    private readonly LineConfig _configCount = Utils.GetLineConfig("Quantité");
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -703,11 +787,65 @@
     protected override void OnParametersSet()
     {
         LastTelemetryDevice = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics).MaxBy(a => a.CreatedAt);
+        LastTelemetryLocalStats = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.LocalStats).MaxBy(a => a.CreatedAt);
         LastTelemetryEnvironment = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics).MaxBy(a => a.CreatedAt);
         LastTelemetryPower = NodeInfo?.Telemetries.Where(t => t.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics).MaxBy(a => a.CreatedAt);
+
+        if (LastTelemetryLocalStats != null)
+        {
+            var today = DateTime.UtcNow.Date;
+            var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+            
+            var localStatsGroupedByDate = NodeInfo?.Telemetries
+                .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.LocalStats)
+                .GroupBy(a => a.CreatedAt.Date)
+                .ToList() ?? [];
+
+            NumPacketsRx = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsRx) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsRx) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsRx) ?? 0),
+            };
+
+            NumPacketsTx = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsTx) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsTx) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsTx) ?? 0),
+            };
+
+            NumPacketsRxBad = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsRxBad) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsRxBad) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsRxBad) ?? 0),
+            };
+
+            NumRxDupe = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumRxDupe) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumRxDupe) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumRxDupe) ?? 0),
+            };
+
+            NumTxRelay = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumTxRelay) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumTxRelay) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumTxRelay) ?? 0),
+            };
+
+            NumTxRelayCanceled = new PacketsStats
+            {
+                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumTxRelayCanceled) ?? 0),
+                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumTxRelayCanceled) ?? 0),
+                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumTxRelayCanceled) ?? 0),
+            };
+        }
         
         DataAirUtil = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.AirUtilTx  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics or Meshtastic.Protobufs.Telemetry.VariantOneofCase.LocalStats, AirUtilTx: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -716,7 +854,7 @@
             }).ToList();
         
         DataChannelUtil = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.ChannelUtilization  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics or Meshtastic.Protobufs.Telemetry.VariantOneofCase.LocalStats, ChannelUtilization: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -725,7 +863,7 @@
             }).ToList();
         
         DataVoltageBattery = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics && a.Voltage  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.DeviceMetrics, Voltage: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -734,7 +872,7 @@
             }).ToList();
         
         DataWeatherTemperature = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.Temperature  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, Temperature: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -743,7 +881,7 @@
             }).ToList();
         
         DataWeatherHumidity = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.RelativeHumidity != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, RelativeHumidity: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -752,7 +890,7 @@
             }).ToList();
         
         DataWeatherPressure = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.BarometricPressure  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, BarometricPressure: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -760,8 +898,8 @@
                 value = a.BarometricPressure ?? 0
             }).ToList();
         
-        DataAirquality = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics && a.Iaq  != null)
+        DataAirQuality = NodeInfo?.Telemetries
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, Iaq: not null })
             .Select(a => new DateChartData<float>
             {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
@@ -770,7 +908,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage1 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel1Voltage  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel1Voltage: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -778,7 +916,7 @@
             }).ToList();
         
         DataPowerMetricsCurrent1 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel1Current  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel1Current: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",
@@ -786,7 +924,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage2 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel2Voltage  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel2Voltage: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -794,7 +932,7 @@
             }).ToList();
         
         DataPowerMetricsCurrent2 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel2Current  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel2Current: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",
@@ -802,7 +940,7 @@
             }).ToList();
         
         DataPowerMetricsVoltage3 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel3Voltage  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel3Voltage: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Voltage",
@@ -810,11 +948,32 @@
             }).ToList();
         
         DataPowerMetricsCurrent3 = NodeInfo?.Telemetries
-            .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics && a.Channel3Current  != null)
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.PowerMetrics, Channel3Current: not null })
             .Select(a => new DateChartData<float> {
                 date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
                 type = "Intensité",
                 value = a.Channel3Current ?? 0
+            }).ToList();
+        
+        DataPaxCounterWiFi = NodeInfo?.PaxCounters
+            .Select(a => new DateChartData<uint> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "WiFi",
+                value = a.Wifi
+            }).ToList();
+        
+        DataPaxCounterBle = NodeInfo?.PaxCounters
+            .Select(a => new DateChartData<uint> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "WiFi",
+                value = a.Wifi
+            }).ToList();
+        
+        DataPaxCounterBle = NodeInfo?.PaxCounters
+            .Select(a => new DateChartData<uint> {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Bluetooth",
+                value = a.Ble
             }).ToList();
 
         base.OnParametersSet();

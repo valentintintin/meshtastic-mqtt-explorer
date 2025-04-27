@@ -247,6 +247,7 @@ public class HttpClientService(
 
         await httpConfiguration.Client.PutAsync("/api/v1/toradio", new ByteArrayContent(packetBytes));
         
+        // dto.channel quand HTTP est un nombre donc pas bon
         await meshtasticService.DoReceive(packet.Packet.From, dto.Channel, packet.Packet);
     }
 

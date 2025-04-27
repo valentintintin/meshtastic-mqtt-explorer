@@ -15,6 +15,7 @@ public class Node : IEntity
     public string? LongName { get; set; }
     public string? ShortName { get; set; }
     public string? AllNames { get; set; }
+    public string? OldAllNames { get; set; }
 
     public Config.Types.DeviceConfig.Types.Role? Role { get; set; }
     public HardwareModel? HardwareModel { get; set; }
@@ -48,6 +49,7 @@ public class Node : IEntity
     public virtual ICollection<Packet> PacketsTo { get; set; } = [];
     public virtual ICollection<Position> Positions { get; set; } = [];
     public virtual ICollection<Waypoint> Waypoints { get; set; } = [];
+    public virtual ICollection<PaxCounter> PaxCounters { get; set; } = [];
     public virtual ICollection<Telemetry> Telemetries { get; set; } = [];
     public virtual ICollection<NeighborInfo> MyNeighbors { get; set; } = [];
     public virtual ICollection<NeighborInfo> NeighborsFor { get; set; } = [];

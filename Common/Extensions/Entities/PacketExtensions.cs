@@ -17,7 +17,7 @@ public static class PacketExtensions
             .Include(p => p.Gateway)
             .Include(p => p.MqttServer)
             .Include(p => p.RelayNodeNode)
-            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId && a.RelayNodeId != packet.GatewayId)
+            .Where(a => a.PacketId == packet.PacketId && a.FromId == packet.FromId && a.ToId == packet.ToId && a.FromId != a.GatewayId)
             .OrderByDescending(p => p.HopLimit)
             .ThenByDescending(p => p.RxSnr)
             .AsEnumerable()

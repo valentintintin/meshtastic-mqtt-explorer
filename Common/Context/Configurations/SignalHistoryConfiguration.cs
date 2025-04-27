@@ -12,11 +12,13 @@ public class SignalHistoryConfiguration : IEntityTypeConfiguration<SignalHistory
 
         builder.HasOne(a => a.NodeReceiver)
             .WithMany()
-            .HasForeignKey(a => a.NodeReceiverId);
+            .HasForeignKey(a => a.NodeReceiverId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(a => a.NodeHeard)
             .WithMany()
-            .HasForeignKey(a => a.NodeHeardId);
+            .HasForeignKey(a => a.NodeHeardId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Packet)
             .WithMany()

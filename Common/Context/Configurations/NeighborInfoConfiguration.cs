@@ -14,11 +14,13 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
         
         builder.HasOne(a => a.NodeReceiver)
             .WithMany(a => a.MyNeighbors)
-            .HasForeignKey(a => a.NodeReceiverId);
+            .HasForeignKey(a => a.NodeReceiverId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.NodeHeard)
             .WithMany(a => a.NeighborsFor)
-            .HasForeignKey(a => a.NodeHeardId);
+            .HasForeignKey(a => a.NodeHeardId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Packet)
             .WithMany()

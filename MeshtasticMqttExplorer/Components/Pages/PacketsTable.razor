@@ -250,6 +250,7 @@ else
                     PacketsQueryable = PacketsQueryable
                         .Where(a => a.To.NodeId == MeshtasticService.NodeBroadcast)
                         .Where(a => a.FromId == Id)
+                        .Where(a => a.PortNum != PortNum.MapReportApp)
                         .Where(a => a.PacketDuplicated == null);
                     
                     totalQueryable = totalQueryable

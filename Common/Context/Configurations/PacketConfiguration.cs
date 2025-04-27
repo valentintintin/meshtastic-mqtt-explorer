@@ -26,7 +26,8 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
 
         builder.HasOne(a => a.Gateway)
             .WithMany(a => a.PacketsGateway)
-            .HasForeignKey(a => a.GatewayId);
+            .HasForeignKey(a => a.GatewayId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(a => a.GatewayPosition)
             .WithMany()
@@ -40,23 +41,28 @@ public class PacketConfiguration : IEntityTypeConfiguration<Packet>
 
         builder.HasOne(a => a.From)
             .WithMany(a => a.PacketsFrom)
-            .HasForeignKey(a => a.FromId);
+            .HasForeignKey(a => a.FromId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(a => a.To)
             .WithMany(a => a.PacketsTo)
-            .HasForeignKey(a => a.ToId);
+            .HasForeignKey(a => a.ToId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Channel)
             .WithMany(a => a.Packets)
-            .HasForeignKey(a => a.ChannelId);
+            .HasForeignKey(a => a.ChannelId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(a => a.RelayNodeNode)
             .WithMany(a => a.RelayFor)
-            .HasForeignKey(a => a.RelayNodeId);
+            .HasForeignKey(a => a.RelayNodeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasOne(a => a.NextHopNode)
             .WithMany(a => a.NextHopFor)
-            .HasForeignKey(a => a.NextHopId);
+            .HasForeignKey(a => a.NextHopId)
+            .OnDelete(DeleteBehavior.SetNull);
         
         builder.HasOne(a => a.PacketDuplicated)
             .WithMany(a => a.AllDuplicatedPackets)

@@ -13,7 +13,8 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
         
         builder.HasOne(a => a.Node)
             .WithMany(a => a.Positions)
-            .HasForeignKey(a => a.NodeId);
+            .HasForeignKey(a => a.NodeId)
+            .OnDelete(DeleteBehavior.Cascade);
         
         builder.HasOne(a => a.Packet)
             .WithMany()

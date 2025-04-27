@@ -197,6 +197,13 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
                 publishInfo.PacketActivity = await routingService.Route(eventArgs.ClientId, user?.Id,
                     packetAndMeshPacket.Value.packet, packetAndMeshPacket.Value.serviceEnveloppe.Packet);
 
+                if (nodeConfiguration?.Forbidden == true)
+                {
+                    _logger.LogWarning("Packet #{packetId}|{guid} is from node forbidden", publishInfo.MeshPacket.Id, publishInfo.Guid);
+                    publishInfo.PacketActivity.Accepted = false;
+                    publishInfo.PacketActivity.Comment = "Noeud interdit en downlink";
+                }
+                
                 if (publishInfo.PacketActivity.Accepted)
                 {
                     if (publishInfo.MeshPacket.Decoded?.Portnum == PortNum.TextMessageApp)
@@ -271,6 +278,12 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
                 return;
             }
 
+            if (eventArgs.ApplicationMessage.Topic.Contains("stat") ||
+                eventArgs.ApplicationMessage.Topic.Contains("json"))
+            {
+                return;
+            }
+
             var meshPacket = new ServiceEnvelope();
 
             var data = eventArgs.ApplicationMessage.Payload.ToArray();
@@ -290,7 +303,7 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
             }
 
             var publishInfo = _messagesToPublish.FirstOrDefault(a =>
-                a.ClientId == eventArgs.SenderClientId && meshPacket.Packet != null && a.MeshPacket.Id == meshPacket.Packet.Id);
+                a.ClientId == eventArgs.SenderClientId && meshPacket.Packet != null && a.MeshPacket != null && a.MeshPacket.Id == meshPacket.Packet.Id);
 
             if (publishInfo == null)
             {
@@ -473,8 +486,8 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
                 return nodeConfiguration;
             }
             
-            _logger.LogError("Client {clientId} and user#{userId} for node#{nodeId} locked", clientId, user?.Id, nodeConfiguration.Id);
-            throw new UnauthorizedAccessException("User locked");
+            _logger.LogWarning("Client {clientId} and user#{userId} for node#{nodeId} locked", clientId, user?.Id, nodeConfiguration.Id);
+            // throw new UnauthorizedAccessException("User locked");
         }
 
         var node = await context.Nodes.FindByNodeIdAsync(connectedNodeId.Value);

@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Text;
 using Common.Context;
 using Common.Context.Entities;
 using Common.Exceptions;
@@ -6,6 +8,7 @@ using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MQTTnet;
 
 namespace Common.Jobs;
 
@@ -23,7 +26,7 @@ public class MqttReceiveJob(ILogger<MqttReceiveJob> logger, IDbContextFactory<Da
         var services = ServiceProvider.CreateScope().ServiceProvider;
         var mqttService = services.GetRequiredService<MqttService>();
 
-        var mqttClient = MqttClientService.MqttClientAndConfigurations.FirstOrDefault(a => a.MqttServer == mqttServer)?.Client;
+        var mqttClient = MqttClientService.MqttClientAndConfigurations.FirstOrDefault(a => a.MqttServer.Id == mqttServer.Id)?.Client;
         var packet = await mqttService.DoReceive(topic, payload, mqttServer, mqttClient != null ? async message => await mqttClient.PublishAsync(message) : null);
         
         Logger.LogInformation("Received frame#{packetId} from {name} on {topic} with id {guid} done. Frame time {frameTime}", packet?.packet.Id, mqttServer.Name, topic, guid, DateTimeOffset.FromUnixTimeSeconds(packet?.serviceEnveloppe.Packet.RxTime ?? 0));

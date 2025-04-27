@@ -33,6 +33,13 @@ public class Telemetry : IEntity
     
     public float? Channel3Voltage { get; set; }
     public float? Channel3Current { get; set; }
+    
+    public uint? NumPacketsRx { get; set; }
+    public uint? NumPacketsRxBad { get; set; }
+    public uint? NumTxRelayCanceled { get; set; }
+    public uint? NumPacketsTx { get; set; }
+    public uint? NumRxDupe { get; set; }
+    public uint? NumTxRelay { get; set; }
 
     public required Meshtastic.Protobufs.Telemetry.VariantOneofCase Type;
 }

@@ -22,6 +22,8 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         builder.Property(a => a.AllNames).HasMaxLength(256);
         builder.HasIndex(a => a.AllNames);
         
+        builder.Property(a => a.OldAllNames).HasMaxLength(256);
+
         builder.Property(a => a.LongName).HasMaxLength(128);
         builder.HasIndex(a => a.LongName);
         

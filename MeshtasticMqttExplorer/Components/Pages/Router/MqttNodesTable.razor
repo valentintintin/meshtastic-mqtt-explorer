@@ -16,7 +16,7 @@
         @Total nœuds MQTT dont @TotalConnected connectés
     </SubtitleTemplate>
     <PageHeaderContent>
-        <Switch @bind-Checked="OnlyConnected" UnCheckedChildren="Tous les noeuds" CheckedChildren="Seulement les connectés" OnChange="value => SetShowOnlyConnected(value)"/>
+        <Switch @bind-Checked="OnlyConnected" CheckedChildren="Seulement les connectés" UnCheckedChildren="Seulement les connectés" OnChange="value => SetShowOnlyConnected(value)"/>
     </PageHeaderContent>
     <PageHeaderExtra>
         <Button OnClick="FetchData">Actualiser</Button>

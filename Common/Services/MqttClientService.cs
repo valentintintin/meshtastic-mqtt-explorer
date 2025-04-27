@@ -61,8 +61,10 @@ public class MqttClientService(
         {
             throw new NotFoundException<MqttServer>(dto.MqttServerId);
         }
-        
-        var meshtasticService = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<MeshtasticService>();
+
+        var provider = serviceProvider.CreateScope().ServiceProvider;
+        var meshtasticService = provider.GetRequiredService<MeshtasticService>();
+        var mqttService = provider.GetRequiredService<MqttService>();
         
         var topic = (string) dto.RootTopic.Clone();
         
@@ -90,7 +92,7 @@ public class MqttClientService(
 
         await mqttConfiguration.Client.PublishBinaryAsync(topic, packetBytes);
 
-        await meshtasticService.DoReceive(packet.Packet.From, dto.Channel, packet.Packet);
+        await mqttService.DoReceive(topic, packetBytes, mqttConfiguration.MqttServer, async message => await mqttConfiguration.Client.PublishAsync(message));
     }
 
     private async Task ConnectMqtt(MqttClientAndConfiguration mqttClientAndConfiguration)
@@ -130,7 +132,9 @@ public class MqttClientService(
             .Where(a => a.Enabled)
             .Where(a => a.Type == MqttServer.ServerType.Mqtt)
             .AsEnumerable()
-            .Where(a => (_isRecorder && a.Topics.Count > 0) || (_isWorker && a.IsARelayType != null) || _isFront)
+            .Where(a => (_isRecorder && a.Topics.Count > 0 || a.IsARelayType != null || a.MqttPostJson) 
+                        || (_isWorker && (a.IsARelayType != null || a.MqttPostJson))
+                        || _isFront)
             .ToList()
             .Select(a => new MqttClientAndConfiguration
             {

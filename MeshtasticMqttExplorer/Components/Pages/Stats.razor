@@ -17,7 +17,7 @@
 <PageHeader Title="Statistiques">
     <SubtitleTemplate>Depuis le @MinDate.ToFrench()</SubtitleTemplate>
     <PageHeaderContent>
-        <Switch @bind-Checked="ShowOnlyRouterAccepted" Disabled="@Loading" UnCheckedChildren="Compter toutes les trames" CheckedChildren="Compter les trames autorisées uniquement" OnChange="value => SetShowOnlyRouterAccepted(value)"/>
+        <Switch @bind-Checked="ShowOnlyRouterAccepted" Disabled="@Loading" CheckedChildren="Compter les trames autorisées uniquement" UnCheckedChildren="Compter les trames autorisées uniquement" OnChange="value => SetShowOnlyRouterAccepted(value)"/>
         @if (ShowOnlyRouterAccepted)
         {
             @* <Switch @bind-Checked="IncludeOnlyBroadcast" Disabled="@Loading" UnCheckedChildren="Inclure les trames avec destinataire" CheckedChildren="Inclure les trames broadcast uniquement" OnChange="value => SetIncludeOnlyBroadcast(value)"/> *@

@@ -22,11 +22,17 @@ public class PurgeJob(
 
     private async Task PurgeOldData()
     {
-        var minDate = DateTime.UtcNow.Date.AddDays(-configuration.GetValue("PurgeDays", 3));
+        var minDate = DateTime.UtcNow.AddDays(-configuration.GetValue("PurgeDays", 3));
         
         Logger.LogTrace("Delete old data if they are too old < {date}", minDate);
 
         Context.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+
+        var deleteResult = await Context.Nodes.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        Logger.LogInformation("Old nodes deleted {result}", deleteResult);
+
+        deleteResult = await Context.Channels.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        Logger.LogInformation("Old channels deleted {result}", deleteResult);
         
         await Context.Positions.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
         await Context.NeighborInfos.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
@@ -34,24 +40,9 @@ public class PurgeJob(
         await Context.Telemetries.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
         await Context.TextMessages.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
         await Context.Waypoints.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
-        var deleteResult = await Context.Packets.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
-
+        await Context.PaxCounters.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        deleteResult = await Context.Packets.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
         Logger.LogInformation("Old packets deleted {result}", deleteResult);
-
-        var nodesIdToDelete = Context.Nodes.Where(a => a.UpdatedAt < minDate).Select(a => a.Id).ToList();
-        await Context.TextMessages.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId)).ExecuteDeleteAsync();
-        await Context.Packets.Where(a => nodesIdToDelete.Contains(a.ToId) || nodesIdToDelete.Contains(a.FromId) || nodesIdToDelete.Contains(a.GatewayId) || (a.NextHopId.HasValue && nodesIdToDelete.Contains(a.NextHopId.Value)) || (a.RelayNodeId.HasValue && nodesIdToDelete.Contains(a.RelayNodeId.Value))).ExecuteDeleteAsync();
-        await Context.NeighborInfos.Where(a => nodesIdToDelete.Contains(a.NodeHeardId) || nodesIdToDelete.Contains(a.NodeReceiverId)).ExecuteDeleteAsync();
-        deleteResult = await Context.Nodes.Where(a => nodesIdToDelete.Contains(a.Id)).ExecuteDeleteAsync();
-        
-        Logger.LogInformation("Old nodes deleted {result}", deleteResult);
-
-        var channelsIdToDelete = Context.Channels.Where(a => a.UpdatedAt < minDate).Select(a => a.Id).ToList();
-        await Context.TextMessages.Where(a => channelsIdToDelete.Contains(a.ChannelId)).ExecuteDeleteAsync();
-        await Context.Packets.Where(a => channelsIdToDelete.Contains(a.ToId)).ExecuteDeleteAsync();
-        deleteResult = await Context.Channels.Where(a => channelsIdToDelete.Contains(a.Id)).ExecuteDeleteAsync();
-        
-        Logger.LogInformation("Old channels deleted {result}", deleteResult);
     }
 
     private async Task RefreshNodesGateway()

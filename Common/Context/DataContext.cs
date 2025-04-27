@@ -2,6 +2,7 @@ using System.Reflection;
 using Common.Context.Configurations;
 using Common.Context.Entities;
 using Common.Context.Entities.Router;
+using Meshtastic.Protobufs;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ using NeighborInfo = Common.Context.Entities.NeighborInfo;
 using NodeConfiguration = Common.Context.Entities.Router.NodeConfiguration;
 using Position = Common.Context.Entities.Position;
 using Telemetry = Common.Context.Entities.Telemetry;
+using User = Common.Context.Entities.Router.User;
 using Waypoint = Common.Context.Entities.Waypoint;
 
 namespace Common.Context;
@@ -26,6 +28,7 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
     public required DbSet<Channel> Channels { get; set; }
     public required DbSet<TextMessage> TextMessages { get; set; }
     public required DbSet<Waypoint> Waypoints { get; set; }
+    public required DbSet<PaxCounter> PaxCounters { get; set; }
     public required DbSet<SignalHistory> SignalHistories { get; set; }
     
     public required DbSet<MqttServer> MqttServers { get; set; }
@@ -79,9 +82,15 @@ public class DataContext(DbContextOptions<DataContext> options, ILogger<DataCont
                     logger.LogError(e, "Error while saving nodeIdString in SaveChanges for node #{node}", node.Id);
                 }
 
-                try 
+                try
                 {
+                    var oldAllNames = node.AllNames;
                     node.AllNames = node.FullName();
+
+                    if (node.AllNames != oldAllNames)
+                    {
+                        node.OldAllNames = oldAllNames;
+                    }
                 }
                 catch (Exception e)
                 {

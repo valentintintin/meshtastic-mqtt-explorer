@@ -52,8 +52,8 @@
 
         <label for="modulation">Modulation :</label>
         <select id="modulation" required>
-            <option value="LF">LF - Long Fast</option>
             <option value="LM" selected>LM - Long Moderate</option>
+            <option value="LF">LF - Long Fast</option>
         </select>
 
         <label for="frequence">Bande de Fréquence :</label>
@@ -67,12 +67,13 @@
         <select id="role" required>
             <option value="Cl" selected>CLIENT</option>
             <option value="CM">CLIENT_MUTE</option>
+            <option value="CH">CLIENT_HIDDEN</option>
             <option value="Ro">ROUTER</option>
+            <option value="Rl">ROUTER_LATE</option>
             <option value="Re">REPEATER</option>
             <option value="Tr">TRACKER</option>
             <option value="Se">SENSOR</option>
             <option value="Ta">TAK</option>
-            <option value="CH">CLIENT_HIDDEN</option>
             <option value="LF">LOST_AND_FOUND</option>
             <option value="TT">TAK_TRACKER</option>
         </select>
