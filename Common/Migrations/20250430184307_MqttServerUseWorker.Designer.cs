@@ -3,6 +3,7 @@ using System;
 using Common.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Common.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250430184307_MqttServerUseWorker")]
+    partial class MqttServerUseWorker
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -47,9 +50,6 @@ namespace Common.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name");
-
-                    b.HasIndex("UpdatedAt")
-                        .IsDescending();
 
                     b.ToTable("Channels");
                 });
@@ -173,6 +173,8 @@ namespace Common.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("DataSource");
 
                     b.HasIndex("NodeHeardId");
@@ -287,10 +289,16 @@ namespace Common.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("HardwareModel");
+
                     b.HasIndex("LastSeen")
                         .IsDescending();
 
+                    b.HasIndex("Latitude");
+
                     b.HasIndex("LongName");
+
+                    b.HasIndex("Longitude");
 
                     b.HasIndex("ModemPreset");
 
@@ -495,6 +503,8 @@ namespace Common.Migrations
 
                     b.HasIndex("PacketId");
 
+                    b.HasIndex("UpdatedAt");
+
                     b.ToTable("PaxCounters");
                 });
 
@@ -535,8 +545,7 @@ namespace Common.Migrations
 
                     b.HasIndex("PacketId");
 
-                    b.HasIndex("UpdatedAt")
-                        .IsDescending();
+                    b.HasIndex("UpdatedAt");
 
                     b.ToTable("Positions");
                 });
@@ -580,12 +589,16 @@ namespace Common.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("Department");
 
                     b.HasIndex("MqttId");
 
                     b.HasIndex("NodeId")
                         .IsUnique();
+
+                    b.HasIndex("UpdatedAt");
 
                     b.HasIndex("UserId");
 
@@ -628,8 +641,14 @@ namespace Common.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Accepted");
+
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("PacketId")
                         .IsUnique();
+
+                    b.HasIndex("UpdatedAt");
 
                     b.ToTable("PacketActivities", "router");
                 });
@@ -870,6 +889,8 @@ namespace Common.Migrations
 
                     b.HasIndex("Type");
 
+                    b.HasIndex("UpdatedAt");
+
                     b.ToTable("Telemetries");
                 });
 
@@ -965,7 +986,11 @@ namespace Common.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("Name");
 
                     b.HasIndex("NodeId");
 
@@ -1015,12 +1040,6 @@ namespace Common.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<bool>("IncludeHopsDetails")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IncludePayloadDetails")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IncludeStats")
                         .HasColumnType("boolean");
 
                     b.Property<double?>("Latitude")

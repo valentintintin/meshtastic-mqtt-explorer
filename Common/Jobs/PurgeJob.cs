@@ -24,15 +24,15 @@ public class PurgeJob(
     {
         var minDate = DateTime.UtcNow.AddDays(-configuration.GetValue("PurgeDays", 3));
         
-        Logger.LogTrace("Delete old data if they are too old < {date}", minDate);
+        Logger.LogInformation("Delete old data if they are too old < {date}", minDate);
 
         Context.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
 
-        var deleteResult = await Context.Nodes.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
-        Logger.LogInformation("Old nodes deleted {result}", deleteResult);
-
-        deleteResult = await Context.Channels.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
-        Logger.LogInformation("Old channels deleted {result}", deleteResult);
+        // var deleteResult = await Context.Nodes.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        // Logger.LogInformation("Old nodes deleted {result}", deleteResult);
+        //
+        // deleteResult = await Context.Channels.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
+        // Logger.LogInformation("Old channels deleted {result}", deleteResult);
         
         await Context.Positions.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
         await Context.NeighborInfos.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
@@ -41,7 +41,7 @@ public class PurgeJob(
         await Context.TextMessages.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
         await Context.Waypoints.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
         await Context.PaxCounters.Where(a => a.UpdatedAt < minDate).ExecuteDeleteAsync();
-        deleteResult = await Context.Packets.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
+        var deleteResult = await Context.Packets.Where(a => a.CreatedAt < minDate).ExecuteDeleteAsync();
         Logger.LogInformation("Old packets deleted {result}", deleteResult);
     }
 

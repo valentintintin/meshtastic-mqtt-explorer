@@ -9,7 +9,6 @@ public class PaxCounterConfiguration : IEntityTypeConfiguration<PaxCounter>
     public void Configure(EntityTypeBuilder<PaxCounter> builder)
     {
         builder.HasIndex(a => a.CreatedAt);
-        builder.HasIndex(a => a.UpdatedAt);
         
         builder.HasOne(a => a.Node)
             .WithMany(a => a.PaxCounters)

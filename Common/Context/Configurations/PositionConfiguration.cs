@@ -9,7 +9,7 @@ public class PositionConfiguration : IEntityTypeConfiguration<Position>
     public void Configure(EntityTypeBuilder<Position> builder)
     {
         builder.HasIndex(a => a.CreatedAt);
-        builder.HasIndex(a => a.UpdatedAt);
+        builder.HasIndex(a => a.UpdatedAt).IsDescending();
         
         builder.HasOne(a => a.Node)
             .WithMany(a => a.Positions)

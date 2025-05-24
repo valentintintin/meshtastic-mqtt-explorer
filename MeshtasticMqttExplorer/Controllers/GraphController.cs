@@ -20,16 +20,18 @@ public class GraphController(ILogger<GraphController> logger, IDbContextFactory<
         
         var context = await contextFactory.CreateDbContextAsync();
 
+        var aDay = DateTime.UtcNow.AddHours(-24);
+        
         var links = await context.NeighborInfos
             .Include(a => a.NodeReceiver)
             .ThenInclude(a => a.Telemetries.OrderByDescending(t => t.UpdatedAt).Take(10))
             .Include(a => a.NodeHeard)
-            .Where(a => a.DataSource != NeighborInfo.Source.Unknown)
+            .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.DataSource != NeighborInfo.Source.NextHop)
             .Where(n => !MeshtasticService.NodesIgnored.Contains(n.NodeReceiver.NodeId) && !MeshtasticService.NodesIgnored.Contains(n.NodeHeard.NodeId))
             .Where(a => a.Distance > 0 && a.Distance < MeshtasticUtils.DefaultDistanceAllowed)
+            .Where(a => a.UpdatedAt >= aDay)
             .OrderByDescending(n => n.UpdatedAt)
-            .ToListAsync()
-            ;
+            .ToListAsync();
 
         return new GraphDto
         {

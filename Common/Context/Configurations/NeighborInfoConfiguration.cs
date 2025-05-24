@@ -9,7 +9,6 @@ public class NeighborInfoConfiguration : IEntityTypeConfiguration<NeighborInfo>
 {
     public void Configure(EntityTypeBuilder<NeighborInfo> builder)
     {
-        builder.HasIndex(a => a.CreatedAt);
         builder.HasIndex(a => a.UpdatedAt);
         
         builder.HasOne(a => a.NodeReceiver)

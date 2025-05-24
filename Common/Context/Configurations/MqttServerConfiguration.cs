@@ -9,9 +9,9 @@ public class MqttServerConfiguration : IEntityTypeConfiguration<MqttServer>
 {
     public void Configure(EntityTypeBuilder<MqttServer> builder)
     {
-        builder.HasIndex(a => a.Name);
         builder.Property(a => a.Name).HasMaxLength(128);
-        
+        builder.HasIndex(a => a.Name);
+
         builder.Property(a => a.Host).HasMaxLength(128);
         
         builder.Property(a => a.Username).HasMaxLength(128);

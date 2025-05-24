@@ -12,78 +12,68 @@ namespace Common.Services;
 
 public class NotificationService(ILogger<AService> logger, IDbContextFactory<DataContext> contextFactory, IConfiguration configuration) : AService(logger, contextFactory)
 {
-    private readonly SemaphoreSlim _lock = new(1, 1);
-    
     public async Task SendNotification(Packet packet)
     {
-        await _lock.WaitAsync();
+        var context = await ContextFactory.CreateDbContextAsync();
 
-        try
+        var notificationsCanalToSend = context.Webhooks
+            .Where(n => n.Enabled)
+            .Where(n => !n.PortNum.HasValue || packet.PortNum == n.PortNum)
+            .Where(n => packet.PortNum != PortNum.MapReportApp)
+            .Where(n => !n.From.HasValue || packet.From.NodeId == n.From)
+            .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
+            .Where(n => !n.Gateway.HasValue || packet.Gateway.NodeId == n.Gateway)
+            .Where(n => !n.FromOrTo.HasValue
+                        || packet.From.NodeId == n.FromOrTo
+                        || packet.To.NodeId == n.FromOrTo)
+            .Where(n => !n.MqttServerId.HasValue
+                        || !n.OnlyWhenDifferentMqttServer && (packet.MqttServerId == n.MqttServerId
+                                                              || packet.From.MqttServerId == n.MqttServerId
+                                                              || packet.Gateway.MqttServerId == n.MqttServerId
+                                                              || (packet.PacketDuplicated != null &&
+                                                                  packet.PacketDuplicated.MqttServerId ==
+                                                                  n.MqttServerId)
+                        )
+                        || (n.OnlyWhenDifferentMqttServer && packet.From.MqttServerId != n.MqttServerId &&
+                            packet.FromId != packet.GatewayId)
+            )
+            .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
+            .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
+            // .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
+            .AsEnumerable()
+            .Where(n =>
+                !n.DistanceAroundPositionKm.HasValue
+                || (
+                    n is { Latitude: not null, Longitude: not null }
+                    && packet.GatewayPosition != null
+                    && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value,
+                        packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <=
+                    n.DistanceAroundPositionKm
+                )
+            )
+            .Union(
+                context.WebhooksHistories
+                    .Where(nn => nn.Packet.PacketId == packet.PacketId)
+                    .Select(n => n.Webhook)
+                    .Where(nn => !string.IsNullOrWhiteSpace(nn.UrlToEditMessage))
+                    .Where(nn => nn.Enabled)
+            )
+            .DistinctBy(n => n.Url)
+            .ToList();
+
+        if (notificationsCanalToSend.Count == 0)
         {
-            var context = await ContextFactory.CreateDbContextAsync();
-
-            var notificationsCanalToSend = context.Webhooks
-                .Where(n => n.Enabled)
-                .Where(n => !n.PortNum.HasValue || packet.PortNum == n.PortNum)
-                .Where(n => !n.From.HasValue || packet.From.NodeId == n.From)
-                .Where(n => !n.To.HasValue || packet.To.NodeId == n.To)
-                .Where(n => !n.Gateway.HasValue || packet.Gateway.NodeId == n.Gateway)
-                .Where(n => !n.FromOrTo.HasValue
-                            || packet.From.NodeId == n.FromOrTo
-                            || packet.To.NodeId == n.FromOrTo)
-                .Where(n => !n.MqttServerId.HasValue
-                            || !n.OnlyWhenDifferentMqttServer && (packet.MqttServerId == n.MqttServerId
-                                                                  || packet.From.MqttServerId == n.MqttServerId
-                                                                  || packet.Gateway.MqttServerId == n.MqttServerId
-                                                                  || (packet.PacketDuplicated != null &&
-                                                                      packet.PacketDuplicated.MqttServerId ==
-                                                                      n.MqttServerId)
-                            )
-                            || (n.OnlyWhenDifferentMqttServer && packet.From.MqttServerId != n.MqttServerId &&
-                                packet.FromId != packet.GatewayId)
-                )
-                .Where(n => string.IsNullOrWhiteSpace(n.Channel) || packet.Channel.Name == n.Channel)
-                .Where(n => n.AllowByHimSelf || packet.FromId != packet.GatewayId)
-                // .Where(n => packet.PacketDuplicated == null || n.AllowDuplication)
-                .AsEnumerable()
-                .Where(n =>
-                    !n.DistanceAroundPositionKm.HasValue
-                    || (
-                        n is { Latitude: not null, Longitude: not null }
-                        && packet.GatewayPosition != null
-                        && MeshtasticUtils.CalculateDistance(n.Latitude.Value, n.Longitude.Value,
-                            packet.GatewayPosition.Latitude, packet.GatewayPosition.Longitude) <=
-                        n.DistanceAroundPositionKm
-                    )
-                )
-                .Union(
-                    context.WebhooksHistories
-                        .Where(nn => nn.Packet.PacketId == packet.PacketId)
-                        .Select(n => n.Webhook)
-                        .Where(nn => !string.IsNullOrWhiteSpace(nn.UrlToEditMessage))
-                        .Where(nn => nn.Enabled)
-                )
-                .DistinctBy(n => n.Url)
-                .ToList();
-
-            if (notificationsCanalToSend.Count == 0)
-            {
-                return;
-            }
-
-            foreach (var notificationConfiguration in notificationsCanalToSend)
-            {
-                var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails);
-                await MakeRequest(notificationConfiguration, message, packet, context);
-            }
+            return;
         }
-        finally
+
+        foreach (var notificationConfiguration in notificationsCanalToSend)
         {
-            _lock.Release();
+            var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails, notificationConfiguration.IncludePayloadDetails, notificationConfiguration.IncludeStats);
+            await MakeRequest(notificationConfiguration, message, packet, context);
         }
     }
 
-    public string GetPacketMessageToSend(Packet packet, DataContext context, bool includeHopsDetails = true)
+    public string GetPacketMessageToSend(Packet packet, DataContext context, bool includeHopsDetails = true, bool includePayloadDetails = true, bool includeStats = true)
     {
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
@@ -105,15 +95,20 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
             foreach (var aPacketData in allPackets)
             {
-                var i = 0;
-
                 message += $"(<b>{aPacketData.Hop}</b>/{packet.HopStart}) ";
                 
                 foreach (var aPacket in aPacketData.Packets)
                 {
-                    message += (aPacket.RelayNodeNode != null ? $"<b>{aPacket.RelayNodeNode.OneName(true)}</b>>" : "") 
-                        + $"<b>{aPacket.Gateway.OneName(true)}</b> ({aPacket.RxSnr})"
-                        + " ; ";
+                    if (aPacket.RelayNodeNode != null)
+                    {
+                        message += $"<b>{aPacket.RelayNodeNode.OneName(true)}</b>>";
+                    }
+                    else if (aPacket.RelayNode > 0)
+                    {
+                        message += $"<b>0x{aPacket.RelayNode}</b>>";
+                    }
+                    
+                    message += $"<b>{aPacket.Gateway.OneName(true)}</b> ({aPacket.RxSnr}) ; ";
                 }
 
                 message += "" + '\n';
@@ -122,9 +117,35 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         message = message.TrimEnd()
                   + '\n'
-                  + $"> <b>{(isText ? "" : $"{packet.PortNum} :\n")}{packet.PayloadJson?.Trim('"')}</b>"
+                  + $"> <b>{(isText ? "" : $"{packet.PortNum}")}";
+        
+        if (includePayloadDetails)
+        {
+            if (!isText)
+            {
+                message += "" + '\n';
+            }
+
+            message += packet.PayloadJson?.Trim('"');
+        }
+        else if (isText)
+        {
+            message += packet.PayloadJson?.Trim('"');
+        }
+        
+        message = message.TrimEnd()
+                  + "</b>"
                   + '\n'
                   + $"{configuration.GetValue<string>("FrontUrl")}/packet/{packet.PacketDuplicatedId ?? packet.Id}";
+
+        if (includeStats)
+        {
+            var packetsStats = context.Packets.Where(a => a.PortNum == packet.PortNum && a.From == packet.From && a.To == packet.To && a.PacketDuplicated == null);
+            var countToday = packetsStats.Count(a => a.CreatedAt.Date == packet.CreatedAt.Date); 
+            var lastPacketDate = packetsStats.OrderByDescending(a => a.CreatedAt).FirstOrDefault(a => a.PacketId != packet.PacketId)?.CreatedAt;
+
+            message += '\n' + $"Dernier : <b>{(int?) (DateTime.UtcNow - lastPacketDate)?.TotalMinutes ?? 0}</b> min | Aujourd'hui : <b>{countToday}</b>";
+        }
         
         return message;
     }
@@ -165,11 +186,15 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         {
             var response = await client.GetAsync(requestUrl);
 
-            response.EnsureSuccessStatusCode();
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Logger.LogError("Send notification to {name} for packet #{packetId} KO : {content}", webhook.Name, packet.Id, responseContent);
+                return null;
+            }
 
             Logger.LogInformation("Send notification to {name} for packet #{packetId} OK", webhook.Name, packet.Id);
-
-            var responseContent = await response.Content.ReadAsStringAsync();
             
             if (requestUrl.StartsWith("https://api.telegram.org/"))
             {

@@ -30,7 +30,6 @@ namespace Common.Services;
 
 public class MqttClientService(
     ILogger<MqttClientService> logger,
-    IConfiguration configuration,
     IDbContextFactory<DataContext> contextFactory,
     IHostEnvironment environment,
     IServiceProvider serviceProvider,
@@ -41,6 +40,9 @@ public class MqttClientService(
     private readonly bool _isWorker = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Worker") ?? false;
     private readonly bool _isRecorder = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Recorder") ?? false;
     private readonly bool _isFront = Assembly.GetEntryAssembly()?.GetName().Name?.Contains("Explorer") ?? false;
+
+    private bool _highLoadTimerAllowed = true;
+    private readonly System.Timers.Timer _highLoadTimer = new(5000);
     
     public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] payload, MqttServer mqttServer)
     {
@@ -127,6 +129,13 @@ public class MqttClientService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
+        
+        _highLoadTimer.Elapsed += (_, _) => _highLoadTimerAllowed = true;
+        _highLoadTimer.AutoReset = false;
+        _highLoadTimer.Enabled = true;
+        _highLoadTimer.Start();
+
         MqttClientAndConfigurations.AddRange(
             (await contextFactory.CreateDbContextAsync(stoppingToken)).MqttServers
             .Where(a => a.Enabled)
@@ -173,9 +182,14 @@ public class MqttClientService(
             
             mqttClientAndConfiguration.Client.ApplicationMessageReceivedAsync += async e =>
             {
-                if (mqttClientAndConfiguration.MqttServer.IsHighLoad && (JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet-2") > 20 || JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet") > 100))
+                if (mqttClientAndConfiguration.MqttServer.IsHighLoad)
                 {
-                    return;
+                    if (!_highLoadTimerAllowed || JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet-2") > 20 || JobStorage.Current.GetMonitoringApi().EnqueuedCount("packet") > 100)
+                    {
+                        return;
+                    }
+                    
+                    _highLoadTimer.Stop();
                 }
                 
                 var topic = e.ApplicationMessage.Topic;
@@ -192,7 +206,7 @@ public class MqttClientService(
                 mqttClientAndConfiguration.NbPacket++;
                 mqttClientAndConfiguration.LastPacketReceivedDate = DateTime.UtcNow;
 
-                if (configuration.GetValue("UseWorker", false) || mqttClientAndConfiguration.MqttServer.IsHighLoad)
+                if (mqttClientAndConfiguration.MqttServer.UseWorker)
                 {
                     var queue = mqttClientAndConfiguration.MqttServer.IsHighLoad ? "packet-2" : "packet";
                     backgroundJobClient.Enqueue<MqttReceiveJob>(queue, a => a.ExecuteAsync(topic, e.ApplicationMessage.Payload.ToArray(), mqttClientAndConfiguration.MqttServer.Id, guid));
@@ -202,6 +216,9 @@ public class MqttClientService(
                     await DoReceive(topic, e.ApplicationMessage.Payload.ToArray(),
                         mqttClientAndConfiguration.MqttServer);
                 }
+
+                _highLoadTimerAllowed = false;
+                _highLoadTimer.Start();
             };
 
             mqttClientAndConfiguration.Client.DisconnectedAsync += async args =>

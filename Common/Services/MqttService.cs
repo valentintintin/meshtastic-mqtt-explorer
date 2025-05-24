@@ -5,7 +5,9 @@ using System.Text.Json;
 using Common.Context;
 using Common.Context.Entities;
 using Common.Extensions;
+using Common.Jobs;
 using Google.Protobuf;
+using Hangfire;
 using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +18,7 @@ using Position = Meshtastic.Protobufs.Position;
 namespace Common.Services;
 
 public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, 
-    MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
+    MeshtasticService meshtasticService, NotificationService notificationService, IBackgroundJobClient backgroundJobClient) : AService(logger, contextFactory)
 {
     public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] data, MqttServer mqttServer, Func<MqttApplicationMessage, Task>? sendAsJsonPayload = null)
     {
@@ -45,7 +47,9 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
             if (packetAndMeshPacket?.packet != null)
             {
                 var packet = packetAndMeshPacket.Value.packet;
-                await notificationService.SendNotification(packet);
+
+                backgroundJobClient.Enqueue<NotificationJob>("notification", a => a.ExecuteAsync(packet.Id));
+                // await notificationService.SendNotification(packet);
 
                 if (packet.PacketDuplicatedId == null && mqttServer.ShouldBeRelayed)
                 {
@@ -162,7 +166,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
             packet.MqttServer = await Context.MqttServers.FindAsync(mqttServerId);
             packet.MqttTopic = topics.Take(topics.Length - 1).JoinString("/");
             Context.Update(packet);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
             
             if (packet.From == packet.Gateway && packet.PortNum != PortNum.MapReportApp || packet.From.MqttServer == null)
             {
@@ -170,7 +174,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
                 
                 packet.From.MqttServer = packet.MqttServer;
                 Context.Update(packet.From);
-                await Context.SaveChangesAsync();
+                // await Context.SaveChangesAsync();
             }
 
             Config.Types.LoRaConfig.Types.RegionCode? regionCode = null;

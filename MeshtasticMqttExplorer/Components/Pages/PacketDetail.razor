@@ -1,5 +1,7 @@
 ﻿@page "/packet/{id:long}"
 @page "/packet/by-packetid/{packetId:long}"
+@page "/packet/by-reply-packetid/{replyId:long}"
+@page "/packet/by-request-packetid/{requestId:long}"
 
 @implements IAsyncDisposable
 
@@ -82,6 +84,10 @@
                         }
                     </TimelineItem>
                 </Timeline>
+                
+                <div>
+                    Canal : <b>@Packet.Channel.Name</b>
+                </div>
 
                 <div>
                     @if (Packet.RequestId > 0)
@@ -97,6 +103,20 @@
                             <text>Réponse à la trame </text><a href="/packet/by-packetid/@Packet.ReplyId" target="_blank" rel="nofollow">#@Packet.ReplyId</a>
                         </p>
                     }
+
+                    @if (Packet.WantAck == true)
+                    {
+                        <p>
+                            <a href="/packet/by-reply-packetid/@Packet.PacketId" target="_blank" rel="nofollow">Voir la trame ack retour</a>
+                        </p>
+                    }
+
+                    @if (Packet.WantResponse == true)
+                    {
+                        <p>
+                            <a href="/packet/by-request-packetid/@Packet.PacketId" target="_blank" rel="nofollow">Voir la trame réponse</a>
+                        </p>
+                    }
                     
                     @if (Packet.PacketDuplicatedId != null)
                     {
@@ -105,6 +125,19 @@
                         </p>
                     }
                 </div>
+                
+                @if (Packet.PacketActivity != null)
+                {
+                    <div>
+                        MQTT : @(Packet.PacketActivity.Accepted ? $"Autorisée {Packet.PacketActivity.HopLimit} sauts" : "Refusée")
+                        <br />
+                        @Packet.PacketActivity.Comment
+                        <details>
+                            <summary>Clients MQTT qui ont reçu</summary>
+                            <pre>@Packet.PacketActivity.ReceiverIds.Order().JoinString("\n")</pre>
+                        </details>
+                    </div>
+                }
             </div>
             
             @if (AllDuplicatedPackets.Any())
@@ -176,6 +209,12 @@
     
     [Parameter]
     public long? PacketId { get; set; }
+    
+    [Parameter]
+    public long? ReplyId { get; set; }
+    
+    [Parameter]
+    public long? RequestId { get; set; }
 
     private RenderFragment ContentNotificationText => @<div>@NotificationText</div>;
     private string? NotificationText { get; set; }
@@ -210,6 +249,7 @@
             .ThenInclude(n => n.NodeHeard)
             .Include(n => n.To)
             .Include(n => n.Gateway)
+            .Include(n => n.PacketActivity)
             .AsNoTrackingWithIdentityResolution()
         ;
 
@@ -220,6 +260,14 @@
         else if (PacketId != 0 && PacketId.HasValue)
         {
             Packet = await query.FindByPacketIdAsync((uint) PacketId.Value);
+        }
+        else if (ReplyId != 0 && ReplyId.HasValue)
+        {
+            Packet = await query.Where(a => a.ReplyId == ReplyId).FindByPacketIdAsync((uint) ReplyId.Value);
+        }
+        else if (RequestId != 0 && RequestId.HasValue)
+        {
+            Packet = await query.Where(a => a.RequestId == RequestId).FindByPacketIdAsync((uint) RequestId.Value);
         }
 
         if (Packet == null)

@@ -50,8 +50,8 @@ public class Packet : IEntity
     
     public string? PayloadJson { get; set; }
     public bool? WantResponse { get; set; }
-    public long? RequestId { get; set; }
-    public long? ReplyId { get; set; }
+    public uint? RequestId { get; set; }
+    public uint? ReplyId { get; set; }
     
     public long? MqttServerId { get; set; }
     public virtual MqttServer? MqttServer { get; set; }

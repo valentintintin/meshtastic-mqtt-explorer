@@ -33,6 +33,8 @@ public class HttpClientService(
     
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await Task.Yield();
+        
         HttpClientAndConfigurations.AddRange(
             (await contextFactory.CreateDbContextAsync(stoppingToken)).MqttServers
                 .Where(a => a.Type == MqttServer.ServerType.NodeHttp)

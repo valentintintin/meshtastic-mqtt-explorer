@@ -15,6 +15,8 @@ public class Webhook : IEntity
     public bool Enabled { get; set; } = true;
     
     public bool IncludeHopsDetails { get; set; } = true;
+    public bool IncludePayloadDetails { get; set; } = true;
+    public bool IncludeStats { get; set; }
     
     public bool AllowDuplication { get; set; }
     public bool AllowByHimSelf { get; set; }

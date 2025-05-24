@@ -8,7 +8,7 @@ public static class PacketExtensions
 {
     public static async Task<Packet?> FindByPacketIdAsync(this IQueryable<Packet> packets, uint packetId)
     {
-        return packetId > 0 ? await packets.OrderBy(p => p.CreatedAt).FirstOrDefaultAsync(n => n.PacketId == packetId) : null;
+        return packetId > 0 ? await packets.OrderByDescending(p => p.CreatedAt).FirstOrDefaultAsync(n => n.PacketId == packetId) : null;
     }
 
     public static List<PacketsHop> GetAllPacketForPacketIdGroupedByHops(this IQueryable<Packet> packets, Packet packet)

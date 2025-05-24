@@ -163,26 +163,59 @@
                                     <DescriptionsItem Title="Pression atmosphérique">
                                         @(Telemetry?.EnvironmentMetrics?.BarometricPressure.IfNaNOrInfinityGetNull())hPa
                                     </DescriptionsItem>
+                                    <DescriptionsItem Title="Vitesse du vent">
+                                        @(Telemetry?.EnvironmentMetrics?.WindSpeed.IfNaNOrInfinityGetNull())m/s
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Direction du vent">
+                                        @(Telemetry?.EnvironmentMetrics?.WindDirection)°
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Rafale de vent">
+                                        @(Telemetry?.EnvironmentMetrics?.WindGust.IfNaNOrInfinityGetNull())m/s
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Pluie dernière heure">
+                                        @(Telemetry?.EnvironmentMetrics?.Rainfall1H.IfNaNOrInfinityGetNull())mm
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Pluie dernière 24 heures">
+                                        @(Telemetry?.EnvironmentMetrics?.Rainfall24H.IfNaNOrInfinityGetNull())mm
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Distance">
+                                        @(Telemetry?.EnvironmentMetrics?.Distance.IfNaNOrInfinityGetNull())
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Radiation">
+                                        @(Telemetry?.EnvironmentMetrics?.Radiation.IfNaNOrInfinityGetNull())
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Lux">
+                                        @(Telemetry?.EnvironmentMetrics?.Lux.IfNaNOrInfinityGetNull())Lux
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="IR Lux">
+                                        @(Telemetry?.EnvironmentMetrics?.IrLux.IfNaNOrInfinityGetNull())Lux
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="UV Lux">
+                                        @(Telemetry?.EnvironmentMetrics?.UvLux.IfNaNOrInfinityGetNull())Lux
+                                    </DescriptionsItem>
+                                    <DescriptionsItem Title="Lux Blanc">
+                                        @(Telemetry?.EnvironmentMetrics?.WhiteLux.IfNaNOrInfinityGetNull())Lux
+                                    </DescriptionsItem>
                                 }
                                 @if (Telemetry?.VariantCase == Telemetry.VariantOneofCase.PowerMetrics)
                                 {
                                     <DescriptionsItem Title="Voltage 1">
-                                        @(Telemetry?.PowerMetrics?.Ch1Voltage.IfNaNOrInfinityGetNull())°C
+                                        @(Telemetry?.PowerMetrics?.Ch1Voltage.IfNaNOrInfinityGetNull())V
                                     </DescriptionsItem>
                                     <DescriptionsItem Title="Intensité 1">
-                                        @(Telemetry?.PowerMetrics?.Ch1Current.IfNaNOrInfinityGetNull())%
+                                        @(Telemetry?.PowerMetrics?.Ch1Current.IfNaNOrInfinityGetNull())mA
                                     </DescriptionsItem>
                                     <DescriptionsItem Title="Voltage 2">
-                                        @(Telemetry?.PowerMetrics?.Ch2Voltage.IfNaNOrInfinityGetNull())°C
+                                        @(Telemetry?.PowerMetrics?.Ch2Voltage.IfNaNOrInfinityGetNull())V
                                     </DescriptionsItem>
                                     <DescriptionsItem Title="Intensité 2">
-                                        @(Telemetry?.PowerMetrics?.Ch2Current.IfNaNOrInfinityGetNull())%
+                                        @(Telemetry?.PowerMetrics?.Ch2Current.IfNaNOrInfinityGetNull())mA
                                     </DescriptionsItem>
                                     <DescriptionsItem Title="Voltage 3">
-                                        @(Telemetry?.PowerMetrics?.Ch3Voltage.IfNaNOrInfinityGetNull())°C
+                                        @(Telemetry?.PowerMetrics?.Ch3Voltage.IfNaNOrInfinityGetNull())V
                                     </DescriptionsItem>
                                     <DescriptionsItem Title="Intensité 3">
-                                        @(Telemetry?.PowerMetrics?.Ch3Current.IfNaNOrInfinityGetNull())%
+                                        @(Telemetry?.PowerMetrics?.Ch3Current.IfNaNOrInfinityGetNull())mA
                                     </DescriptionsItem>
                                 }
                             </Descriptions>

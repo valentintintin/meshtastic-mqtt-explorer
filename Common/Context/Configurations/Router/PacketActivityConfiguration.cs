@@ -11,11 +11,6 @@ public class PacketActivityConfiguration : IEntityTypeConfiguration<PacketActivi
     {
         builder.ToTable("PacketActivities", "router");
         
-        builder.HasIndex(a => a.CreatedAt);
-        builder.HasIndex(a => a.UpdatedAt);
-
-        builder.HasIndex(a => a.Accepted);
-        
         builder.Property(a => a.ReceiverIds).ListOfString();
         builder.Property(a => a.Comment).HasMaxLength(256);
     }

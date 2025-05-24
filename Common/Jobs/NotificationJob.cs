@@ -21,6 +21,8 @@ public class NotificationJob(ILogger<NotificationJob> logger, IDbContextFactory<
             .Include(n => n.From)
             .Include(n => n.To)
             .Include(n => n.Gateway)
+            .Include(n => n.GatewayPosition)
+            .Include(n => n.PacketDuplicated)
             .FindByIdAsync(packetId);
 
         if (packet == null)

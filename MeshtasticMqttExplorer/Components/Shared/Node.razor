@@ -41,8 +41,8 @@
                             <TimeElapsed Value="@(DateTime.UtcNow - NodeInfo.LastSeen)" Fallback="-"></TimeElapsed>
                         </DescriptionsItem>
                         
-                        <DescriptionsItem Title="Nombre de trames broadcast (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                            @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)/@(PacketsInfo?.Total ?? 0)
+                        <DescriptionsItem Title="Nombre de trames broadcast (aujourd'hui/hier)" ContentStyle="font-weight: bold">
+                            @(PacketsInfo?.Today ?? 0)/@(PacketsInfo?.Yesterday ?? 0)
                             <a href="/node/@NodeInfo.Id/packets" rel="nofollow">Voir</a>
                         </DescriptionsItem>
                         
@@ -137,30 +137,32 @@
                         {
                             <DescriptionsItem Title="Dernière télémétrie stats" ContentStyle="font-weight: bold">
                                 <TimeElapsed Value="DateTime.UtcNow - LastTelemetryLocalStats?.CreatedAt" Fallback="-"></TimeElapsed>
+                                <br />
+                                Depuis <TimeElapsed Value="NumPacketsRx?.Uptime" Fallback="-"></TimeElapsed>
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de trames RX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumPacketsRx?.Today/@NumPacketsRx?.Yesterday/@NumPacketsRx?.Total
+                            <DescriptionsItem Title="Nombre de trames RX" ContentStyle="font-weight: bold">
+                                @NumPacketsRx?.Total
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de mauvaises trames RX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumPacketsRxBad?.Today/@NumPacketsRxBad?.Yesterday/@NumPacketsRxBad?.Total
+                            <DescriptionsItem Title="Nombre de trames en double" ContentStyle="font-weight: bold">
+                                @NumRxDupe?.Total
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de trames TX (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumPacketsTx?.Today/@NumPacketsTx?.Yesterday/@NumPacketsTx?.Total
+                            <DescriptionsItem Title="Nombre de mauvaises trames RX" ContentStyle="font-weight: bold">
+                                @NumPacketsRxBad?.Total
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de trames en double (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumRxDupe?.Today/@NumRxDupe?.Yesterday/@NumRxDupe?.Total
+                            <DescriptionsItem Title="Nombre de trames TX" ContentStyle="font-weight: bold">
+                                @NumPacketsTx?.Total
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de trames relayées (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumTxRelay?.Today/@NumTxRelay?.Yesterday/@NumTxRelay?.Total
+                            <DescriptionsItem Title="Nombre de trames relayées" ContentStyle="font-weight: bold">
+                                @NumTxRelay?.Total
                             </DescriptionsItem>
 
-                            <DescriptionsItem Title="Nombre de trames non relayées (aujourd'hui/hier/total)" ContentStyle="font-weight: bold">
-                                @NumTxRelayCanceled?.Today/@NumTxRelayCanceled?.Yesterday/@NumTxRelayCanceled?.Total
+                            <DescriptionsItem Title="Nombre de trames non relayées" ContentStyle="font-weight: bold">
+                                @NumTxRelayCanceled?.Total
                             </DescriptionsItem>
                         }
                         
@@ -589,19 +591,19 @@
     public required Common.Context.Entities.Node? NodeInfo { get; set; }
     
     [Parameter]
-    public PacketsStats? PacketsInfo { get; set; }
+    public PacketsStats<int>? PacketsInfo { get; set; }
 
     private Telemetry? LastTelemetryDevice { get; set; }
     private Telemetry? LastTelemetryLocalStats { get; set; }
     private Telemetry? LastTelemetryEnvironment { get; set; }
     private Telemetry? LastTelemetryPower { get; set; }
     
-    private PacketsStats? NumPacketsRx { get; set; }
-    private PacketsStats? NumPacketsRxBad { get; set; }
-    private PacketsStats? NumTxRelayCanceled { get; set; }
-    private PacketsStats? NumPacketsTx { get; set; }
-    private PacketsStats? NumRxDupe { get; set; }
-    private PacketsStats? NumTxRelay { get; set; }
+    private PacketsStats<uint>? NumPacketsRx { get; set; }
+    private PacketsStats<uint>? NumPacketsRxBad { get; set; }
+    private PacketsStats<uint>? NumTxRelayCanceled { get; set; }
+    private PacketsStats<uint>? NumPacketsTx { get; set; }
+    private PacketsStats<uint>? NumRxDupe { get; set; }
+    private PacketsStats<uint>? NumTxRelay { get; set; }
     
     private List<DateChartData<float>>? DataAirUtil { get; set; }
     private List<DateChartData<float>>? DataChannelUtil { get; set; }
@@ -796,52 +798,54 @@
             var today = DateTime.UtcNow.Date;
             var yesterday = DateTime.UtcNow.Date.AddDays(-1);
             
-            var localStatsGroupedByDate = NodeInfo?.Telemetries
+            var localStats = NodeInfo?.Telemetries
                 .Where(a => a.Type == Meshtastic.Protobufs.Telemetry.VariantOneofCase.LocalStats)
-                .GroupBy(a => a.CreatedAt.Date)
                 .ToList() ?? [];
 
-            NumPacketsRx = new PacketsStats
+            NumPacketsRx = new PacketsStats<uint>();
+            NumPacketsTx = new PacketsStats<uint>();
+            NumPacketsRxBad = new PacketsStats<uint>();
+            NumRxDupe = new PacketsStats<uint>();
+            NumTxRelay = new PacketsStats<uint>();
+            NumTxRelayCanceled = new PacketsStats<uint>();
+            
+            uint rx = 0, tx = 0, rxBad = 0, rxDupe = 0, txRelay = 0, txRelayCanceled = 0;
+            TimeSpan uptime = TimeSpan.Zero;
+            Telemetry? lastItem = null;
+            
+            foreach (var item in localStats)
             {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsRx) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsRx) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsRx) ?? 0),
-            };
+                if (lastItem == null || lastItem.Uptime <= item.Uptime)
+                {
+                    lastItem = item;
+                }
+                else
+                {
+                    NumPacketsRx.Total += rx;
+                    NumPacketsTx.Total += tx;
+                    NumPacketsRxBad.Total += rxBad;
+                    NumRxDupe.Total += rxDupe;
+                    NumTxRelay.Total += txRelay;
+                    NumTxRelayCanceled.Total += txRelayCanceled;
+                    NumPacketsRx.Uptime = NumPacketsRx.Uptime.Add(uptime);
+                    lastItem = null;
+                }
+                
+                rx = item.NumPacketsRx ?? 0;
+                tx = item.NumPacketsTx ?? 0;
+                rxBad = item.NumPacketsRxBad ?? 0;
+                rxDupe = item.NumRxDupe ?? 0;
+                txRelay = item.NumTxRelay ?? 0;
+                txRelayCanceled = item.NumTxRelayCanceled ?? 0;
+                uptime = item.Uptime ?? TimeSpan.Zero;
+            }
 
-            NumPacketsTx = new PacketsStats
-            {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsTx) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsTx) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsTx) ?? 0),
-            };
-
-            NumPacketsRxBad = new PacketsStats
-            {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumPacketsRxBad) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumPacketsRxBad) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumPacketsRxBad) ?? 0),
-            };
-
-            NumRxDupe = new PacketsStats
-            {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumRxDupe) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumRxDupe) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumRxDupe) ?? 0),
-            };
-
-            NumTxRelay = new PacketsStats
-            {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumTxRelay) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumTxRelay) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumTxRelay) ?? 0),
-            };
-
-            NumTxRelayCanceled = new PacketsStats
-            {
-                Today = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == today)?.Sum(a => a.NumTxRelayCanceled) ?? 0),
-                Yesterday = (int) (localStatsGroupedByDate.FirstOrDefault(a => a.Key == yesterday)?.Sum(a => a.NumTxRelayCanceled) ?? 0),
-                Total = (int) localStatsGroupedByDate.Sum(a => a?.Sum(aa => aa.NumTxRelayCanceled) ?? 0),
-            };
+            NumPacketsRx.Total += rx;
+            NumPacketsTx.Total += tx;
+            NumPacketsRxBad.Total += rxBad;
+            NumRxDupe.Total += rxDupe;
+            NumTxRelay.Total += txRelay;
+            NumPacketsRx.Uptime = NumPacketsRx.Uptime.Add(uptime);
         }
         
         DataAirUtil = NodeInfo?.Telemetries
@@ -979,11 +983,12 @@
         base.OnParametersSet();
     }
     
-    public class PacketsStats
+    public class PacketsStats<T>
     {
-        public int Today { get; set; }
-        public int Yesterday { get; set; }
-        public int Total { get; set; }
+        public T Today { get; set; }
+        public T Yesterday { get; set; }
+        public T Total { get; set; }
+        public TimeSpan Uptime { get; set; } = TimeSpan.Zero;
         public List<string> MqttTopics = [];
     }
 }

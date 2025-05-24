@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
+using MQTTnet.Protocol;
 using MQTTnet.Server;
 using MqttRouter.Services;
 using MqttServer = Common.Context.Entities.MqttServer;
@@ -26,6 +27,8 @@ namespace MqttRouter.Controllers;
 
 public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Server.MqttServer server)
 {
+    private static readonly SemaphoreSlim Lock = new(1, 1);
+    
     private readonly ILogger<MqttServerController> _logger =
         serviceProvider.GetRequiredService<ILogger<MqttServerController>>();
 
@@ -47,6 +50,7 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
             {
                 _logger.LogWarning("Client {username} identified with id {clientId} as guest", eventArgs.UserName,
                     eventArgs.ClientId);
+                eventArgs.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                 throw new UnauthorizedAccessException();
             }
 
@@ -57,13 +61,11 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
             if (user == null)
             {
                 _logger.LogWarning("Client {username} not identified", eventArgs.UserName);
+                eventArgs.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                 throw new UnauthorizedAccessException();
             }
 
-            if (_userIdForClientIds.ContainsKey(eventArgs.ClientId))
-            {
-                _userIdForClientIds.Remove(eventArgs.ClientId);
-            }
+            _userIdForClientIds.Remove(eventArgs.ClientId);
 
             _userIdForClientIds.Add(eventArgs.ClientId, user.Id);
 
@@ -96,16 +98,24 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
     {
         try
         {
+            // _logger.LogInformation("Begin lock");
+            // await Lock.WaitAsync();
+            // _logger.LogInformation("Locked !");
+            
             PurgeOldPublishInfos();
 
             if (!eventArgs.ApplicationMessage.Topic.Contains("msh/"))
             {
+                // Lock.Release();
+                // _logger.LogInformation("Return unlock");
                 return;
             }
 
             if (eventArgs.ApplicationMessage.Topic.Contains("stat") ||
                 eventArgs.ApplicationMessage.Topic.Contains("json"))
             {
+                // Lock.Release();
+                // _logger.LogInformation("Return unlock");
                 return;
             }
 
@@ -179,6 +189,9 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
                     user?.Id, publishInfo.Guid, eventArgs.ApplicationMessage.Topic);
 
                 eventArgs.ProcessPublish = false;
+                
+                // Lock.Release();
+                // _logger.LogInformation("Return unlock");
 
                 return;
             }
@@ -261,6 +274,11 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
         catch (Exception e)
         {
             _logger.LogError(e, "Error before publish !!");
+        }
+        finally
+        {
+            // Lock.Release();
+            // _logger.LogInformation("Finally unlock");
         }
     }
 

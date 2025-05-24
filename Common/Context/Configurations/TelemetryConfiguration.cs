@@ -10,7 +10,6 @@ public class TelemetryConfiguration : IEntityTypeConfiguration<Telemetry>
     public void Configure(EntityTypeBuilder<Telemetry> builder)
     {
         builder.HasIndex(a => a.CreatedAt);
-        builder.HasIndex(a => a.UpdatedAt);
 
         builder.Property(a => a.Type).EnumToString(32);
         builder.HasIndex(a => a.Type);

@@ -62,7 +62,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeGateway.Id == 0)
         {
             Context.Add(nodeGateway);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
             Logger.LogInformation("New node (gateway) created {node}", nodeGateway);
         }
         else
@@ -75,12 +75,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             
             nodeGateway.IsMqttGateway = true;
             Context.Update(nodeGateway);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
         }
 
         if (NodesIgnored.Contains(meshPacket.From))
         {
             Logger.LogInformation("Node (from) ignored : {node}", meshPacket.From.ToHexString());
+            await Context.SaveChangesAsync();
             return null;
         }
         
@@ -94,7 +95,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeFrom.Id == 0)
         {
             Context.Add(nodeFrom);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
             Logger.LogInformation("New node (from) created {node}", nodeFrom);
         }
         else
@@ -102,6 +103,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             if (nodeFrom.Ignored)
             {
                 Logger.LogInformation("Node (from) ignored : {node}", nodeFrom);
+                await Context.SaveChangesAsync();
                 return null;
             }
 
@@ -112,7 +114,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (meshPacket.To == NodeBroadcast && meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.TextMessageApp)
         {
             nodeFrom.HopStart = (int?)meshPacket.HopStart;
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
         }
 
         var nodeTo = nodes.FindByNodeId(meshPacket.To) ?? new Node
@@ -124,7 +126,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (nodeTo.Id == 0)
         {
             Context.Add(nodeTo);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
             Logger.LogInformation("New node (to) created {node}", nodeTo);
         }
         
@@ -138,7 +140,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         if (channel.Id == 0)
         {
             Context.Add(channel);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
             Logger.LogInformation("New channel created {channel}", channel);
         }
         else
@@ -149,17 +151,23 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
                 channel.Index = meshPacket.Channel;
             }
             Context.Update(channel);
-            await Context.SaveChangesAsync();
+            // await Context.SaveChangesAsync();
         }
         
         meshPacket.Decoded ??= Decrypt(meshPacket.Encrypted.ToByteArray(), "AQ==", meshPacket.Id, meshPacket.From);
+
+        if (meshPacket.Decoded == null && meshPacket.Encrypted.IsEmpty)
+        {
+            Logger.LogWarning("Packet #{id} is empty", meshPacket.Id);
+            return null;
+        }
 
         var isOnPrimaryChannel = meshPacket.Decoded?.Portnum != null && meshPacket.Decoded?.Portnum != PortNum.TextMessageApp;
         if (isOnPrimaryChannel)
         {
             nodeFrom.PrimaryChannel = channel.Name;
-            Context.Update(nodeFrom);
-            await Context.SaveChangesAsync();
+            // Context.Update(nodeFrom);
+            // await Context.SaveChangesAsync();
         }
 
         var intervalDuplicated = TimeSpan.FromHours(1);
@@ -190,7 +198,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PortNum = meshPacket.Decoded?.Portnum,
             WantResponse = meshPacket.Decoded?.WantResponse,
             RequestId = meshPacket.Decoded?.RequestId,
-            ReplyId = meshPacket.Decoded?.ReplyId > 0 ? meshPacket.Decoded?.ReplyId : null,
+            ReplyId = meshPacket.Decoded?.ReplyId,
             Payload = meshPacket.ToByteArray(),
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
@@ -203,6 +211,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         // Check if owner send multiple time same packet
         if (packetDuplicated.Any(a => a.Gateway == nodeGateway))
         {
+            await Context.SaveChangesAsync();
             return null;
         }
         
@@ -307,31 +316,34 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
     private async Task<Node?> GetNodeFromLastByteForAnother(Node from, uint lastByte)
     {
-        // TODO Utiliser les voisins ?
-        var nodesCandidate = await Context.Nodes
-            .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
-            .Where(a => a != from)
-            .Where(a => (a.NodeId & 0xFF) == lastByte)
+        var nodesCandidate = await Context.NeighborInfos
+            // .Include(a => a.Positions.OrderByDescending(b => b.UpdatedAt).Take(1))
+            .Where(a => a.NodeReceiver == from)
+            .Where(a => (a.NodeHeard.NodeId & 0xFF) == lastByte)
+            .Where(a => a.DataSource != Entities_NeighborInfo.Source.Unknown && a.DataSource != Entities_NeighborInfo.Source.NextHop)
             .OrderByDescending(a => a.UpdatedAt)
+            .Select(a => a.NodeHeard)
             .ToListAsync();
 
-        if (nodesCandidate.Count == 1)
-        {
-            return nodesCandidate.First();
-        }
+        // if (nodesCandidate.Count == 1)
+        // {
+            // return nodesCandidate.First();
+        // }
 
-        var fromPosition = from.Positions.FirstOrDefault();
+        // var fromPosition = from.Positions.FirstOrDefault();
 
-        if (fromPosition != null)
-        { 
-            return nodesCandidate
-                .Where(n => n is { Latitude: not null, Longitude: not null })
-                .OrderBy(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude))
-                .FirstOrDefault(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude) <= MeshtasticUtils.DefaultDistanceAllowed)
-                ?? nodesCandidate.FirstOrDefault();
-        }
+        // if (fromPosition != null)
+        // { 
+            // return nodesCandidate
+                // .Where(n => n is { Latitude: not null, Longitude: not null })
+                // .OrderBy(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude))
+                // .FirstOrDefault(n => MeshtasticUtils.CalculateDistance(n.Latitude!.Value, n.Longitude!.Value, fromPosition.Latitude, fromPosition.Longitude) <= MeshtasticUtils.DefaultDistanceAllowed)
+                // ?? nodesCandidate.FirstOrDefault();
+        // }
 
-        return null;
+        // return null;
+
+        return nodesCandidate.FirstOrDefault();
     }
 
     private async Task SetPositionAndUpdateNeighborsForPacket(Packet packet, Position? nodeFromPosition)
@@ -1090,6 +1102,10 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
         {
             key = "1PG7OiApB1nwvP+rz05pAQ==";
         }
+        
+        /*var nonce = new NonceGenerator(serviceEnvelope.Packet.From, serviceEnvelope.Packet.Id).Create();
+        var decrypted = PacketEncryption.TransformPacket(serviceEnvelope.Packet.Encrypted.ToByteArray(), nonce, Resources.DEFAULT_PSK);
+        var payload = Data.Parser.ParseFrom(decrypted);*/
         
         var nonce = CreateNonce(packetId, nodeFromId);
 

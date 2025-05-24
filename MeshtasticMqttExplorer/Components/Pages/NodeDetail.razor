@@ -88,7 +88,7 @@
     private bool Loading { get; set; } = true;
     private bool Alive { get; set; }
     private Common.Context.Entities.Node? Node { get; set; }
-    private Node.PacketsStats PacketsStats { get; } = new();
+    private Node.PacketsStats<int> PacketsStats { get; } = new();
     private DataContext Context { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
@@ -153,7 +153,6 @@
         var countPackets = Context.Packets
             .Where(a => a.From == Node && a.To.NodeId == MeshtasticService.NodeBroadcast && a.PortNum != PortNum.TextMessageApp && a.PortNum != PortNum.MapReportApp && a.PacketDuplicated == null && a.ViaMqtt != true && a.HopStart > 0)
             .AsNoTrackingWithIdentityResolution();
-        PacketsStats.Total = await countPackets.CountAsync();
         PacketsStats.Today = await countPackets.CountAsync(a => a.CreatedAt.Date == today);
         PacketsStats.Yesterday = await countPackets.CountAsync(a => a.CreatedAt.Date == yesterday);
         

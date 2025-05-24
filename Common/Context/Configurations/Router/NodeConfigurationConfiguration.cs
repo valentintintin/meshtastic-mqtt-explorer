@@ -9,9 +9,6 @@ public class NodeConfigurationConfiguration : IEntityTypeConfiguration<Entities.
     {
         builder.ToTable("NodeConfigurations", "router");
         
-        builder.HasIndex(a => a.CreatedAt);
-        builder.HasIndex(a => a.UpdatedAt);
-
         builder.Property(a => a.MqttId).HasMaxLength(512);
         builder.HasIndex(a => a.MqttId);
 

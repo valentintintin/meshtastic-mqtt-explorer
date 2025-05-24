@@ -26,6 +26,7 @@ public class MqttServer : IEntity
 
     public ServerType Type { get; set; } = ServerType.Mqtt;
 
+    public bool UseWorker { get; set; }
     public bool IsHighLoad { get; set; }
     public bool MqttPostJson { get; set; }
     public bool ShouldBeRelayed { get; set; }

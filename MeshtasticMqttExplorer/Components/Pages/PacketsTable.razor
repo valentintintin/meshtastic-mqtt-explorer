@@ -161,8 +161,8 @@ else
                 @if (context.PacketActivity != null)
                 {
                     <br />
-                    <Tooltip Title="@($"{context.PacketActivity.Comment} ({context.PacketActivity.ReceiverIds.JoinString()})")">
-                        @(context.PacketActivity.HopLimit > 0 ? $"Autorisée {context.PacketActivity.HopLimit} sauts" : "Refusée")
+                    <Tooltip Title="@($"{context.PacketActivity.Comment} ({context.PacketActivity.ReceiverIds.Order().JoinString()})")">
+                        @(context.PacketActivity.Accepted ? $"Autorisée {context.PacketActivity.HopLimit} sauts" : "Refusée")
                     </Tooltip>
                 }
             </div>
