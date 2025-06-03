@@ -47,7 +47,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
                 case NodeinfoApp:
                     await DoWhenNodeInfo(clientId, userId, packet, packetActivity);
                     break;
-                case TelemetryApp:
+                // case TelemetryApp:
                 case PositionApp:
                     await DoWhenPositionOrTelemetry(clientId, userId, packet, packetActivity);
                     break;
@@ -66,19 +66,28 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
 
     private async Task DoWhenPositionOrTelemetry(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
-        if (await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-1)) != null)
+        const int maxHours = 12;
+        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-maxHours));
+        
+        if (hasPacketTypeBeforeDate != null)
         {
-            await DoWhenPositionOrTelemetryForLocalOnly(clientId, userId, packet, packetActivity);
+            // await DoWhenPositionOrTelemetryForLocalOnly(clientId, userId, packet, packetActivity);
+            
+            logger.LogInformation(
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there are some packets of this type during the last {maxHours} hours",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, maxHours);
+            
+            packetActivity.Comment = $"Trame interdite {packet.PortNumVariant} car envoyée il y a moins de {maxHours} heures : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
         else
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last hour",
-                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last {maxHours} hours",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, maxHours);
 
             packetActivity.Accepted = true;
             packetActivity.HopLimit = 1;
-            packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus d'une heure";
+            packetActivity.Comment = $"Trame autorisée {packet.PortNumVariant} et la dernière date de plus de {maxHours} heures";
         }
     }
 
@@ -177,24 +186,25 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
 
     private async Task DoWhenNodeInfo(string clientId, long? userId, Packet packet, PacketActivity packetActivity)
     {
-        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-4));
+        const int maxHours = 6;
+        var hasPacketTypeBeforeDate = await HasPacketTypeBeforeDate(packet, DateTime.UtcNow.AddHours(-maxHours));
 
         if (hasPacketTypeBeforeDate != null)
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last 4 hours",
-                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);   
-            packetActivity.Comment = $"Trame interdite car il y en a déjà eu dans les dernières 4 heures : {hasPacketTypeBeforeDate.Value.ToFrench()}";
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} refused because there is packet of this type during the last {maxHours} hours",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, maxHours);   
+            packetActivity.Comment = $"Trame interdite car il y en a déjà eu dans les dernières {maxHours} heures : {hasPacketTypeBeforeDate.Value.ToFrench()}";
         }
         else
         {
             logger.LogInformation(
-                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last 4 hours",
-                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId);
+                "Packet #{id} from {from} of type {portNum} via {clientId}#{gatewayId} and user #{userId} accepted because there isn't any packet of this type during the last {maxHours} hours",
+                packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, maxHours);
             
             packetActivity.Accepted = true;
             packetActivity.HopLimit = 1;
-            packetActivity.Comment = "Trame autorisée et la dernière date de plus de 4 heures";
+            packetActivity.Comment = $"Trame autorisée et la dernière date de plus de {maxHours} heures";
         }
     }
 
@@ -253,7 +263,7 @@ public class RoutingService(ILogger<RoutingService> logger, IDbContextFactory<Da
         
         logger.LogInformation("Packet #{id} from {from} of type {portNum} via {clientId}#{gateway} and user #{userId} accepted because it's not a broadcast (to {to} which has the mqttClientId {mqttClientId})", packet.Id, packet.From, packet.PortNum, clientId, packet.GatewayId, userId, packet.To, nodeToConfiguration?.MqttId);
 
-        if (packet.PortNum is TextMessageApp or AdminApp or RoutingApp || meshPacket.PkiEncrypted)
+        if (packet.PortNum is TextMessageApp or PositionApp or TelemetryApp or AdminApp or RoutingApp || meshPacket.PkiEncrypted)
         {
             if (nodeToConfiguration != null)
             {
