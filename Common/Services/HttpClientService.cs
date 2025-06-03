@@ -22,9 +22,7 @@ namespace Common.Services;
 public class HttpClientService(
     ILogger<HttpClientService> logger,
     IDbContextFactory<DataContext> contextFactory,
-    IConfiguration configuration,
-    IServiceProvider serviceProvider,
-    IBackgroundJobClient backgroundJobClient) : 
+    IServiceProvider serviceProvider) : 
     BackgroundService
 {
     public readonly List<HttpClientAndConfiguration> HttpClientAndConfigurations  = [];

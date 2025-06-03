@@ -31,14 +31,6 @@ try {
         action.Queues = ["packet-2", "default-2"];
     });
     
-    builder.Services.AddHangfireServer(action =>
-    {
-        action.ServerName = "Meshtastic Explorer Worker 3";
-        action.SchedulePollingInterval = TimeSpan.FromSeconds(1);
-        action.WorkerCount = 1;
-        action.Queues = ["notification", "default-3"];
-    });
-    
     var app = builder.Build();
 
     await app.Configure();

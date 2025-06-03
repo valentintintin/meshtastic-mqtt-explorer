@@ -18,7 +18,7 @@ using Position = Meshtastic.Protobufs.Position;
 namespace Common.Services;
 
 public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataContext> contextFactory, 
-    MeshtasticService meshtasticService, NotificationService notificationService, IBackgroundJobClient backgroundJobClient) : AService(logger, contextFactory)
+    MeshtasticService meshtasticService, NotificationService notificationService) : AService(logger, contextFactory)
 {
     public async Task<(Packet packet, ServiceEnvelope serviceEnveloppe)?> DoReceive(string topic, byte[] data, MqttServer mqttServer, Func<MqttApplicationMessage, Task>? sendAsJsonPayload = null)
     {
@@ -48,8 +48,7 @@ public class MqttService(ILogger<MqttService> logger, IDbContextFactory<DataCont
             {
                 var packet = packetAndMeshPacket.Value.packet;
 
-                backgroundJobClient.Enqueue<NotificationJob>("notification", a => a.ExecuteAsync(packet.Id));
-                // await notificationService.SendNotification(packet);
+                await notificationService.SendNotification(packet);
 
                 if (packet.PacketDuplicatedId == null && mqttServer.ShouldBeRelayed)
                 {
