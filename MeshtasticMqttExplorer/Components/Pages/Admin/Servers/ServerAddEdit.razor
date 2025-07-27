@@ -1,0 +1,157 @@
+﻿@page "/admin/server"
+@page "/admin/server/{id:long}"
+@implements IAsyncDisposable
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Exceptions
+@using Common.Extensions
+@using Common.Extensions.Entities
+@using Common.Models
+@using Common.Services
+@using Microsoft.EntityFrameworkCore
+
+@inject MqttServerService MqttServerService
+@inject IMessageService MessageService
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<PageTitle>Ajout d'un server</PageTitle>
+
+@if (Id.HasValue)
+{
+    <PageHeader Title="Modification du serveur"></PageHeader>
+}
+else
+{
+    <PageHeader Title="Ajout d'un serveur"></PageHeader>
+}
+
+<Form Model="@_model"
+      OnFinish="OnFinish"
+      LabelColSpan="8"
+      WrapperColSpan="16">
+    <FormItem Label="Nom">
+        <Input @bind-Value="@context.Name" />
+    </FormItem>
+    <FormItem Label="Type">
+        <Select DataSource="[MqttServer.ServerType.MqttClient, MqttServer.ServerType.MqttServer, MqttServer.ServerType.NodeHttp]"
+                @bind-Value="@context.Type"
+                TItem="MqttServer.ServerType" TItemValue="MqttServer.ServerType" 
+                Style="width:120px">
+        </Select>
+    </FormItem>
+    <FormItem Label="URL">
+        <Input @bind-Value="@context.Host" />
+    </FormItem>
+    <FormItem Label="Port">
+        <Input @bind-Value="@context.Port" Type="InputType.Number" />
+    </FormItem>
+    <FormItem Label="Identifiant">
+        <Input @bind-Value="@context.Username" />
+    </FormItem>
+    <FormItem Label="Mot de passe">
+        <Input @bind-Value="@context.Password" Type="InputType.Password" />
+    </FormItem>
+    <FormItem Label="Topics">
+        <Input @bind-Value="@context.Topics" />
+    </FormItem>
+    <FormItem Label="Activé">
+        <Checkbox @bind-Value="@context.Enabled"></Checkbox>
+    </FormItem>
+    <FormItem Label="Type de relais">
+        <Select DataSource="[MqttServer.RelayType.All, MqttServer.RelayType.MapReport, MqttServer.RelayType.NodeInfoAndPosition, MqttServer.RelayType.UseFull]"
+                @bind-Value="@context.IsARelayType"
+                TItem="MqttServer.RelayType?" TItemValue="MqttServer.RelayType?"
+                Style="width:120px" AllowClear>
+        </Select>
+    </FormItem>
+    <FormItem Label="Précision de la position quand relayé">
+        <Input @bind-Value="@context.RelayPositionPrecision" Type="InputType.Number" />
+    </FormItem>
+    <FormItem Label="Utilise le worker">
+        <Checkbox @bind-Value="@context.UseWorker"></Checkbox>
+    </FormItem>
+    <FormItem Label="Prioritaire">
+        <Checkbox @bind-Value="@context.IsNotHighLoad"></Checkbox>
+    </FormItem>
+    <FormItem Label="Traduit en JSON">
+        <Checkbox @bind-Value="@context.MqttPostJson"></Checkbox>
+    </FormItem>
+    <FormItem Label="Peut être relayé">
+        <Checkbox @bind-Value="@context.ShouldBeRelayed"></Checkbox>
+    </FormItem>
+    <FormItem WrapperColOffset="8" WrapperColSpan="16">
+        <Button Type="@ButtonType.Primary" HtmlType="submit">
+            Valider
+        </Button>
+    </FormItem>
+</Form>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private readonly ServerCreateUpdateDto _model = new();
+    
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+
+        if (Id.HasValue)
+        {
+            var server = await Context.MqttServers.FindByIdAsync(Id);
+
+            if (server == null)
+            {
+                throw new NotFoundException<MqttServer>(Id);
+            }
+            
+            _model.Name = server.Name;
+            _model.Type = server.Type;
+            _model.Host = server.Host;
+            _model.Username = server.Username;
+            _model.Password = server.Password;
+            _model.Topics = server.Topics.JoinString();
+            _model.Enabled = server.Enabled;
+            _model.IsARelayType = server.IsARelayType;
+            _model.RelayPositionPrecision = server.RelayPositionPrecision;
+            _model.MqttPostJson = server.MqttPostJson;
+            _model.ShouldBeRelayed = server.ShouldBeRelayed;
+            _model.UseWorker = server.UseWorker;
+            _model.IsHighLoad = server.IsHighLoad;
+        }
+
+        await base.OnInitializedAsync();
+    }
+    
+    private async Task OnFinish(EditContext editContext)
+    {
+        try
+        {
+            if (Id.HasValue)
+            {
+                await MqttServerService.UpdateMqttServer(Id.Value, _model);
+                await MessageService.SuccessAsync("Serveur mis à jour, pensez à redémarrer tous les services !");
+            }
+            else
+            {
+                Id = (await MqttServerService.CreateMqttServer(_model)).Id;
+            
+                await InvokeAsync(StateHasChanged);
+                
+                await MessageService.SuccessAsync("Serveur créé, pensez à redémarrer tous les services !");
+            }
+        }
+        catch (Exception e)
+        {
+            await MessageService.ErrorAsync($"Erreur : {e}");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

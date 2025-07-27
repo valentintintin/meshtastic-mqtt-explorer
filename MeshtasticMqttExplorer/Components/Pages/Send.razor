@@ -190,13 +190,13 @@ else
                 await HttpClientService.PublishMessage(_model);
             }
             
-            await Message.Success("Trame bien envoyée !");
+            await Message.SuccessAsync("Trame bien envoyée !");
             await LocalStorage.SetItemAsync("lastSentDto", _model);
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
-            await Message.Error($"Il y a eu une erreur pendant l'envoi : {e.Message}");
+            await Message.ErrorAsync($"Il y a eu une erreur pendant l'envoi : {e.Message}");
         }
     }
     

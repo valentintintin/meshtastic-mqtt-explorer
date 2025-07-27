@@ -1,0 +1,97 @@
+@page "/admin/servers"
+@implements IAsyncDisposable
+@using Common.Context
+@using Common.Context.Entities
+@using Common.Extensions
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<DataContext> ContextFactory
+
+<PageTitle>Tableau des serveurs</PageTitle>
+
+<PageHeader Title="Serveurs">
+    <PageHeaderExtra>
+        <a href="/admin/server" rel="nofollow">Ajouter</a>
+    </PageHeaderExtra>
+</PageHeader>
+
+<Table TItem="MqttServer" DataSource="ServersQueryable" Responsive Locale="Utils.TableLocale" HidePagination>
+    <ChildContent>
+        <PropertyColumn Property="c => c.Name" Title="Nom">
+            <div style="width: 150px">
+                <a href="/admin/server/@context.Id" target="_blank" rel="nofollow">@context.Name</a>
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Host" Title="Type">
+            <div style="width: 70px">
+                @context.Type
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Host" Title="URL:port">
+            <div style="width: 200px">
+                @context.Host:@context.Port
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Topics" Title="Topics">
+            <div style="width: 200px">
+                @context.Topics.JoinString(" | ");
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.IsARelayType" Title="Relais">
+            <div style="width: 100px">
+                @if (context.IsARelayType.HasValue)
+                {
+                    <text>@context.IsARelayType précision de @context.RelayPositionPrecision</text>
+                }
+                else
+                {
+                    <text>Non</text>
+                }
+            </div>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Enabled" Title="Activé">
+            @(context.Enabled ? "Oui" : "Non")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.ShouldBeRelayed" Title="Relayable">
+            @(context.ShouldBeRelayed ? "Oui" : "Non")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.MqttPostJson" Title="JSON">
+            @(context.MqttPostJson ? "Oui" : "Non")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.UseWorker" Title="Worker">
+            @(context.UseWorker ? "Oui" : "Non")
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.IsHighLoad" Title="Prioritaire">
+            @(context.IsHighLoad ? "Non" : "Oui")
+        </PropertyColumn>
+    </ChildContent>
+</Table>
+
+@code
+{
+    [Parameter]
+    public long? Id { get; set; }
+    
+    private IQueryable<MqttServer> ServersQueryable { get; set; } = null!;
+    private DataContext Context { get; set; } = null!;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        Context = await ContextFactory.CreateDbContextAsync();
+       
+        FetchData();
+
+        await base.OnInitializedAsync();
+    }
+
+    private void FetchData()
+    {
+        ServersQueryable = Context.MqttServers
+            .AsNoTrackingWithIdentityResolution();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Context.DisposeAsync();
+    }
+}

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Common.Context;
 using Common.Context.Entities;
+using Common.Exceptions;
+using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Models;
 using Meshtastic.Protobufs;
@@ -68,12 +70,19 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         foreach (var notificationConfiguration in notificationsCanalToSend)
         {
-            var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails, notificationConfiguration.IncludePayloadDetails, notificationConfiguration.IncludeStats);
-            await MakeRequest(notificationConfiguration, message, packet, context);
+            try
+            {
+                var message = GetPacketMessageToSend(packet, context, notificationConfiguration.IncludeHopsDetails, notificationConfiguration.IncludePayloadDetails, notificationConfiguration.IncludeStats, notificationConfiguration.MinimumMinutesBetweenPacketsWhenIncludeStats, notificationConfiguration.MinimumNumberOfPacketsWhenIncludeStats);
+                await MakeRequest(notificationConfiguration, message, packet, context);
+            }
+            catch (NotificationIgnoredException e)
+            {
+                Logger.LogTrace(e, "Message ignored for notification #{id}", notificationConfiguration.Id);
+            }
         }
     }
 
-    public string GetPacketMessageToSend(Packet packet, DataContext context, bool includeHopsDetails = true, bool includePayloadDetails = true, bool includeStats = true)
+    public string GetPacketMessageToSend(Packet packet, DataContext context, bool includeHopsDetails = true, bool includePayloadDetails = true, bool includeStats = true, int? minimumMinutesBetweenPacketsWhenIncludeStats = null, int? minimumNumberOfPacketsWhenIncludeStats = null)
     {
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
@@ -117,7 +126,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         message = message.TrimEnd()
                   + '\n'
-                  + $"> <b>{(isText ? "" : $"{packet.PortNum}")}";
+                  + $"> <b>{(isText ? "" : $"{packet.PortNum} {packet.PortNumVariant}".Trim())}";
         
         if (includePayloadDetails)
         {
@@ -140,11 +149,24 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         if (includeStats)
         {
-            var packetsStats = context.Packets.Where(a => a.PortNum == packet.PortNum && a.From == packet.From && a.To == packet.To && a.PacketDuplicated == null);
-            var countToday = packetsStats.Count(a => a.CreatedAt.Date == packet.CreatedAt.Date); 
+            var now = DateTime.UtcNow; // .ToFrench();
+            var packetsStats = context.Packets.Where(a => a.PortNum == packet.PortNum && a.PortNumVariant == packet.PortNumVariant && a.From == packet.From && a.To == packet.To && a.PacketDuplicated == null);
+            var countToday = packetsStats.Count(a => a.CreatedAt.Date == now.Date); 
             var lastPacketDate = packetsStats.OrderByDescending(a => a.CreatedAt).FirstOrDefault(a => a.PacketId != packet.PacketId)?.CreatedAt;
 
-            message += '\n' + $"Dernier : <b>{(int?) (DateTime.UtcNow - lastPacketDate)?.TotalMinutes ?? 0}</b> min | Aujourd'hui : <b>{countToday}</b>";
+            var totalMinutes = (int?) (DateTime.UtcNow - lastPacketDate)?.TotalMinutes ?? 0;
+
+            if (minimumMinutesBetweenPacketsWhenIncludeStats.HasValue && totalMinutes > 0 && totalMinutes >= minimumMinutesBetweenPacketsWhenIncludeStats.Value)
+            {
+                throw new NotificationIgnoredException($"Total minutes since last frame {totalMinutes} >= {minimumMinutesBetweenPacketsWhenIncludeStats}");
+            }
+            
+            if (minimumNumberOfPacketsWhenIncludeStats.HasValue && countToday > 0 && countToday <= minimumNumberOfPacketsWhenIncludeStats.Value)
+            {
+                throw new NotificationIgnoredException($"Count today {countToday} <= {minimumNumberOfPacketsWhenIncludeStats}");
+            }
+
+            message += '\n' + $"Dernier : <b>{totalMinutes}</b> min | Aujourd'hui : <b>{countToday}</b>";
         }
         
         return message;
@@ -159,20 +181,21 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         var encodedMessage = Uri.EscapeDataString(message);
         var requestUrl = webhook.Url;
 
-        var messageHistory = await context.WebhooksHistories.FirstOrDefaultAsync(a => a.WebhookId == webhook.Id && a.Packet.PacketId == packet.PacketId) ?? new WebhookHistory
+        var originalPacketId = packet.PacketDuplicatedId ?? packet.Id;
+        
+        var messageHistory = await context.WebhooksHistories.FirstOrDefaultAsync(a => a.Webhook.Url == webhook.Url && a.PacketId == originalPacketId) ?? new WebhookHistory
         {
-            WebhookId = webhook.Id
+            WebhookId = webhook.Id,
+            PacketId = originalPacketId
         };
-
-        messageHistory.PacketId = packet.Id;
         
         if (!string.IsNullOrWhiteSpace(webhook.UrlToEditMessage) && !string.IsNullOrWhiteSpace(messageHistory.MessageId))
         {
-            Logger.LogDebug("Send notification to {name} for packet #{packetId} with edit url and messageId {messageId} found", webhook.Name, packet.Id, messageHistory.MessageId);
+            Logger.LogDebug("Send notification to {name} for packet #{packetId}/${originalPacketId} with edit url and messageId {messageId} found", webhook.Name, packet.Id, originalPacketId, messageHistory.MessageId);
             
             if (!webhook.IncludeHopsDetails)
             {
-                Logger.LogDebug("Send notification to {name} for packet #{packetId} ignored because no hop details but edit url", webhook.Name, packet.Id);
+                Logger.LogDebug("Send notification to {name} for packet #{packetId}/${originalPacketId} ignored because no hop details but edit url", webhook.Name, packet.Id, originalPacketId);
 
                 return null;
             }
@@ -190,11 +213,11 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
             if (!response.IsSuccessStatusCode)
             {
-                Logger.LogError("Send notification to {name} for packet #{packetId} KO : {content}", webhook.Name, packet.Id, responseContent);
+                Logger.LogError("Send notification to {name} for packet #{packetId}/${originalPacketId} KO : {content}", webhook.Name, packet.Id, originalPacketId, responseContent);
                 return null;
             }
 
-            Logger.LogInformation("Send notification to {name} for packet #{packetId} OK", webhook.Name, packet.Id);
+            Logger.LogInformation("Send notification to {name} for packet #{packetId}/${originalPacketId} OK", webhook.Name, packet.Id, originalPacketId);
             
             if (requestUrl.StartsWith("https://api.telegram.org/"))
             {
@@ -216,7 +239,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
         }
         catch (Exception e)
         {
-            Logger.LogWarning(e, "Send notification to {name} for packet #{packetId} KO", webhook.Name, packet.Id);
+            Logger.LogWarning(e, "Send notification to {name} for packet #{packetId}/${originalPacketId} KO", webhook.Name, packet.Id, originalPacketId);
         }
 
         return null;

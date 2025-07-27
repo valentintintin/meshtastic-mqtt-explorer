@@ -102,6 +102,7 @@ public static class Init
         builder.Services.AddScoped<MeshtasticService>();
         builder.Services.AddScoped<MqttService>();
         builder.Services.AddScoped<UserService>();
+        builder.Services.AddScoped<MqttServerService>();
         
         var culture = CultureInfo.GetCultureInfo("fr-FR");
 
@@ -129,7 +130,7 @@ public static class Init
             webApplicationBuilder.Services.AddCors(option =>
             {
                 option.AddDefaultPolicy(corsPolicyBuilder => corsPolicyBuilder
-                    .WithOrigins(webApplicationBuilder.Configuration.GetSection("CorsHosts").Value?.Split(",") ?? [])
+                    .WithOrigins(webApplicationBuilder.Configuration.GetSection("CorsHosts").Value?.Split(";") ?? [])
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                 );

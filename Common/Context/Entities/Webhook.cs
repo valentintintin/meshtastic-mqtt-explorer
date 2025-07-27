@@ -36,6 +36,8 @@ public class Webhook : IEntity
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public int? DistanceAroundPositionKm { get; set; }
+    public int? MinimumMinutesBetweenPacketsWhenIncludeStats { get; set; }
+    public int? MinimumNumberOfPacketsWhenIncludeStats { get; set; }
     
     public virtual ICollection<WebhookHistory> Histories { get; set; } = [];
 }

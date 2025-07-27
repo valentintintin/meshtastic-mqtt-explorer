@@ -1,0 +1,55 @@
+services:
+  database:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_PASSWORD: motdepasse
+  mosquitto:
+    image: eclipse-mosquitto
+    ports:
+      - "1883:1883"
+    restart: always
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+  front:
+    image: ghcr.io/valentintintin/meshtastic-mqtt-explorer:latest
+    restart: always
+    ports:
+      - "80:8080"
+    volumes:
+      - ./appsettings.json:/app/appsettings.Production.json
+  recorder:
+    image: ghcr.io/valentintintin/meshtastic-mqtt-explorer:latest
+    entrypoint: "dotnet"
+    command:
+      - "Recorder.dll"
+    restart: always
+    ports:
+      - "81:8080"
+    volumes:
+      - ./appsettings.json:/app/appsettings.Production.json
+  worker:
+    image: ghcr.io/valentintintin/meshtastic-mqtt-explorer:latest
+    entrypoint: "dotnet"
+    command:
+      - "Worker.dll"
+    restart: always
+    volumes:
+      - ./appsettings.json:/app/appsettings.Production.json
+#  router:
+#    image: ghcr.io/valentintintin/meshtastic-mqtt-explorer:latest
+#    entrypoint: "dotnet"
+#    command:
+#      - "MqttRouter.dll"
+#    restart: always
+#    ports:
+#      - "1883:1883"
+#      - "82:8080"
+#    volumes:
+#      - ./appsettings.json:/app/appsettings.Production.json

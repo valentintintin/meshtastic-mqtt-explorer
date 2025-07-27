@@ -133,7 +133,7 @@
             
             if (_data == null) 
             {
-                await MessageService.Error("Erreur durant le déchiffrement");
+                await MessageService.ErrorAsync("Erreur durant le déchiffrement");
             }
         }
         else
@@ -144,7 +144,7 @@
             }
             catch (Exception)
             {
-                await MessageService.Error("Erreur durant la conversion de la base64");
+                await MessageService.ErrorAsync("Erreur durant la conversion de la base64");
                 return;
             }
         }
@@ -168,7 +168,7 @@
 
         if (_messages.Count == 0)
         {
-            await MessageService.Error("Le message n'a pas pu être décodé");
+            await MessageService.ErrorAsync("Le message n'a pas pu être décodé");
         }
     }
 

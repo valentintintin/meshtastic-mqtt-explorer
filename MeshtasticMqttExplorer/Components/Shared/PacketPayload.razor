@@ -629,11 +629,11 @@
         try
         {
             await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
-            await Message.Info("Copié !");
+            await Message.InfoAsync("Copié !");
         }
         catch (Exception)
         {
-            await Message.Error("Impossible d'accéder au presse-papier");
+            await Message.ErrorAsync("Impossible d'accéder au presse-papier");
         }
     }
 }

@@ -13,3 +13,7 @@ MqttRouter/appsettings.Production.json
 MqttRouter/appsettings.Production.Gaulix.json
 Worker/appsettings.Production.json
 Worker/appsettings.Production.Gaulix.json
+
+docker/mosquitto/data/*
+docker/mosquitto/log/*
+docker/database/*

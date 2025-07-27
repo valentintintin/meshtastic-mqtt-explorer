@@ -24,7 +24,7 @@ public class MqttServer : IEntity
 
     public uint? RelayPositionPrecision { get; set; } = 32;
 
-    public ServerType Type { get; set; } = ServerType.Mqtt;
+    public ServerType Type { get; set; } = ServerType.MqttClient;
 
     public bool UseWorker { get; set; }
     public bool IsHighLoad { get; set; }
@@ -36,7 +36,7 @@ public class MqttServer : IEntity
     
     public enum ServerType
     {
-        Mqtt,
+        MqttClient,
         NodeHttp,
         NodeSerial,
         MqttServer

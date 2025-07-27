@@ -139,7 +139,7 @@ public class MqttClientService(
         MqttClientAndConfigurations.AddRange(
             (await contextFactory.CreateDbContextAsync(stoppingToken)).MqttServers
             .Where(a => a.Enabled)
-            .Where(a => a.Type == MqttServer.ServerType.Mqtt)
+            .Where(a => a.Type == MqttServer.ServerType.MqttClient)
             .AsEnumerable()
             .Where(a => (_isRecorder && a.Topics.Count > 0 || a.IsARelayType != null || a.MqttPostJson) 
                         || (_isWorker && (a.IsARelayType != null || a.MqttPostJson))

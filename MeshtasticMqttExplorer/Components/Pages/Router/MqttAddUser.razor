@@ -41,11 +41,11 @@
         try
         {
             await UserService.CreateUser(_model);
-            await MessageService.Success("Utilisateur créé !");
+            await MessageService.SuccessAsync("Utilisateur créé !");
         }
         catch (Exception e)
         {
-            await MessageService.Error($"Erreur : {e}");
+            await MessageService.ErrorAsync($"Erreur : {e}");
         }
     }
 }

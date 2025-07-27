@@ -179,6 +179,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .OrderBy(a => a.CreatedAt)
             .ToListAsync();
 
+        var firstPacketDuplicated = packetDuplicated.FirstOrDefault();
+        
         var packet = new Packet
         {
             Channel = channel,
@@ -203,7 +205,8 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             PayloadJson = payload != null ? Regex.Unescape(JsonSerializer.Serialize(payload, JsonSerializerOptions)) : null,
             From = nodeFrom,
             To = nodeTo,
-            PacketDuplicated = packetDuplicated.FirstOrDefault(),
+            PacketDuplicated = firstPacketDuplicated,
+            PortNumVariant = firstPacketDuplicated?.PortNumVariant,
             RelayNode = meshPacket.RelayNode,
             NextHop = meshPacket.NextHop
         };

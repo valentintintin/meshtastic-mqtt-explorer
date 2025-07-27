@@ -151,7 +151,7 @@
             Encoding.UTF8.GetString(memoryStream.ToArray())
         );
         
-        await Message.Info("CSV téléchargé !");
+        await Message.InfoAsync("CSV téléchargé !");
     }
 
     private List<SignalHistory> GetSignalHistories(DateTime fromDate)

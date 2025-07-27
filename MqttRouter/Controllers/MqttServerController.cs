@@ -27,8 +27,6 @@ namespace MqttRouter.Controllers;
 
 public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Server.MqttServer server)
 {
-    private static readonly SemaphoreSlim Lock = new(1, 1);
-    
     private readonly ILogger<MqttServerController> _logger =
         serviceProvider.GetRequiredService<ILogger<MqttServerController>>();
 
@@ -132,6 +130,11 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
             routingService.SetDbContext(context);
             mqttService.SetDbContext(context);
             _mqttServer ??= await context.MqttServers.FirstAsync(a => a.Type == MqttServer.ServerType.MqttServer);
+
+            if (_mqttServer == null)
+            {
+                throw new NotFoundException<MqttServer>(MqttServer.ServerType.MqttServer);
+            }
 
             _logger.LogTrace("Client {clientId} send packet {guid} on {topic}", eventArgs.ClientId, publishInfo.Guid,
                 eventArgs.ApplicationMessage.Topic);

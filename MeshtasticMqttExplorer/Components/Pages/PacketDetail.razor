@@ -286,13 +286,13 @@
     private async Task ComputeAgain()
     {
         await MeshtasticService.DoReceive(Packet);
-        await Message.Info("Trame traitée !");
+        await Message.InfoAsync("Trame traitée !");
     }
 
     private async Task Notify()
     {
         await NotificationService.SendNotification(Packet);
-        await Message.Info("Notification envoyée !");
+        await Message.InfoAsync("Notification envoyée !");
     }
 
     private async Task CopyTextToClipboard(string text)
@@ -300,11 +300,11 @@
         try
         {
             await JsRuntime.InvokeVoidAsync("copyTextToClipboard", text);
-            await Message.Info("Copié !");
+            await Message.InfoAsync("Copié !");
         }
         catch (Exception)
         {
-            await Message.Error("Impossible d'accéder au presse-papier");
+            await Message.ErrorAsync("Impossible d'accéder au presse-papier");
         }
     }
 
