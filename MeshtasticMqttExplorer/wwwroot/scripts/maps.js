@@ -1,93 +1,99 @@
 window.initializeLeafletMap = (where) => {
     window.leafletMarkers = [];
 
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    });
+    const layers = [];
+    let layerSwitcher;
     
-    const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {	
-        maxZoom: 17,
-        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
-    });
-    
-    const satellite = L.geoportalLayer.WMTS({
-        layer: "ORTHOIMAGERY.ORTHOPHOTOS",
-    }, {
-        opacity: 0.4
-    });
-    
-    const courbeNiveau = L.geoportalLayer.WMTS({
-        layer: "ELEVATION.SLOPES",
-    }, {
-        opacity: 0.1
-    });
+    if (window.useOfflineMaps) {
+        const proto = protomapsL.leafletLayer({ 
+            url: 'mymap.pmtiles', 
+            flavor: 'light',
+            lang: 'fr',
+        });
+        
+        layers.push(proto);
+    } else {
+        const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        });
 
-    const proto = protomapsL.leafletLayer({
-        url: 'mymap.pmtiles',
-        theme: "light"
-    });
+        const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+        });
+
+        const satellite = L.geoportalLayer.WMTS({
+            layer: "ORTHOIMAGERY.ORTHOPHOTOS",
+        }, {
+            opacity: 0.4
+        });
+
+        const courbeNiveau = L.geoportalLayer.WMTS({
+            layer: "ELEVATION.SLOPES",
+        }, {
+            opacity: 0.1
+        });
+
+        layers.push(...[osm, topo, satellite, courbeNiveau]);
+        
+        layerSwitcher = L.geoportalControl.LayerSwitcher({
+            layers: [
+                {
+                    layer: osm,
+                    config: {
+                        title: "OpenStreetMap",
+                        description: "Couche Open Street Maps"
+                    }
+                },
+                {
+                    layer: topo,
+                    config: {
+                        title: "OpenTopoMap",
+                        description: "Couche Open Topo Maps",
+                        visibility: false
+                    }
+                },
+                {
+                    layer: satellite,
+                    config: {
+                        title: "IGN Satellite",
+                        description: "Couche satellite issue de l'IGN",
+                        visibility: false
+                    }
+                },
+                {
+                    layer: courbeNiveau,
+                    config: {
+                        title: "IGN Altitude",
+                        description: "Couche coloriée de l'altitude issue de l'IGN"
+                    }
+                }
+            ]
+        });
+    }
     
     window.leafletMap = L.map('map', {
         preferCanvas: true,
-        layers: [osm, topo, satellite, courbeNiveau, proto],
+        layers
     }).setView({
         lat: where.latitude,
         lng: where.longitude
     }, where.zoom);
 
-    const layerSwitcher = L.geoportalControl.LayerSwitcher({
-        layers : [
-            {
-                layer : osm,
-                config : {
-                    title : "OpenStreetMap",
-                    description : "Couche Open Street Maps"
-                }
-            },
-            {
-                layer : topo,
-                config : {
-                    title : "OpenTopoMap",
-                    description : "Couche Open Topo Maps",
-                    visibility: false
-                }
-            },
-            {
-                layer : satellite,
-                config : {
-                    title : "IGN Satellite",
-                    description : "Couche satellite issue de l'IGN",
-                    visibility: false
-                }
-            },
-            {
-                layer : courbeNiveau,
-                config : {
-                    title : "IGN Altitude",
-                    description : "Couche coloriée de l'altitude issue de l'IGN"
-                }
-            },
-            {
-                layer : proto,
-                config : {
-                    title : "ProtoMaps AURA",
-                    description : "Couche stockée sur le serveur",
-                    visibility: false
-                }
-            }
-        ]
-    });
-    window.leafletMap.addControl(layerSwitcher);
-    
-    const elevationPath = L.geoportalControl.ElevationPath();
-    window.leafletMap.addControl(elevationPath);
-    
+    if (!window.useOfflineMaps) {
+        window.leafletMap.addControl(layerSwitcher);
+
+        const elevationPath = L.geoportalControl.ElevationPath();
+        window.leafletMap.addControl(elevationPath);
+    }
+
     const mousePosition = L.geoportalControl.MousePosition({
-        displayCoordinate : true,
+        displayCoordinate: true,
+        displayAltitude: !window.useOfflineMaps,
         editCoordinates: true,
-        altitude : {
-            triggerDelay : 250
+        altitude: {
+            triggerDelay: 250
         }
     });
     window.leafletMap.addControl(mousePosition);

@@ -7,7 +7,6 @@ published*/
 .idea
 MeshtasticMqttExplorer/appsettings.Production.json
 MeshtasticMqttExplorer/appsettings.Production.Gaulix.json
-MeshtasticMqttExplorer/wwwroot/mymap.pmtiles
 Recorder/appsettings.Production.json
 MqttRouter/appsettings.Production.json
 MqttRouter/appsettings.Production.Gaulix.json
@@ -17,3 +16,4 @@ Worker/appsettings.Production.Gaulix.json
 docker/mosquitto/data/*
 docker/mosquitto/log/*
 docker/database/*
+docker/mymap.pmtiles

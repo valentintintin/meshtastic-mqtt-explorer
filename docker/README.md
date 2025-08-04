@@ -17,6 +17,7 @@ Il faut configurer *chaque fichier* `appsettings.xxx.json` avant de tout lancer.
 
 - `ConnectionStrings.Default` : identifiant de connexion à la base de donnée
 - `FrontUrl` : lien externe vers le site par exemple `192.168.1.x:80`
+- `UseOfflineMaps` : utiliser une carte hors ligne `mymap.pmtiles`. Décommenter la ligne `- ./mymap.pmtiles:/app/wwwroot/mymap.pmtiles` dans le docker compose sur le front
 - `AllowSend` : autorise l'envoi de trames depuis le site via la page `/send`
 - `NodesIgnored` : tableau d'ID de noeuds (décimal) à ignorer quand on les voit
 - `PurgeDays` : quantité de jours à garder dans la base de données (trames, positions, voisins, historiques de signaux, messages, points d'intérêts, pax)

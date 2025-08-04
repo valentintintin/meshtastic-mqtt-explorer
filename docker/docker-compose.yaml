@@ -24,6 +24,7 @@ services:
       - "80:8080"
     volumes:
       - ./appsettings.json:/app/appsettings.Production.json
+#      - ./mymap.pmtiles:/app/wwwroot/mymap.pmtiles
   recorder:
     image: ghcr.io/valentintintin/meshtastic-mqtt-explorer:latest
     entrypoint: "dotnet"

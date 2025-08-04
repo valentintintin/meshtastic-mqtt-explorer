@@ -1,6 +1,5 @@
-﻿@using MeshtasticMqttExplorer.Services
-@inject IMessageService MessageService;
-@inject RecorderService RecorderService;
+﻿@inject IMessageService MessageService;
+@inject IConfiguration Configuration;
 
 <!DOCTYPE html>
 <html lang="fr">
@@ -25,12 +24,12 @@
     <meta property="og:type" content="website">
     <meta property="og:title" content="Meshtastic MQTT Explorer - Suivi en Temps Réel des Réseaux Mesh LoRa">
     <meta property="og:description" content="Suivez et surveillez le réseau mesh LoRa Meshtastic en temps réel avec une carte interactive. Visualisez facilement les emplacements des nœuds, les messages et l'état du réseau.">
-    <meta property="og:url" content="https://meshtastic-mqtt-explorer.pixel-server.ovh">
+    <meta property="og:url" content="@FrontUrl">
 
     <!-- Twitter -->
     <meta name="twitter:title" content="Meshtastic MQTT Explorer - Suivi en Temps Réel des Réseaux Mesh LoRa">
     <meta name="twitter:description" content="Suivez et surveillez le réseau mesh LoRa Meshtastic en temps réel avec une carte interactive. Visualisez facilement les emplacements des nœuds, les messages et l'état du réseau.">
-    <meta name="twitter:url" content="https://meshtastic-mqtt-explorer.pixel-server.ovh">
+    <meta name="twitter:url" content="@FrontUrl">
     
     <base href="/"/>
     <link href="_content/AntDesign/css/ant-design-blazor.css?=@Version" rel="stylesheet" />
@@ -44,25 +43,31 @@
 <body>
 <Routes @rendermode="InteractiveServer" />
 <AntContainer @rendermode="InteractiveServer" />
+<script type="text/javascript">
+    window.useOfflineMaps = @(UseOfflineMaps == true ? "true" : "false");
+</script>
 <script src="_framework/blazor.web.js?=@Version"></script>
 <script src="_content/AntDesign/js/ant-design-blazor.js?=@Version"></script>
 <script src="_content/AntDesign.Charts/ant-design-charts-blazor.js?=@Version"></script>
-<script src="scripts/g2plot_1.1.28.js"></script>
-<script src="scripts/leaflet_1.9.4.js" crossorigin=""></script>
-<script src="scripts/protomaps-leaflet_3.1.2.js"></script>
+<script src="scripts/leaflet_1.9.4.js"></script>
+<script src="scripts/protomaps-leaflet_5.1.0.js"></script>
 <script src="scripts/GpPluginLeaflet.js"></script>
 <script src="scripts/script.js?=@Version"></script>
-<script src="scripts/osm.js?=@Version"></script>
+<script src="scripts/maps.js?=@Version"></script>
 </body>
 
 </html>
 
 @code {
     private string? Version { get; set; }
+    private string? FrontUrl { get; set; }
+    private bool? UseOfflineMaps { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         Version = GetType().Assembly.GetName().Version?.ToString();
+        FrontUrl = Configuration.GetValue<string>("FrontUrl");
+        UseOfflineMaps = Configuration.GetValue("UseOfflineMaps", false);
 
         MessageService.Config(new MessageGlobalConfig
         {
