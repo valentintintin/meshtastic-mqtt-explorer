@@ -324,7 +324,7 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
             }
 
             var publishInfo = _messagesToPublish.FirstOrDefault(a =>
-                a.ClientId == eventArgs.SenderClientId && meshPacket.Packet != null && a.MeshPacket != null && a.MeshPacket.Id == meshPacket.Packet.Id);
+                a != null && eventArgs != null && a.ClientId == eventArgs.SenderClientId && meshPacket.Packet != null && a.MeshPacket != null && a.MeshPacket.Id == meshPacket.Packet.Id);
 
             if (publishInfo == null)
             {

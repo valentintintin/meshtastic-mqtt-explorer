@@ -102,7 +102,7 @@ public class HttpClientService(
                             break;
                         case FromRadio.PayloadVariantOneofCase.MyInfo:
                             httpClientAndConfiguration.Gateway =
-                                context.Nodes.FindByNodeId(fromRadio.MyInfo.MyNodeNum) ?? new Node
+                                await context.Nodes.FindByNodeIdAsync(fromRadio.MyInfo.MyNodeNum) ?? new Node
                                 {
                                     NodeId = fromRadio.MyInfo.MyNodeNum,
                                     IsMqttGateway = true
@@ -144,7 +144,7 @@ public class HttpClientService(
 
                             break;
                         case FromRadio.PayloadVariantOneofCase.NodeInfo:
-                            var node = context.Nodes.FindByNodeId(fromRadio.NodeInfo.Num) ?? new Node
+                            var node = await context.Nodes.FindByNodeIdAsync(fromRadio.NodeInfo.Num) ?? new Node
                             {
                                 NodeId = fromRadio.NodeInfo.Num,
                             };

@@ -5,6 +5,8 @@ window.initializeLeafletMap = (where) => {
     let layerSwitcher;
     
     if (window.useOfflineMaps) {
+        console.log('Use offline maps');
+        
         const proto = protomapsL.leafletLayer({ 
             url: 'mymap.pmtiles', 
             flavor: 'light',

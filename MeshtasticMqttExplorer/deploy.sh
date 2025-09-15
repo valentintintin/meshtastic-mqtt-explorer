@@ -1,6 +1,6 @@
 #!/bin/bash
 
-server="valentin.ddns.info"
+server="valentin@valentin.ddns.info"
 port=22
 
 set -e

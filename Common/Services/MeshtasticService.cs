@@ -53,7 +53,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             .Where(a => a.NodeId == nodeGatewayId || a.NodeId == meshPacket.From || a.NodeId == meshPacket.To)
             .ToListAsync();
 
-        var nodeGateway = nodes.FindByNodeId(nodeGatewayId) ?? new Node
+        var nodeGateway = nodes.AsQueryable().FindByNodeId(nodeGatewayId) ?? new Node
         {
             NodeId = nodeGatewayId,
             IsMqttGateway = true
@@ -85,7 +85,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             return null;
         }
         
-        var nodeFrom = nodes.FindByNodeId(meshPacket.From) ?? new Node
+        var nodeFrom = nodes.AsQueryable().FindByNodeId(meshPacket.From) ?? new Node
         {
             NodeId = meshPacket.From,
             ModemPreset = nodeGateway.ModemPreset,
@@ -111,13 +111,13 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             await UpdateRegionCodeAndModemPreset(nodeFrom, nodeGateway.RegionCode, nodeGateway.ModemPreset, RegionCodeAndModemPresetSource.Gateway);
         }
         
-        if (meshPacket.To == NodeBroadcast && meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.TextMessageApp)
+        if (meshPacket.To == NodeBroadcast && meshPacket.Decoded?.Portnum is PortNum.NodeinfoApp or PortNum.PositionApp or PortNum.TelemetryApp or PortNum.TextMessageApp)
         {
             nodeFrom.HopStart = (int?)meshPacket.HopStart;
             // await Context.SaveChangesAsync();
         }
 
-        var nodeTo = nodes.FindByNodeId(meshPacket.To) ?? new Node
+        var nodeTo = nodes.AsQueryable().FindByNodeId(meshPacket.To) ?? new Node
         {
             NodeId = meshPacket.To,
             ModemPreset = nodeGateway.ModemPreset,
@@ -330,7 +330,7 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
 
         // if (nodesCandidate.Count == 1)
         // {
-            // return nodesCandidate.First();
+        //     return nodesCandidate.First();
         // }
 
         // var fromPosition = from.Positions.FirstOrDefault();
@@ -363,27 +363,28 @@ public class MeshtasticService(ILogger<MeshtasticService> logger, IDbContextFact
             Context.Update(packet);
             await Context.SaveChangesAsync();
         }
+        
+        if (packet.RelayNode > 0)
+        {
+            packet.RelayNodeNode = await GetNodeFromLastByteForAnother(packet.Gateway, packet.RelayNode!.Value);
+
+            if (packet.RelayNodeNode != null)
+            {
+                await SetNeighbor(Entities_NeighborInfo.Source.Relay, packet, packet.Gateway, packet.RelayNodeNode, packet.RxSnr!.Value, packet.RxRssi, packet.RelayNodeNode.Positions.FirstOrDefault(), packet.GatewayPosition);
+                Context.Update(packet);
+            }
+        }
+
+        if (packet.RelayNodeNode == null)
+        {
+            await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, null, packet.GatewayPosition, nodeFromPosition);
+        }
 
         if (packet.HopLimit == packet.HopStart)
         {
-            await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr!.Value, packet.RxRssi!.Value, packet.GatewayPosition, nodeFromPosition);
-        }
-        else
-        {
-            if (packet.RelayNode > 0)
+            if (packet.RelayNodeNode == null || packet.RelayNode == (packet.From.NodeId & 0xFF)) // On a pas trouvé le noeud relais ou alors c'est l'émetteur donc cohérent
             {
-                packet.RelayNodeNode = await GetNodeFromLastByteForAnother(packet.Gateway, packet.RelayNode!.Value);
-
-                if (packet.RelayNodeNode != null)
-                {
-                    await SetNeighbor(Entities_NeighborInfo.Source.Relay, packet, packet.Gateway, packet.RelayNodeNode, packet.RxSnr!.Value, packet.RxRssi, packet.RelayNodeNode.Positions.FirstOrDefault(), packet.GatewayPosition);
-                    Context.Update(packet);
-                }
-            }
-
-            if (packet.RelayNodeNode == null)
-            {
-                await SetNeighbor(Entities_NeighborInfo.Source.Unknown, packet, packet.Gateway, packet.From, -999, null, packet.GatewayPosition, nodeFromPosition);
+                await SetNeighbor(Entities_NeighborInfo.Source.Gateway, packet, packet.Gateway, packet.From, packet.RxSnr!.Value, packet.RxRssi!.Value, packet.GatewayPosition, nodeFromPosition);
             }
         }
         

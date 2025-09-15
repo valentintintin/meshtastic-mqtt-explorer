@@ -15,7 +15,7 @@ public static class NodeExtensions
                    ?? await nodes.OrderByDescending(a => a.UpdatedAt).FirstOrDefaultAsync(a => a.LongName != null && a.LongName.ToLower() == search);
     }
     
-    public static Node? FindByNodeId(this IEnumerable<Node> nodes, uint nodeId)
+    public static Node? FindByNodeId(this IQueryable<Node> nodes, uint nodeId)
     {
         return nodes.OrderBy(n => n.CreatedAt).FirstOrDefault(n => n.NodeId == nodeId);
     }

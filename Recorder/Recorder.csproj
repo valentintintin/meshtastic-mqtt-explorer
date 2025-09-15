@@ -24,12 +24,6 @@
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
-      <Content Update="appsettings.Production.json">
-        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-        <DependentUpon>appsettings.json</DependentUpon>
-      </Content>
       <Content Update="Dockerfile">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
@@ -59,11 +53,6 @@
       </Content>
       <None Remove="appsettings.Development.json" />
       <Content Include="appsettings.Development.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <DependentUpon>appsettings.json</DependentUpon>
-      </Content>
-      <None Remove="appsettings.Production.json" />
-      <Content Include="appsettings.Production.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
