@@ -639,19 +639,6 @@
         {
             List<Osm.Marker> markers = [];
             List<Osm.Line> lines = [];
-            
-            if (NodeInfo.Latitude.HasValue && NodeInfo.Longitude.HasValue)
-            {
-                markers.Add(new Osm.Marker
-                {
-                    Id = $"node-{NodeInfo.Id}",
-                    Latitude = NodeInfo.Latitude!.Value,
-                    Longitude = NodeInfo.Longitude!.Value,
-                    Color = "blue",
-                    Label = NodeInfo.AllNames,
-                    PopupOnHover = true
-                });
-            }
 
             if (NodeInfo.Positions.Any())
             {
@@ -663,6 +650,16 @@
                         .ToList(),
                     Color = Utils.Blue
                 });
+
+                markers.AddRange(NodeInfo.Positions.Select(p => new Osm.Marker
+                {
+                    Id = $"position-{p.Id}",
+                    Latitude = p.Latitude,
+                    Longitude = p.Longitude,
+                    Color = "blue",
+                    Label = $"{p.CreatedAt.ToFrench()}",
+                    Popup = Utils.GetPositionLinePopupHtml(p)
+                }));
             }
 
             if (NodeInfo.MyNeighbors.Any()) {

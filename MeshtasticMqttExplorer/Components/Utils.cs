@@ -6,6 +6,7 @@ using Common.Extensions;
 using Meshtastic.Protobufs;
 using MeshtasticMqttExplorer.Models;
 using Color = System.Drawing.Color;
+using Position = Common.Context.Entities.Position;
 using Waypoint = Common.Context.Entities.Waypoint;
 
 namespace MeshtasticMqttExplorer.Components;
@@ -228,6 +229,18 @@ public static class Utils
                $"</p>" +
                $"<p>" +
                $"Distance : {MeshtasticUtils.CalculateDistance(node.Latitude!.Value, node.Longitude!.Value, waypoint.Latitude, waypoint.Longitude)} Km" +
+               $"</p>";
+    }
+
+    public static string GetPositionLinePopupHtml(Position position)
+    {
+        return $"<p>" +
+               $"<b>{position.Node.AllNames}</b>" +
+               $"</p>" +
+               $"<p>" +
+               $"<a href=\"/packet/{position.PacketId}\" target=\"_blank\" rel=\"nofollow\">" +
+               $"Voir la trame position reçue le {position.CreatedAt.ToFrench()}" +
+               $"</a>" +
                $"</p>";
     }
 }

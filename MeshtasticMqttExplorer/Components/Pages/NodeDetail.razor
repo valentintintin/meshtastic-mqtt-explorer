@@ -124,7 +124,7 @@
                 .Where(a => a.DataSource != NeighborInfo.Source.Unknown && a.DataSource != NeighborInfo.Source.NextHop && a.Distance <= MeshtasticUtils.DefaultDistanceAllowed)
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.NodeReceiver)
-            .Include(n => n.Positions.Where(a => a.UpdatedAt >= today).OrderByDescending(a => a.UpdatedAt))
+            .Include(n => n.Positions.Where(a => a.UpdatedAt >= yesterday).OrderByDescending(a => a.UpdatedAt))
             .Include(n => n.Telemetries.OrderBy(a => a.CreatedAt))
             .Include(n => n.PaxCounters.OrderBy(a => a.CreatedAt))
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))
