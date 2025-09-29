@@ -86,8 +86,6 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
     {
         var isText = packet.PortNum is PortNum.TextMessageApp;
 
-        var allPackets = context.Packets.GetAllPacketForPacketIdGroupedByHops(packet);
-
         var message = $"[{packet.Channel.Name}] <b>{packet.From.AllNames}</b>";
 
         if (packet.To.NodeId != MeshtasticService.NodeBroadcast)
@@ -97,31 +95,7 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
 
         if (includeHopsDetails)
         {
-            if (allPackets.Count != 0)
-            {
-                message += "" + '\n';
-            }
-
-            foreach (var aPacketData in allPackets)
-            {
-                message += $"(<b>{aPacketData.Hop}</b>/{packet.HopStart}) ";
-                
-                foreach (var aPacket in aPacketData.Packets)
-                {
-                    if (aPacket.RelayNodeNode != null)
-                    {
-                        message += $"<b>{aPacket.RelayNodeNode.OneName(true)}</b>>";
-                    }
-                    else if (aPacket.RelayNode > 0)
-                    {
-                        message += $"<b>0x{aPacket.RelayNode}</b>>";
-                    }
-                    
-                    message += $"<b>{aPacket.Gateway.OneName(true)}</b> ({aPacket.RxSnr}) ; ";
-                }
-
-                message += "" + '\n';
-            }
+            message += includeHopsDetails;
         }
 
         message = message.TrimEnd()
@@ -169,6 +143,41 @@ public class NotificationService(ILogger<AService> logger, IDbContextFactory<Dat
             message += '\n' + $"Dernier : <b>{totalMinutes}</b> min | Aujourd'hui : <b>{countToday}</b>";
         }
         
+        return message;
+    }
+
+    public string GetHopsDetails(Packet packet, DataContext context)
+    {
+        var allPackets = context.Packets.GetAllPacketForPacketIdGroupedByHops(packet);
+        
+        var message = string.Empty;
+        
+        if (allPackets.Count != 0)
+        {
+            message += "" + '\n';
+        }
+
+        foreach (var aPacketData in allPackets)
+        {
+            message += $"(<b>{aPacketData.Hop}</b>/{packet.HopStart}) ";
+                
+            foreach (var aPacket in aPacketData.Packets)
+            {
+                if (aPacket.RelayNodeNode != null)
+                {
+                    message += $"<b>{aPacket.RelayNodeNode.OneName(true)}</b>>";
+                }
+                else if (aPacket.RelayNode > 0)
+                {
+                    message += $"<b>0x{aPacket.RelayNode}</b>>";
+                }
+                    
+                message += $"<b>{aPacket.Gateway.OneName(true)}</b> ({aPacket.RxSnr}) ; ";
+            }
+
+            message += "" + '\n';
+        }
+
         return message;
     }
 

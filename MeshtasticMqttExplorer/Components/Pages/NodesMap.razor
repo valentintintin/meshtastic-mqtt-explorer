@@ -149,10 +149,10 @@
         .Concat(Utils.RegionCodeFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.RegionCode?>(a.Value, a.Text)))
         .ToList();
     private List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> ModemsPresets { get; } = new List<SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>> { new(null, "Tous") } 
-        .Concat(Utils.ModemPresetFilters.Take(2).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
+        .Concat(Utils.ModemPresetFilters.Take(3).Select(a => new SegmentedOption<Config.Types.LoRaConfig.Types.ModemPreset?>(a.Value, a.Text)))
         .ToList();
     private List<Config.Types.DeviceConfig.Types.Role?> Roles { get; } = Utils.RoleFilters.Select(r => r.Value).ToList();
-    private List<TimeSpan> DurationsNeighbors { get; } = [TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(6), TimeSpan.FromHours(12), TimeSpan.FromDays(1), TimeSpan.FromDays(2), TimeSpan.FromDays(3)];
+    private List<TimeSpan> DurationsNeighbors { get; } = [TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(6), TimeSpan.FromHours(12), TimeSpan.FromDays(1), TimeSpan.FromDays(2), TimeSpan.FromDays(3), TimeSpan.FromDays(7), TimeSpan.FromDays(14)];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -350,7 +350,7 @@
     private Osm.Marker GetMarker(Node node)
     {
         var color = node.IsOffline() ? Utils.Red : node.IsMqttGateway == true ? Utils.Green : Utils.Blue;
-        
+
         return new Osm.Marker
         {
             Id = node.Id.ToString(),

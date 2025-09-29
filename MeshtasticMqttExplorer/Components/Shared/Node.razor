@@ -4,6 +4,10 @@
 @using MeshtasticMqttExplorer.Models
 @using Telemetry = Common.Context.Entities.Telemetry
 @using Common;
+@using Common.Context
+@using NotificationService = Common.Services.NotificationService
+
+@inject NotificationService NotificationService;
 
 @if (NodeInfo != null)
 {
@@ -592,6 +596,9 @@
     
     [Parameter]
     public PacketsStats<int>? PacketsInfo { get; set; }
+    
+    [Parameter]
+    public DataContext Context { get; set; }
 
     private Telemetry? LastTelemetryDevice { get; set; }
     private Telemetry? LastTelemetryLocalStats { get; set; }
@@ -658,7 +665,7 @@
                     Longitude = p.Longitude,
                     Color = "blue",
                     Label = $"{p.CreatedAt.ToFrench()}",
-                    Popup = Utils.GetPositionLinePopupHtml(p)
+                    Popup = p.Packet != null ? Utils.GetPositionLinePopupHtml(p.Packet, NotificationService.GetHopsDetails(p.Packet, Context), NodeInfo) : null
                 }));
             }
 

@@ -65,7 +65,7 @@
             </PageHeaderExtra>
         </PageHeader>
 
-        <Node NodeInfo="Node" PacketsInfo="PacketsStats"></Node>
+        <Node NodeInfo="Node" PacketsInfo="PacketsStats" Context="Context"></Node>
     }
     else if (Loading)
     {
@@ -125,6 +125,7 @@
                 .OrderBy(t => t.UpdatedAt))
             .ThenInclude(n => n.NodeReceiver)
             .Include(n => n.Positions.Where(a => a.UpdatedAt >= yesterday).OrderByDescending(a => a.UpdatedAt))
+            .ThenInclude(p => p.Packet)
             .Include(n => n.Telemetries.OrderBy(a => a.CreatedAt))
             .Include(n => n.PaxCounters.OrderBy(a => a.CreatedAt))
             .Include(n => n.Waypoints.Where(a => a.ExpiresAt >= DateTime.UtcNow).OrderBy(a => a.CreatedAt))

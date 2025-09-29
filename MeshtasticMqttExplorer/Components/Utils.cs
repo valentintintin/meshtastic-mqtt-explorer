@@ -47,6 +47,7 @@ public static class Utils
         {
             return p.Value switch
             {
+                Config.Types.LoRaConfig.Types.ModemPreset.MediumFast => "2",
                 Config.Types.LoRaConfig.Types.ModemPreset.LongFast => "1",
                 Config.Types.LoRaConfig.Types.ModemPreset.LongModerate => "0",
                 _ => p.Text
@@ -232,15 +233,18 @@ public static class Utils
                $"</p>";
     }
 
-    public static string GetPositionLinePopupHtml(Position position)
+    public static string GetPositionLinePopupHtml(Packet packet, string? details = null, Node? node = null)
     {
         return $"<p>" +
-               $"<b>{position.Node.AllNames}</b>" +
+               $"<b>{(node ?? packet.From)?.AllNames}</b>" +
                $"</p>" +
                $"<p>" +
-               $"<a href=\"/packet/{position.PacketId}\" target=\"_blank\" rel=\"nofollow\">" +
-               $"Voir la trame position reçue le {position.CreatedAt.ToFrench()}" +
+               $"<a href=\"/packet/{packet.Id}\" target=\"_blank\" rel=\"nofollow\">" +
+               $"Voir la trame {packet.PortNum} reçue le {packet.CreatedAt.ToFrench()}" +
                $"</a>" +
+               $"</p>" +
+               $"<p>" +
+               details +
                $"</p>";
     }
 }
