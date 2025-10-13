@@ -1,6 +1,6 @@
 #!/bin/bash
 
-server="flowapps.link"
+server="valentin@flowapps.link"
 port=2234
 
 set -e

@@ -64,10 +64,6 @@
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
       <None Remove="appsettings.Production.json" />
-      <Content Include="appsettings.Production.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <DependentUpon>appsettings.json</DependentUpon>
-      </Content>
       <None Remove="Properties\**" />
       <None Remove="Dockerfile" />
       <Content Include="Dockerfile">
@@ -77,10 +73,6 @@
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
       <None Remove="appsettings.Production.Gaulix.json" />
-      <Content Include="appsettings.Production.Gaulix.json">
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        <DependentUpon>appsettings.json</DependentUpon>
-      </Content>
       <Content Update="nlog.Production.Gaulix.config">
         <DependentUpon>nlog.config</DependentUpon>
       </Content>
