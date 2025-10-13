@@ -4,8 +4,6 @@
 @using Common.Context.Entities.Router
 @using Common.Extensions
 @using Microsoft.EntityFrameworkCore
-@using MeshtasticMqttExplorer.Components.Shared
-@using Node = Common.Context.Entities.Node
 
 @inject IDbContextFactory<DataContext> ContextFactory
 
@@ -47,7 +45,7 @@
         <PropertyColumn Property="c => c.UserId" Title="Utilisateur">
             @if (context.User != null)
             {
-                <a href="mailto:@context.User.Email">@context.User.UserName - @context.User.Email</a>
+                @context.User.UserName
             }
         </PropertyColumn>
         @* <PropertyColumn Property="c => c.MqttId" Title="Interdit d'emission" Filterable> *@
