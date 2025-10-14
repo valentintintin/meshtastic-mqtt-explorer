@@ -129,11 +129,23 @@ public static class Init
             
             webApplicationBuilder.Services.AddCors(option =>
             {
-                option.AddDefaultPolicy(corsPolicyBuilder => corsPolicyBuilder
-                    .WithOrigins(webApplicationBuilder.Configuration.GetSection("CorsHosts").Value?.Split(";") ?? [])
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                );
+                option.AddDefaultPolicy(corsPolicyBuilder =>
+                {
+                    var corsHosts = webApplicationBuilder.Configuration.GetSection("CorsHosts").Value?.Split(";") ?? [];
+                    
+                    corsPolicyBuilder
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+
+                    if (corsHosts.Length != 0)
+                    {
+                        corsPolicyBuilder.WithOrigins(corsHosts);
+                    }
+                    else
+                    {
+                        corsPolicyBuilder.AllowAnyOrigin();
+                    }
+                });
             });
             
             webApplicationBuilder.Services.AddAuthorization();

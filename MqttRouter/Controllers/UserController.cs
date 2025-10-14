@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MqttRouter.Services;
 
 namespace MqttRouter.Controllers;
 
@@ -22,49 +21,58 @@ public class UserController(ILogger<AController> logger, UserManager<User> userM
     [HttpGet("create-mqtt-password")]
     public async Task<string> CreateMqttPassword()
     {
-        var userExternalId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-
-        Logger.LogInformation("Generate MQTT password for user external ID {userExternalId}", userExternalId);
-        
-        if (string.IsNullOrWhiteSpace(userExternalId))
+        try
         {
-            throw new NotFoundException("UserViaExternalId", userExternalId);
-        }
-        
-        var user = await userManager.Users.SingleOrDefaultAsync(a => a.ExternalId == userExternalId);
+            var userExternalId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
 
-        var email = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
-        var username = User.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
-        var password = userService.GeneratePassword(10);
-            
-        if (user == null)
-        {
-            Logger.LogInformation("Create new user for external ID {userExternalId} ", userExternalId);
+            Logger.LogInformation("Generate MQTT password for user external ID {userExternalId}", userExternalId);
 
-            await userService.CreateUser(new UserCreateDto
+            if (string.IsNullOrWhiteSpace(userExternalId))
             {
-                Email = email,
-                Username = username,
-                Password = password,
-                ExternalId = userExternalId
-            });
-        }
-        else
-        {
-            Logger.LogInformation("Generate MQTT password for user#{id} external ID {userExternalId}", user.Id, userExternalId);
+                Logger.LogWarning("Generate MQTT password for user external ID null !");
+                throw new NotFoundException("UserViaExternalId", userExternalId);
+            }
 
-            if (user.UserName != username || user.Email != email)
+            var user = await userManager.Users.SingleOrDefaultAsync(a => a.ExternalId == userExternalId);
+
+            var email = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            var username = User.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
+            var password = userService.GeneratePassword(10);
+
+            if (user == null)
             {
-                await userService.UpdateUser(user.Id, new UserUpdateDto
+                Logger.LogInformation("Create new user for external ID {userExternalId} ", userExternalId);
+
+                await userService.CreateUser(new UserCreateDto
                 {
-                    Username = username,
                     Email = email,
+                    Username = username,
+                    Password = password,
+                    ExternalId = userExternalId
                 });
             }
-            
-            await userService.ChangePassword(user.Id, password);
-        }
+            else
+            {
+                Logger.LogInformation("Generate MQTT password for user#{id} external ID {userExternalId}", user.Id,
+                    userExternalId);
 
-        return password;
+                if (user.UserName != username || user.Email != email)
+                {
+                    await userService.UpdateUser(user.Id, new UserUpdateDto
+                    {
+                        Username = username,
+                        Email = email,
+                    });
+                }
+
+                await userService.ChangePassword(user.Id, password);
+            }
+
+            return password;
+        }
+        catch (Exception e)
+        {
+            return e.ToString();
+        }
     }
 }

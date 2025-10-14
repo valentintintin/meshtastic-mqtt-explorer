@@ -1,6 +1,4 @@
 using System.Buffers;
-using System.Text;
-using System.Text.Json;
 using Common;
 using Common.Context;
 using Common.Context.Entities;
@@ -10,13 +8,10 @@ using Common.Extensions;
 using Common.Extensions.Entities;
 using Common.Services;
 using Google.Protobuf;
-using Meshtastic.Extensions;
 using Meshtastic.Protobufs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MQTTnet;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
 using MqttRouter.Services;
@@ -359,9 +354,9 @@ public class MqttServerController(IServiceProvider serviceProvider, MQTTnet.Serv
                     eventArgs.AcceptEnqueue = false;
 
                     _logger.LogDebug(
-                    "Packet#{id} {guid} from client {senderId} on {topic} not sent to {receiverId} because refused",
-                    meshPacket.Packet.Id, publishInfo.Guid, eventArgs.SenderClientId,
-                    eventArgs.ApplicationMessage.Topic, eventArgs.ReceiverClientId);
+                        "Packet#{id} {guid} from client {senderId} on {topic} not sent to {receiverId} because refused",
+                        meshPacket.Packet.Id, publishInfo.Guid, eventArgs.SenderClientId,
+                        eventArgs.ApplicationMessage.Topic, eventArgs.ReceiverClientId);
 
                     return;
                 }
