@@ -191,6 +191,13 @@
                             </DescriptionsItem>
                         }
                         
+                        @if (LastTelemetryEnvironment?.Temperature.HasValue == true && LastTelemetryEnvironment?.RelativeHumidity.HasValue == true)
+                        {
+                            <DescriptionsItem Title="Point de rosée" ContentStyle="font-weight: bold">
+                                @(Utils.CalculateDewPoint(LastTelemetryEnvironment.Temperature.Value, LastTelemetryEnvironment.RelativeHumidity.Value)) °C
+                            </DescriptionsItem>
+                        }
+                        
                         @if (LastTelemetryEnvironment?.BarometricPressure.HasValue == true)
                         {
                             <DescriptionsItem Title="Pression atmosphérique" ContentStyle="font-weight: bold">
@@ -477,6 +484,17 @@
             </GridCol>
         }
 
+        @if (DataWeatherDewPoint?.Count > 0)
+        {
+            <GridCol Xs="24" Md="12">
+                <Card Title="Point de rosée">
+                    <ChildContent>
+                        <AntDesign.Charts.Line Data="DataWeatherDewPoint" Config="_configTemperature"/>
+                    </ChildContent>
+                </Card>
+            </GridCol>
+        }
+
         @if (DataWeatherPressure?.Count > 0)
         {
             <GridCol Xs="24" Md="12">
@@ -617,6 +635,7 @@
     private List<DateChartData<float>>? DataVoltageBattery { get; set; }
     private List<DateChartData<float>>? DataWeatherTemperature { get; set; }
     private List<DateChartData<float>>? DataWeatherHumidity { get; set; }
+    private List<DateChartData<float>>? DataWeatherDewPoint { get; set; }
     private List<DateChartData<float>>? DataWeatherPressure { get; set; }
     private List<DateChartData<float>>? DataAirQuality { get; set; }
     private List<DateChartData<float>>? DataPowerMetricsVoltage1 { get; set; }
@@ -897,6 +916,15 @@
                 value = a.RelativeHumidity ?? 0
             }).ToList();
         
+        DataWeatherDewPoint = NodeInfo?.Telemetries
+            .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, Temperature: not null, RelativeHumidity: not null })
+            .Select(a => new DateChartData<float>
+            {
+                date = a.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Point de rosée",
+                value = Utils.CalculateDewPoint(a.Temperature ?? 0, a.RelativeHumidity ?? 0)
+            }).ToList();
+        
         DataWeatherPressure = NodeInfo?.Telemetries
             .Where(a => a is { Type: Meshtastic.Protobufs.Telemetry.VariantOneofCase.EnvironmentMetrics, BarometricPressure: not null })
             .Select(a => new DateChartData<float>
@@ -986,7 +1014,7 @@
 
         base.OnParametersSet();
     }
-    
+
     public class PacketsStats<T>
     {
         public T Today { get; set; }

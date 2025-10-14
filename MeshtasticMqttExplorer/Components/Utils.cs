@@ -247,4 +247,12 @@ public static class Utils
                details +
                $"</p>";
     }
+    
+    public static float CalculateDewPoint(float temperature, float humidity)
+    {
+        var a = 17.27;
+        var b = 237.7;
+        var alpha = (a * temperature) / (b + temperature) + Math.Log(humidity / 100);
+        return (float)((b * alpha) / (a - alpha));
+    }
 }
