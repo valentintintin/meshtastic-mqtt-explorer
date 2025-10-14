@@ -218,7 +218,8 @@ window.addMarkerToMap = (marker) => {
             keepInView: true,
             closeButton: true,
             autoClose: true,
-            closeOnEscapeKey: true
+            closeOnEscapeKey: true,
+            autoPan: false,
         }).on({
             click(e) {
                 console.log(marker.id);
@@ -275,7 +276,8 @@ window.createPolyline = (line) => {
             keepInView: true,
             closeButton: true,
             autoClose: true,
-            closeOnEscapeKey: true
+            closeOnEscapeKey: true,
+            autoPan: false,
         }).on({
             click(e) {
                 console.log(line.id);
